@@ -82,15 +82,15 @@ public class IncomingHandler {
 //                RequestPeerLinksProtocol.asAnswerer(parent, from);
 //            } else if (message.header.getType() == SL_WHO_AM_I) {
 //                WhoAmIProtocol.asAnswerer(parent, receivedPacket);
-            } else if (message.header.getType() == SL_PING) {
+//            } else if (message.header.getType() == SL_PING) {
 //            PingProtocol.asAnswerer(parent, from);
                 //ping always requests a receipt - so that was already sent
-            } else if (message.header.getType() == SL_DIRECT_CONNECTION_REQUEST) {
-                EstablishConnectionProtocol.asAnswererDirect(parent, receivedPacket.getSocketAddress(), message);
-            } else if(message.header.getType() == SL_REQUEST_DIRECT_CONNECT_TO) {
-                EstablishConnectionProtocol.asAnswererRequestReverseConnection(parent, message);
-            } else if(message.header.getType() == SL_RELAY_REQUEST_DIRECT_CONNECT) {
-                EstablishConnectionProtocol.asAnswererRelayRequestReverseConnection(parent, message);
+//            } else if (message.header.getType() == SL_DIRECT_CONNECTION_REQUEST) {
+//                EstablishConnectionProtocol.asAnswererDirect(parent, receivedPacket.getSocketAddress(), message);
+//            } else if(message.header.getType() == SL_REQUEST_DIRECT_CONNECT_TO) {
+//                EstablishConnectionProtocol.asAnswererRequestReverseConnection(parent, message);
+//            } else if(message.header.getType() == SL_RELAY_REQUEST_DIRECT_CONNECT) {
+//                EstablishConnectionProtocol.asAnswererRelayRequestReverseConnection(parent, message);
 //            } else if(message.header.getType() == SC_BROADCAST_WITHOUT_HASH) {
 //                if(parent.isConnectedTo(from))
 //                    BroadcastMessageProtocol.asAnswererWithoutHash(parent, brdMessageQueue, broadcastState, from, message);
@@ -125,6 +125,15 @@ public class IncomingHandler {
             if(parent.isConnectedTo(convo.getPeer()))
                 BroadcastMessageProtocol.asAnswererWithHash(parent, convo, m0, brdMessageQueue, broadcastState);
         });
+        conversationMessageHandler.registerConversationFor(SL_REQUEST_DIRECT_CONNECT_TO, ((convo, m0) -> {
+            EstablishConnectionProtocol.asAnswererRequestReverseConnection(parent, convo, m0);
+        }));
+        conversationMessageHandler.registerConversationFor(SL_RELAY_REQUEST_DIRECT_CONNECT, ((convo, m0) -> {
+            EstablishConnectionProtocol.asAnswererRelayRequestReverseConnection(parent, convo, m0);
+        }));
+        conversationMessageHandler.registerConversationFor(SL_DIRECT_CONNECTION_REQUEST, ((convo, m0) -> {
+            EstablishConnectionProtocol.asAnswererDirect(parent, convo, m0);
+        }));
 
         serverSocket = new DatagramSocket(parent.getSelfLink().getPort());
         serverSocket.setTrafficClass(0x10 | 0x08); //emphasize IPTOS_THROUGHPUT & IPTOS_LOWDELAY  - these options will likely be ignored by the underlying implementation

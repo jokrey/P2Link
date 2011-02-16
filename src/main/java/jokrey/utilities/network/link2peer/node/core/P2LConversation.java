@@ -15,6 +15,7 @@ import java.net.SocketAddress;
  */
 public interface P2LConversation {
     SocketAddress getPeer();
+    int getAvRTT();
     void setMaxAttempts(int maxRetries);
     void setM(float m);
     void setA(int a);

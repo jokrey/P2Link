@@ -9,5 +9,5 @@ import java.io.IOException;
  */
 @FunctionalInterface
 public interface ConversationAnswererChangeThisName {
-    void converse(P2LConversation convo, P2LMessage initMessage) throws IOException;
+    void converse(P2LConversation convo, P2LMessage m0) throws IOException;
 }

@@ -49,6 +49,7 @@ public class P2LConversationImpl implements P2LConversation {
     }
 
     @Override public SocketAddress getPeer() { return peer; }
+    @Override public int getAvRTT() { return con.avRTT; }
 
     private int calcWaitBeforeRetryTime() {
         return con.avRTT == -1? 500 :(int) (con.avRTT * m + a);

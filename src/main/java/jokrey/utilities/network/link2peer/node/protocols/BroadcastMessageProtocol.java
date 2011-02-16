@@ -14,7 +14,6 @@ import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -65,24 +64,6 @@ public class BroadcastMessageProtocol {
         } else {
             convo.close();
         }
-//        return parent.tryComplete(P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT, () ->
-//                P2LFuture.before(() ->  parent.sendInternalMessage(to, P2LMessage.Factory.createSendMessage(SC_BROADCAST_WITH_HASH, message.getContentHash().raw())),
-//                                        parent.expectInternalMessage(to, C_BROADCAST_HASH_KNOWLEDGE_ANSWER))
-//                .andThen(peerHashKnowledgeOfMessage_msg -> {
-//                    boolean peerHashKnowledgeOfMessage = peerHashKnowledgeOfMessage_msg.nextBool();
-//
-//                    if(!peerHashKnowledgeOfMessage) {
-////                        try {
-////                            parent.sendInternalMessage(
-////                                    to, packBroadcastMessage(message)
-////                            );
-////                        } catch (IOException e) {
-////                            return new P2LFuture<>(false);
-////                        }
-//                    }
-//                    return new P2LFuture<>(true);
-//                })
-//        );
     }
 
     public static void asAnswererWithHash(P2LNodeInternal parent, P2LConversation convo, P2LMessage m0, P2LMessageQueue userBrdMessageQueue, BroadcastState state) throws IOException {
@@ -104,39 +85,6 @@ public class BroadcastMessageProtocol {
                 parent.notifyUserBroadcastMessageReceived(receivedBroadcastMessage);
             }
         }
-
-//        Hash brdMessageHash = new Hash(initialMessage.asBytes());
-//
-////        boolean wasKnown = state.markAsKnown(brdMessageHash); //problem: if the actual message is later dropped, we never receive it at all... so we try to get the message as often as we can, but only once present it to the user
-//
-//        if(state.isKnown(brdMessageHash)) {
-////        if(wasKnown) {
-//            parent.sendInternalMessage(from, P2LMessage.Factory.createSendMessage(C_BROADCAST_HASH_KNOWLEDGE_ANSWER, true));
-//            //do not tell application about broadcast again
-//        } else {
-//            try {
-//                P2LMessage message = P2LFuture.before(
-//                        ()-> parent.sendInternalMessage(from, P2LMessage.Factory.createSendMessage(C_BROADCAST_HASH_KNOWLEDGE_ANSWER, false)),
-//                        parent.expectInternalMessage(from, C_BROADCAST_MSG))
-//                        .get(P2LHeuristics.DEFAULT_PROTOCOL_ANSWER_RECEIVE_TIMEOUT);
-//                P2LMessage receivedBroadcastMessage = unpackBroadcastMessage(message);
-//                if(receivedBroadcastMessage == null || state.markAsKnown(brdMessageHash)) ////if message invalid or message was known - while receiving this message, this node has received it from somewhere else
-//                    return;
-//
-//                relayBroadcast(parent, receivedBroadcastMessage, from);
-//
-//                if(receivedBroadcastMessage.isInternalMessage()) {
-//                    System.err.println("someone managed to send an internal broadcast message...? How? And more importantly why?");
-//                } else {
-//                    userBrdMessageQueue.handleNewMessage(receivedBroadcastMessage);
-//                    parent.notifyUserBroadcastMessageReceived(receivedBroadcastMessage);
-//                }
-//            } catch (Throwable t) {
-//                t.printStackTrace();
-//                state.markAsUnknown(brdMessageHash);
-//            }
-//
-//        }
     }
 
 
