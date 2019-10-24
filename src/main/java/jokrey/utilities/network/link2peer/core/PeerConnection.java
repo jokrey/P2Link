@@ -24,8 +24,6 @@ class PeerConnection implements AutoCloseable {
         this.peerLink = peerLink;
         this.connection = connection;
         this.node = node;
-
-
     }
     PeerConnection(P2LNodeInternal node, P2Link peerLink, Socket connection) throws IOException {
         this(node, new MCNP_ConnectionIO(connection), peerLink);

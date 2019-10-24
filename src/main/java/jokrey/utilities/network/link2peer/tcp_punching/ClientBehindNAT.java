@@ -11,9 +11,10 @@ import java.net.UnknownHostException;
 /** from: http://blog.boehme.me/2011/06/nat-holepunch-solution-in-java.html */
 public class ClientBehindNAT {
     public static int RELAY_SERVER_PORT = 43288;
-    public static String RELAY_SERVER_IP = "lmservicesip.ddns.net";
+    public static String RELAY_SERVER_IP = "localhost";
+//    public static String RELAY_SERVER_IP = "lmservicesip.ddns.net";
 
-    private String destinationIP;
+    private String destinationIP = "test1";
     private InetAddress clientIP;
 
     private int socketTimeout = 3000;
