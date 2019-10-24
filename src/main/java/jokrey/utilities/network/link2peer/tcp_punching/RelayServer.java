@@ -15,11 +15,11 @@ public class RelayServer {
 
     public static void main(String[] args) {
         RelayServer rs = new RelayServer();
-        try {
+//        try {
             rs.startServer();
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
-        }
+//        } catch (IOException | InterruptedException e) {
+//            e.printStackTrace();
+//        }
     }
 
 //    public static void
