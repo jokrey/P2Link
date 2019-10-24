@@ -6,7 +6,11 @@ import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.core.OutgoingHandler.Task;
 import jokrey.utilities.network.link2peer.util.Hash;
 import java.io.IOException;
+import java.net.SocketAddress;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
 
@@ -14,57 +18,56 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
  * @author jokrey
  */
 class BroadcastMessageProtocol {
-    public static boolean send(PeerConnection connection, P2LNodeInternal node, int msgId, byte[] message) {
+    public static boolean send(P2LNodeInternal parent, P2Link peer, int msgId, byte[] message) {
         try {
-            send(connection, new P2LMessage(node.getSelfLink(), msgId, message));
+            send(parent, peer, new P2LMessage(parent.getSelfLink(), msgId, message));
             return true;
         } catch (IOException e) {
             e.printStackTrace();
             return false;
         }
     }
-    public static void send(PeerConnection connection, P2LMessage message) throws IOException {
-        connection.sendSuperCause(SC_BROADCAST);
+    public static void send(P2LNodeInternal parent, P2Link peer, P2LMessage message) throws IOException {
+        SocketAddress peerConnection = parent.getActiveConnection(peer);
+        parent.sendRaw(new P2LMessage(parent.getSelfLink(), SC_BROADCAST, message.getHash().raw()), peerConnection);
 
-        //System.out.println("sending brd to "+connection.peerLink + " - sending hash");
-        connection.send(C_BROADCAST_HASH, message.getHash().raw());
-        //System.out.println("sending brd to "+connection.peerLink + " - send hash");
-
-        P2LMessage peerHashKnowledgeOfMessage_msg = connection.futureRead(C_BROADCAST_MSG_KNOWLEDGE_RETURN).get(5000);
+        P2LMessage peerHashKnowledgeOfMessage_msg = parent.futureForInternal(peer, C_BROADCAST_MSG_KNOWLEDGE_RETURN).get(5000);
         boolean peerHashKnowledgeOfMessage = peerHashKnowledgeOfMessage_msg.asBool();
 
         //System.out.println("sending brd to "+connection.peerLink + " - peer has knowledge of message received - "+peerHashKnowledgeOfMessage);
 
         if(!peerHashKnowledgeOfMessage) {
-            connection.send(C_BROADCAST_MSG, new LIbae().encode(P2LMessage.fromInt(message.type), message.sender.getRepresentingByteArray(), message.data).getEncoded());
+            parent.sendRaw(
+                    new P2LMessage(
+                        parent.getSelfLink(), C_BROADCAST_MSG,
+                        new LIbae().encode(P2LMessage.fromInt(message.type), message.sender.getRepresentingByteArray(), message.data).getEncoded()),
+                    peerConnection);
             //System.out.println("sending brd to "+connection.peerLink + " - send sender + data");
         }
     }
 
-    public static P2LMessage receive(BroadcastState state, P2LNodeInternal selfNode, PeerConnection connection) throws IOException {
-        //SUPER CAUSE HAS BEEN PREVIOUSLY RECEIVED
-
+    public static P2LMessage receive(P2LNodeInternal parent, BroadcastState state, P2Link peer, Hash broadcastMessageHash) throws IOException {
+        SocketAddress peerConnection = parent.getActiveConnection(peer);
         //System.out.println("receiving message at " + selfNode.getSelfLink());
 
-        Hash hash = new Hash(connection.futureRead(C_BROADCAST_HASH).get(5000).data);
-        boolean wasKnown = state.markAsKnown(hash);
+        boolean wasKnown = state.markAsKnown(broadcastMessageHash);
 
         //System.out.println("receiving message at " + selfNode.getSelfLink() + " - got hash");
 
         if(wasKnown) {
 //        if(state.isKnown(hash)) {
             //System.out.println("receiving message at " + selfNode.getSelfLink() + " - known - sending msg knowledge return");
-            connection.send(C_BROADCAST_MSG_KNOWLEDGE_RETURN, P2LMessage.fromBool(true));
+            parent.sendRaw(new P2LMessage(parent.getSelfLink(), C_BROADCAST_MSG_KNOWLEDGE_RETURN, P2LMessage.fromBool(true)), peerConnection);
             //System.out.println("receiving message at " + selfNode.getSelfLink() + " - known - send msg knowledge return");
             return null; //do not tell application over broadcast again
         } else {
 //            state.markAsKnown(hash);
 
             //System.out.println("receiving message at " + selfNode.getSelfLink() + " - NOT known - sending msg knowledge return");
-            connection.send(C_BROADCAST_MSG_KNOWLEDGE_RETURN, P2LMessage.fromBool(false));
+            parent.sendRaw(new P2LMessage(parent.getSelfLink(), C_BROADCAST_MSG_KNOWLEDGE_RETURN, P2LMessage.fromBool(false)), peerConnection);
             //System.out.println("receiving message at " + selfNode.getSelfLink() + " - NOT known - send msg knowledge return");
 
-            Iterator<byte[]> libae = new LIbae(connection.futureRead(C_BROADCAST_MSG).get(5000).data).iterator();
+            Iterator<byte[]> libae = new LIbae(parent.futureForInternal(peer, C_BROADCAST_MSG).get(5000).data).iterator();
             int id = P2LMessage.trans.detransform_int(libae.next());
             P2Link sender = new P2Link(P2LMessage.trans.detransform_string(libae.next()));
             //System.out.println("receiving message at " + selfNode.getSelfLink() + " - read sender");
@@ -72,7 +75,7 @@ class BroadcastMessageProtocol {
             //System.out.println("receiving message at " + selfNode.getSelfLink() + " - read data");
             P2LMessage receivedMessage = new P2LMessage(sender, id, data);
 
-            relayBroadcast(receivedMessage, selfNode, connection.peerLink);
+            relayBroadcast(receivedMessage, parent, peer);
             //System.out.println("receiving message at " + selfNode.getSelfLink() + " - relayed broadcast");
 
             //todo mark as unknown on error...
@@ -83,17 +86,21 @@ class BroadcastMessageProtocol {
 
     //outgoing thread pool
     public static void relayBroadcast(P2LMessage message, P2LNodeInternal node, P2Link messageReceivedFrom) {
-        PeerConnection[] connections = node.getActiveConnectionsExcept(message.sender, messageReceivedFrom);
-        Task[] tasks = new Task[connections.length];
-        for(int i=0;i<connections.length;i++) {
-            PeerConnection connection = connections[i];
+        Set<P2Link> links = node.getActivePeerLinks();
+        ArrayList<P2Link> linksExcept = new ArrayList<>(links.size()-1);//not guaranteed that orig message sender is a direct peer, so NOT -2
+        for(P2Link l:links)
+            if(!l.equals(message.sender) && !l.equals(messageReceivedFrom))
+                linksExcept.add(l);
+
+        Task[] tasks = new Task[linksExcept.size()];
+        for (int i = 0; i < linksExcept.size(); i++) {
+            P2Link l = linksExcept.get(i);
             tasks[i] = () -> {
-                send(connection, message);
+                send(node, l, message);
                 return true;
             };
         }
-
-        node.executeAllOnSendThreadPool(tasks); //ignores future, because it does not matter when the tasks finish
+        node.executeAllOnSendThreadPool(tasks);
     }
 
 

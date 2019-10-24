@@ -59,9 +59,9 @@ public class RelayServer {
 //            if (matchComp != null) {
 //                System.out.println("Already present.. now sending packets to both of them...");
 //                //send to the socket from previously saved first NAT Device infos from the second NAT Device
-//                sendPacket(serverSocket, matchComp, startComp);
+//                sendRaw(serverSocket, matchComp, startComp);
 //                Thread.sleep(1000);
-//                sendPacket(serverSocket, startComp, matchComp);
+//                sendRaw(serverSocket, startComp, matchComp);
 //
 //                inquiredComputers.remove(startComp);
 //                inquiredComputers.remove(matchComp);

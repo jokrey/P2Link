@@ -103,7 +103,7 @@ public class IntermediateTests {
 
 
 
-    @Test public void establishConnectionProtocolTest() {
+    @Test public void establishConnectionProtocolTest() throws IOException {
         P2Link link1 = new P2Link("localhost", 53189);
         P2Link link2 = new P2Link("localhost", 53188);
 
@@ -119,7 +119,7 @@ public class IntermediateTests {
 
 
 
-    @Test public void garnerConnectionProtocolTest() {
+    @Test public void garnerConnectionProtocolTest() throws IOException {
         {
             P2LNode[] nodes = generateNodes(10, P2Link.DEFAULT_PORT);
 
@@ -188,14 +188,14 @@ public class IntermediateTests {
             System.out.println("node " + i + "("+nodes[i].getSelfLink()+") peers: " + nodes[i].getActivePeerLinks());
     }
 
-    private P2LNode[] generateNodes(int size, int startPort) {
+    private P2LNode[] generateNodes(int size, int startPort) throws IOException {
         return generateNodes(size, startPort, null, null);
     }
-    private P2LNode[] generateNodes(int size, int startPort, Function<P2Link, P2LNode.P2LMessageListener> idvListenerCreator, Function<P2Link, P2LNode.P2LMessageListener> brdListenerCreator) {
+    private P2LNode[] generateNodes(int size, int startPort, Function<P2Link, P2LNode.P2LMessageListener> idvListenerCreator, Function<P2Link, P2LNode.P2LMessageListener> brdListenerCreator) throws IOException {
         P2LNode[] nodes = new P2LNode[size];
         P2Link[] links = new P2Link[nodes.length];
         for(int i=0;i<nodes.length;i++) {
-            links[i] = new P2Link("localhost", startPort + i);
+            links[i] = new P2Link("127.0.0.1", startPort + i);
             nodes[i] = P2LNode.create(links[i]);
             if(idvListenerCreator != null)
                 nodes[i].addIndividualMessageListener(idvListenerCreator.apply(links[i]));
@@ -206,7 +206,7 @@ public class IntermediateTests {
     }
 
 
-    @Test public void individualMessageTest() {
+    @Test public void individualMessageTest() throws IOException {
         Map<P2Link, Integer> nodesAndNumberOfReceivedMessages = new ConcurrentHashMap<>();
 
         byte[] idvMsgToSend = new byte[] {17,32,37,45,5,99,33,55,16,43,127};
@@ -259,7 +259,7 @@ public class IntermediateTests {
     }
 
 
-    @Test public void futureIdvMsgText() {
+    @Test public void futureIdvMsgText() throws IOException {
         P2Link l1 = new P2Link("localhost", 34189);
         P2Link l2 = new P2Link("localhost", 34188);
         P2LNode node1 = P2LNode.create(l1); //creates server thread
@@ -303,7 +303,7 @@ public class IntermediateTests {
     }
 
 
-    @Test public void broadcastMessageTest() {
+    @Test public void broadcastMessageTest() throws IOException {
         Map<P2Link, Integer> nodesAndNumberOfReceivedMessages = new ConcurrentHashMap<>();
 
         AtomicReference<byte[]> brdMsgToSend = new AtomicReference<>(new byte[] {17,32,37,45,5,99,33,55,16,43,127});
@@ -454,18 +454,15 @@ public class IntermediateTests {
 
         for(P2LNode node:nodes) {
             if(new Random().nextBoolean()) {
-                assertThrows(TimeoutException.class, () -> {
-                    node.expectBroadcastMessage(nodes[0].getSelfLink(), 10).get(1000);
-                });
+                assertThrows(TimeoutException.class, () -> node.expectBroadcastMessage(nodes[0].getSelfLink(), 10).get(1000));
                 assertArrayEquals(brdMsgToSend.get(), node.expectBroadcastMessage(senderNode.getSelfLink(), 10).get(10000).data);
             } else {
                 assertArrayEquals(brdMsgToSend.get(), node.expectBroadcastMessage(10).get(10000).data);
             }
         }
-        assertThrows(TimeoutException.class, () -> {
-            senderNode.expectBroadcastMessage(10).get(1000); //sender node will be the only one that does not receive the broadcast (from itself)
-            nodes[0].expectBroadcastMessage(10).get(1000); //also times out, because the message has been consumed..
-        });
+        assertThrows(TimeoutException.class, () -> senderNode.expectBroadcastMessage(10).get(1000)); //sender node will be the only one that does not receive the broadcast (from itself)
+        assertThrows(TimeoutException.class, () -> nodes[0].expectBroadcastMessage(10).get(1000)); //also times out, because the message has been consumed by node 0 already
+
 
         while(nodesAndNumberOfReceivedMessages.size() < nodes.length) {
             sleep(10);

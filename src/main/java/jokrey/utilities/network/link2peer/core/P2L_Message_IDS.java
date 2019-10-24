@@ -1,21 +1,23 @@
 package jokrey.utilities.network.link2peer.core;
 
 public class P2L_Message_IDS {
-    public static final int IC_CONNECTION_REQUEST_LINK_VERIFY = -1;
-    public static final int IC_NEW_PEER_CONNECTION = -2;
-    public static final int IC_REQUEST_KNOWN_ACTIVE_PEER_LINKS = -3;
+    //STATE LESS - i.e. connection and therefore verified p2link does not need to be known by incoming handler to handle these:
+    public static final int SL_LINK_VERIFY_REQUEST = -1;
+    public static final int SL_LINK_VERIFY_ANSWER = -2;
+    public static final int SL_PEER_CONNECTION_REQUEST = -3;
+    public static final int SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS = -4;
 
-    public static final int SC_BROADCAST = -1;
-    public static final int SC_REQUEST_KNOWN_ACTIVE_PEER_LINKS = -2;
+    public static final int SC_BROADCAST = -21;
+    public static final int SC_REQUEST_KNOWN_ACTIVE_PEER_LINKS = -22;
 
-    public static final int C_PEER_LINKS = -11;
-    public static final int C_BROADCAST_HASH = -12;
-    public static final int C_BROADCAST_MSG_KNOWLEDGE_RETURN = -13;
-    public static final int C_BROADCAST_MSG = -14;
+    public static final int C_PEER_LINKS = -31;
+    public static final int C_BROADCAST_HASH = -32;
+    public static final int C_BROADCAST_MSG_KNOWLEDGE_RETURN = -33;
+    public static final int C_BROADCAST_MSG = -34;
 
-    public static final int R_CONNECTION_DENIED_TOO_MANY_PEERS = -1;
-    public static final int R_CONNECTION_ACCEPTED = -2;
-    public static final int R_LINK_VALID = -3;
+    public static final int R_CONNECTION_DENIED_TOO_MANY_PEERS = -991;
+    public static final int R_CONNECTION_REQUEST_ANSWER = -992;
+    public static final int R_LINK_VALID = -993;
     public static final int DEFAULT_ID = 0;
 
     public static boolean isInternalMessageId(int msgId) {

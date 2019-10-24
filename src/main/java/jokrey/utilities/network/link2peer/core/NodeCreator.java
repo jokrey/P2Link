@@ -3,7 +3,9 @@ package jokrey.utilities.network.link2peer.core;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
 
+import java.io.IOException;
+
 public class NodeCreator {
-    public static P2LNode create(P2Link selfLink) {return new P2LNodeImpl(selfLink); }
-    public static P2LNode create(P2Link selfLink, int peerLimit) {return new P2LNodeImpl(selfLink, peerLimit); }
+    public static P2LNode create(P2Link selfLink) throws IOException {return new P2LNodeImpl(selfLink); }
+    public static P2LNode create(P2Link selfLink, int peerLimit) throws IOException {return new P2LNodeImpl(selfLink, peerLimit); }
 }

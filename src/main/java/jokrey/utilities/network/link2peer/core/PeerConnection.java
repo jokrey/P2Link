@@ -14,18 +14,18 @@ import java.util.Objects;
 /**
  * @author jokrey
  */
-class PeerConnection implements AutoCloseable {
+class PeerConnectionX implements AutoCloseable {
     final P2Link peerLink;
     private final MCNP_Connection connection;
     private final P2LNodeInternal node;
 //    private long lastSuccessfulConversation = -1;  //maybe used for a ping like system later
 
-    PeerConnection(P2LNodeInternal node, MCNP_Connection connection, P2Link peerLink) {
+    PeerConnectionX(P2LNodeInternal node, MCNP_Connection connection, P2Link peerLink) {
         this.peerLink = peerLink;
         this.connection = connection;
         this.node = node;
     }
-    PeerConnection(P2LNodeInternal node, P2Link peerLink, Socket connection) throws IOException {
+    PeerConnectionX(P2LNodeInternal node, P2Link peerLink, Socket connection) throws IOException {
         this(node, new MCNP_ConnectionIO(connection), peerLink);
     }
 
@@ -71,14 +71,14 @@ class PeerConnection implements AutoCloseable {
 
 
     //as server
-    static class Incoming extends PeerConnection {
+    static class Incoming extends PeerConnectionX {
         Incoming(P2LNodeInternal node, P2Link validLink, MCNP_Connection connection) {
             super(node, connection, validLink);
         }
     }
 
     //as client
-    static class Outgoing extends PeerConnection {
+    static class Outgoing extends PeerConnectionX {
         Outgoing(P2LNodeInternal node, P2Link link) throws IOException {
             super(node, link, MCNP_ClientIO.getConnectionToServer(link.ipOrDns, link.port, 2000));
         }
@@ -88,7 +88,7 @@ class PeerConnection implements AutoCloseable {
     @Override public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        PeerConnection that = (PeerConnection) o;
+        PeerConnectionX that = (PeerConnectionX) o;
         return Objects.equals(peerLink, that.peerLink) && Objects.equals(connection, that.connection);
     }
     @Override public int hashCode() { return Objects.hash(peerLink, connection); }

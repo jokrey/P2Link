@@ -4,6 +4,7 @@ import jokrey.utilities.network.link2peer.core.NodeCreator;
 import jokrey.utilities.network.link2peer.core.P2L_Message_IDS;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
@@ -36,8 +37,8 @@ import java.util.Set;
  * @author jokrey
  */
 public interface P2LNode {
-    static P2LNode create(P2Link selfLink) { return NodeCreator.create(selfLink); }
-    static P2LNode create(P2Link selfLink, int peerLimit) { return NodeCreator.create(selfLink, peerLimit); }
+    static P2LNode create(P2Link selfLink) throws IOException { return NodeCreator.create(selfLink); }
+    static P2LNode create(P2Link selfLink, int peerLimit) throws IOException { return NodeCreator.create(selfLink, peerLimit); }
 
 
     /**

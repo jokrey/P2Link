@@ -1,8 +1,11 @@
 package jokrey.utilities.network.link2peer;
 
+import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.encoder.tag_based.implementation.paired.length_indicator.type.transformer.LITypeToBytesTransformer;
 import jokrey.utilities.encoder.type_transformer.bytes.TypeToBytesTransformer;
 import jokrey.utilities.network.link2peer.util.Hash;
+
+import java.net.DatagramPacket;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -52,6 +55,12 @@ public class P2LMessage {
         this.data = data;
     }
 
+    public DatagramPacket getPacket() {
+        byte[] typeAndData = new byte[4 + data.length];
+        BitHelper.writeInt32(typeAndData, 0, type);
+        System.arraycopy(data, 0, typeAndData, 4, data.length);
+        return new DatagramPacket(typeAndData, typeAndData.length);
+    }
 
     @Override public boolean equals(Object o) {
         if (this == o) return true;

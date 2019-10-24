@@ -1,5 +1,6 @@
 package jokrey.utilities.network.link2peer;
 
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
@@ -51,6 +52,8 @@ public class P2Link {
         }
         if(port < 0 || port > Short.MAX_VALUE*2)
             throw new IllegalArgumentException("port out of bounds");
+        if(ipOrDns == null || ipOrDns.isEmpty())
+            throw new IllegalArgumentException("ip or dns is null or empty and therefore invalid");
     }
 
     /**
@@ -80,5 +83,10 @@ public class P2Link {
     }
     @Override public String toString() {
         return "P2Link{"+ raw + '}';
+    }
+
+    public boolean validateResolvesTo(InetSocketAddress from) {
+        InetSocketAddress reResolved = new InetSocketAddress(ipOrDns, port);
+        return reResolved.getPort() == from.getPort() && reResolved.getAddress().equals(from.getAddress());
     }
 }
