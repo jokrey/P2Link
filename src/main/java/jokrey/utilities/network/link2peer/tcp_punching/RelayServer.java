@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 
+/** from: http://blog.boehme.me/2011/06/nat-holepunch-solution-in-java.html */
 public class RelayServer {
 
     private Set<NATDevice> inquiredComputers = new HashSet<NATDevice>();

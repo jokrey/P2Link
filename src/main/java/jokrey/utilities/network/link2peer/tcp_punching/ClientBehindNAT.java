@@ -8,7 +8,7 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 
-/** from:  */
+/** from: http://blog.boehme.me/2011/06/nat-holepunch-solution-in-java.html */
 public class ClientBehindNAT {
 
     private String relayServerIP;
