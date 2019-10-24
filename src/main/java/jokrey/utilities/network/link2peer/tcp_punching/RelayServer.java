@@ -7,6 +7,8 @@ import java.net.InetAddress;
 import java.util.HashSet;
 import java.util.Set;
 
+import static jokrey.utilities.network.link2peer.tcp_punching.ClientBehindNAT.RELAY_SERVER_PORT;
+
 
 /** from: http://blog.boehme.me/2011/06/nat-holepunch-solution-in-java.html */
 public class RelayServer {
@@ -32,11 +34,11 @@ public class RelayServer {
     }
 
     private void startServer() throws IOException, InterruptedException {
-        DatagramSocket serverSocket = new DatagramSocket(12345);
-        byte[] receiveData = new byte[50];
+        DatagramSocket serverSocket = new DatagramSocket(RELAY_SERVER_PORT);
+        byte[] receiveDataBuffer = new byte[50];
 
         while (true) {
-            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+            DatagramPacket receivePacket = new DatagramPacket(receiveDataBuffer, receiveDataBuffer.length);
             System.out.println("Listening...");
             serverSocket.receive(receivePacket);
             String data = new String(receivePacket.getData());

@@ -10,29 +10,24 @@ import java.net.UnknownHostException;
 
 /** from: http://blog.boehme.me/2011/06/nat-holepunch-solution-in-java.html */
 public class ClientBehindNAT {
+    public static int RELAY_SERVER_PORT = 43288;
+    public static String RELAY_SERVER_IP = "lmservicesip.ddns.net";
 
-    private String relayServerIP;
     private String destinationIP;
     private InetAddress clientIP;
 
-    private int socketTimeout;
+    private int socketTimeout = 3000;
 
     public static void main(String[] args) {
         ClientBehindNAT c = new ClientBehindNAT();
-        boolean result = c.parseInput(args);
 
-        if(result){
-            try {
-                c.createHole(true);
-            } catch (SocketTimeoutException e) {
-                System.out.println("Timeout occured... Try again?");
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        } else{
-            System.err.println("Usage: <Relay Server IP> (e.g. 192.168.40.1) <Destination IP> (e.g. 192.168.40.128) <Timeout> (in milliseconds)");
+        try {
+            c.createHole(true);
+        } catch (SocketTimeoutException e) {
+            System.out.println("Timeout occured... Try again?");
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-
     }
 
     /**
@@ -42,37 +37,22 @@ public class ClientBehindNAT {
      * @throws IOException
      */
     public synchronized int createConnectionToPeer(String relayServerIP, String destinationIP, int socketTimeout) throws IOException{
-        this.relayServerIP = relayServerIP;
         this.destinationIP = destinationIP;
         this.socketTimeout = socketTimeout;
         return createHole(false);
     }
 
-    private boolean parseInput(String[] args){
-        if(args.length < 3){
-            return false;
-        } else if(args[0].equals("") || args[1].equals("") || args[2].equals("")){
-            return false;
-        }else{
-            relayServerIP = args[0];
-            destinationIP = args[1];
-            socketTimeout = Integer.valueOf(args[2]);
-            return true;
-        }
-    }
-
     private int createHole(boolean standAlone) throws IOException{
 //        InetAddress serverIPAddress = InetAddress.getByName("192.168.40.1");
         clientIP = InetAddress.getLocalHost();
-        byte[] addrInByte = createInternetAddressFromString(relayServerIP);//{(byte) 192, (byte) 168, 40, 1};
-        InetAddress serverIPAddress = InetAddress.getByAddress(addrInByte);
-        int port = 12345;
+//        byte[] addrInByte = createInternetAddressFromString(relayServerIP);//{(byte) 192, (byte) 168, 40, 1};
+        InetAddress serverIPAddress = InetAddress.getByName(RELAY_SERVER_IP);
         String data = destinationIP;
-        System.out.println("Try to send: "+data+" TO: "+serverIPAddress+" ON PORT: "+port);
+        System.out.println("Try to send: "+data+" TO: "+serverIPAddress+" ON PORT: "+RELAY_SERVER_PORT);
         //first send UDP packet to the relay server
         DatagramSocket clientSocket = new DatagramSocket();
         clientSocket.setSoTimeout(socketTimeout);
-        sendPacket(clientSocket, serverIPAddress, port, data);
+        sendPacket(clientSocket, serverIPAddress, RELAY_SERVER_PORT, data);
         //now wait for the answer of the server
         String peer = receivePacket(clientSocket);
         clientSocket.close();
