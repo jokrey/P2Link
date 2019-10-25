@@ -1,14 +1,7 @@
 package jokrey.utilities.network.link2peer.core;
 
-import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
-import jokrey.utilities.simple.data_structure.queue.LFQueue;
-import jokrey.utilities.simple.data_structure.queue.Queue;
 
-import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;

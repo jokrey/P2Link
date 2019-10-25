@@ -38,7 +38,7 @@ class GarnerConnectionsRecursivelyProtocol {
                     newlyConnectedCounter++;
                 }
                 connectedSetupLinks.add(peerLink);
-            } catch (IOException | EstablishSingleConnectionProtocol.RequestRefusedException e) {
+            } catch (IOException  e) {
                 e.printStackTrace();
                 System.err.println(peerLink+" could not be connected to, because: "+e.getMessage());
             }

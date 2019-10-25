@@ -1,7 +1,6 @@
 package jokrey.utilities.network.link2peer;
 
 import jokrey.utilities.network.link2peer.core.NodeCreator;
-import jokrey.utilities.network.link2peer.core.P2L_Message_IDS;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
@@ -21,18 +20,24 @@ import java.util.Set;
  * Or broadcast messages that will be automatically redistributed to peers, should they not have knowledge of the message yet.
  *
  *
- *
- * TODO: detect stale connections by pinging every 2 minutes
- * TODO: fixed size networks (with much improved broadcast efficiency and maybe send to type(instead of send to link))
- * TODO:  improving upon fixed size: limit size networks..
- * TODO: retry broken peers in increasing intervals (5 minutes the first time, then 10, then 20, etc. NO MAX!!)
- *
  * !!!!!
  * TODO: light clients (clients without a public link, i.e. url + free port)
  * TODO: allow light clients to connect with each other (tcp hole punching or something like that)
  *
- * TODO: allow sending messages to a not directly connected peer (i.e. send through the network via a random search - for example useful when it is a light peer or max connections are reached)
+ * TODO: detect stale connections by pinging every 2 minutes
+ * TODO: retry broken peers in increasing intervals (5 minutes the first time, then 10, then 20, etc. NO MAX!!)
+ *
+ *
+ * TODO: out of the box and optional: detect lost packet and retry message protocols
+ *
+ *
+ * LATER:
+ * TODO: fixed size networks (with much improved broadcast efficiency and maybe send to type(instead of send to link))
+ * TODO:     improving upon fixed size: limit size networks..
+ *
+ * NOT_TODO: allow sending messages to a not directly connected peer (i.e. send through the network via a random search - for example useful when it is a light peer or max connections are reached)
  *       could mean a ton of traffic... (same amount of traffic as a broadcast...)
+ *       can be implemented with pretty much the same efficiency using broadcasts.....
  *
  * @author jokrey
  */
@@ -90,15 +95,13 @@ public interface P2LNode {
     List<P2Link> recursiveGarnerConnections(int newConnectionLimit, P2Link... setupLinks);
 
 
-
-    default P2LFuture<Integer> sendBroadcast(byte[] message) {
-        return sendBroadcast(P2L_Message_IDS.DEFAULT_ID, message);
-    }
-    P2LFuture<Integer> sendBroadcast(int msgId, byte[] message);
-    default P2LFuture<Boolean> sendIndividualMessageTo(P2Link peer, byte[] message) {
-        return sendIndividualMessageTo(peer, P2L_Message_IDS.DEFAULT_ID, message);
-    }
-    P2LFuture<Boolean> sendIndividualMessageTo(P2Link peer, int msgId, byte[] message);
+    /**
+     * @param message message to be send, sender field can be null in that case it will be filled automatically
+     * @return a future that is set to complete when attempts were made to send to all
+     * @throws IllegalArgumentException if the message has an invalid sender(!= null and not equal to getSelfLink())
+     */
+    P2LFuture<Integer> sendBroadcast(P2LMessage message);
+    P2LFuture<Boolean> sendIndividualMessageTo(P2Link peer, P2LMessage message);
     P2LFuture<P2LMessage> expectIndividualMessage(int msgId);
     P2LFuture<P2LMessage> expectIndividualMessage(P2Link fromPeer, int msgId);
     P2LFuture<P2LMessage> expectBroadcastMessage(int msgId);

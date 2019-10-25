@@ -39,7 +39,7 @@ public class RelayServer {
 //        byte[] receiveDataBuffer = new byte[50];
 //
 //        while (true) {
-//            DatagramPacket receivePacket = new DatagramPacket(receiveDataBuffer, receiveDataBuffer.length);
+//            DatagramPacket receivePacket = new DatagramPacket(receiveDataBuffer, receiveDataBuffer.payloadLength);
 //            System.out.println("Listening...");
 //            serverSocket.receive(receivePacket);
 //            String idOfRequestedPeer = new String(receivePacket.getData());
@@ -59,9 +59,9 @@ public class RelayServer {
 //            if (matchComp != null) {
 //                System.out.println("Already present.. now sending packets to both of them...");
 //                //send to the socket from previously saved first NAT Device infos from the second NAT Device
-//                sendRaw(serverSocket, matchComp, startComp);
+//                send(serverSocket, matchComp, startComp);
 //                Thread.sleep(1000);
-//                sendRaw(serverSocket, startComp, matchComp);
+//                send(serverSocket, startComp, matchComp);
 //
 //                inquiredComputers.remove(startComp);
 //                inquiredComputers.remove(matchComp);

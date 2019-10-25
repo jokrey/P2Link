@@ -1,6 +1,7 @@
 package jokrey.utilities.network.link2peer;
 
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
@@ -17,20 +18,32 @@ public class P2Link {
      */
     public final String raw;
 
-    /** ip / dns part of the link */
-    public final String ipOrDns;
+    /** ip / dns / lt_id part of the link */
+    public final String ipOrDnsOrLtId;
     /** port of the link - defaults to 52189, guaranteed to be between 0 and 2^16  */
     public final int port;
 
+    public final boolean isPublicLink;
+
     /**
-     * Creates a link from ip/dns and port
-     * @param ipOrDns an ip or a dns resolvable address.
+     * Creates a link from ip/dns and port to a public node
+     * @param ipOrDnsOrLtId an ip or a dns resolvable address.
      * @param port has be between 0 and 2^16(otherwise and exception is thrown)
      */
-    public P2Link(String ipOrDns, int port) {
-        this.raw = ipOrDns+":"+port;
+    public P2Link(String ipOrDnsOrLtId, int port) {
+        this(ipOrDnsOrLtId, port, true);
+    }
+    /**
+     * Creates a link from ip/dns/lt_id and port
+     * @param ipOrDnsOrLtId an ip or a dns resolvable address.
+     * @param port has be between 0 and 2^16(otherwise and exception is thrown)
+     * @param isPublicLink whether this represents a link to a public or light node
+     */
+    public P2Link(String ipOrDnsOrLtId, int port, boolean isPublicLink) {
+        this.raw = (isPublicLink?"":"lt:")+ipOrDnsOrLtId+":"+port;
         rawBytes = raw.getBytes(StandardCharsets.UTF_8);
-        this.ipOrDns = ipOrDns;
+        this.isPublicLink=isPublicLink;
+        this.ipOrDnsOrLtId = ipOrDnsOrLtId;
         this.port = port;
         if(port < 0 || port > Short.MAX_VALUE*2)
             throw new IllegalArgumentException("port out of bounds");
@@ -43,17 +56,24 @@ public class P2Link {
         this.raw = rawLink;
         rawBytes = raw.getBytes(StandardCharsets.UTF_8);
 
-        if(rawLink.contains(":")) {
-            ipOrDns = rawLink.split(":")[0];
-            port = Integer.parseInt(rawLink.split(":")[1]);
-        } else {
-            ipOrDns = rawLink;
+        String[] split = rawLink.split(":");
+        if(split.length==1) {
+            ipOrDnsOrLtId = rawLink;
             port = DEFAULT_PORT;
+            isPublicLink=true;
+        } else if(split.length==2) {
+            ipOrDnsOrLtId = split[0];
+            port = Integer.parseInt(split[1]);
+            isPublicLink=true;
+        } else {
+            ipOrDnsOrLtId = split[1];
+            port = Integer.parseInt(split[2]);
+            isPublicLink=false;
         }
         if(port < 0 || port > Short.MAX_VALUE*2)
-            throw new IllegalArgumentException("port out of bounds");
-        if(ipOrDns == null || ipOrDns.isEmpty())
-            throw new IllegalArgumentException("ip or dns is null or empty and therefore invalid");
+            throw new IllegalArgumentException("port("+port+") out of bounds");
+        if(ipOrDnsOrLtId == null || ipOrDnsOrLtId.isEmpty())
+            throw new IllegalArgumentException("ip or dns is null or empty and therefore invalid - rawLink: "+rawLink);
     }
 
     /**
@@ -79,14 +99,14 @@ public class P2Link {
         return Objects.equals(raw, p2Link.raw);
     }
     @Override public int hashCode() {
-        return Objects.hash(raw, ipOrDns, port);
+        return Objects.hash(raw, ipOrDnsOrLtId, port);
     }
     @Override public String toString() {
         return "P2Link{"+ raw + '}';
     }
 
     public boolean validateResolvesTo(InetSocketAddress from) {
-        InetSocketAddress reResolved = new InetSocketAddress(ipOrDns, port);
+        InetSocketAddress reResolved = new InetSocketAddress(ipOrDnsOrLtId, port);
         return reResolved.getPort() == from.getPort() && reResolved.getAddress().equals(from.getAddress());
     }
 }

@@ -40,6 +40,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
 
         incomingHandler = new IncomingHandler(this);
         outgoingHandler = new OutgoingHandler();
+
+        new Thread(() -> {
+            //todo - historic connection retry
+            //todo - ping protocol
+        }).start();
     }
 
     @Override public P2Link getSelfLink() { return selfLink; }
@@ -60,7 +65,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
                     EstablishSingleConnectionProtocol.asRequester(this, peerLink);
                 }
                 successLinks.add(peerLink);
-            } catch (IOException | EstablishSingleConnectionProtocol.RequestRefusedException e) {
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
@@ -83,7 +88,14 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         }
     }
 
-    @Override public P2LFuture<Integer> sendBroadcast(int msgId, byte[] message) {
+    @Override public P2LFuture<Integer> sendBroadcast(P2LMessage message) {
+        if(message.sender != null && !message.sender.equals(getSelfLink()))
+            throw new IllegalArgumentException("sender of message has to be this node's link or null");
+        if(message.sender == null)
+            message = message.attachSender(getSelfLink());
+        validateMsgIdNotInternal(message.type);
+        P2LMessage fMessage = message;
+
         P2Link[] originallyActivePeers = activeConnections.keySet().toArray(new P2Link[0]);
         if(originallyActivePeers.length == 0)
             return new P2LFuture<>(new Integer(0));
@@ -91,19 +103,25 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         Task[] tasks = new Task[originallyActivePeers.length];
         for(int i=0;i<tasks.length;i++) {
             P2Link peer = originallyActivePeers[i];
-            tasks[i] = () -> BroadcastMessageProtocol.send(this, peer, msgId, message);
+            tasks[i] = () -> {
+                BroadcastMessageProtocol.send(this, peer, fMessage);
+                return true;
+            };
         }
 
         return outgoingHandler.executeAll(tasks);
     }
-    @Override public P2LFuture<Boolean> sendIndividualMessageTo(P2Link peer, int msgId, byte[] message) {
-        validateMsgIdNotInternal(msgId);
+    @Override public P2LFuture<Boolean> sendIndividualMessageTo(P2Link peer, P2LMessage message) {
+        if(message.sender != null && !message.sender.equals(getSelfLink()))
+            throw new IllegalArgumentException("sender of message has to be this node's link or null");
+        validateMsgIdNotInternal(message.type);
+
         SocketAddress connection = getActiveConnection(peer);
         if(connection == null)
             return new P2LFuture<>(false);
 
         try {
-            sendRaw(new P2LMessage(getSelfLink(), msgId, message), connection);
+            send(message, connection);
             return new P2LFuture<>(true);
         } catch (IOException e) {
             return new P2LFuture<>(false);
@@ -138,7 +156,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     @Override public int remainingNumberOfAllowedPeerConnections() {
         return peerLimit - activeConnections.size();
     }
-    @Override public void addActivePeer(P2Link link, SocketAddress connection) throws IOException {
+    @Override public void addPotentialPeer(P2Link link, SocketAddress connection) throws IOException {
 //        System.out.println("P2LNodeImpl.addActivePeer");
 //        System.out.println("getSelfLink() = " + getSelfLink());
 //        System.out.println("link = [" + link + "], connection = [" + connection + "]");
@@ -149,17 +167,29 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
             throw new IOException("Connection link("+link+") already known - this should kinda not happen if peers behave logically - selfLink: "+getSelfLink());
         }
         activeLinks.put(connection, link);
-        historicConnections.remove(link); //if connection was previously marked as broken, it is no longer
     }
-    @Override public boolean markBrokenConnection(P2Link link) {
+    @Override public void cancelPotentialPeer(P2Link link) throws IOException {
+        SocketAddress previous = activeConnections.remove(link);
+        if(previous == null)
+            throw new IOException("cannot cancel unknown peer");
+        activeLinks.remove(previous);
+    }
+
+    @Override public void graduateToActivePeer(P2Link link) throws IOException {
+        SocketAddress connection = activeConnections.get(link);
+        if(connection!=null && activeLinks.containsKey(connection))
+            historicConnections.remove(link); //if connection was previously marked as broken, it is no longer
+        else
+            throw new IOException("cannot graduate unknown peer");
+    }
+    @Override public void markBrokenConnection(P2Link link) {
         SocketAddress removed = activeConnections.remove(link);
         if(removed == null) {
             System.err.println(getSelfLink() + " - link("+link+") was not found - could not mark as broken (already marked??)");
-            return false;
+            return;
         }
         activeLinks.remove(removed);
         historicConnections.put(link, System.currentTimeMillis());
-        return true;
     }
     @Override public SocketAddress getActiveConnection(P2Link peerLink) {
         return activeConnections.get(peerLink);
@@ -181,15 +211,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         for (P2LMessageListener l : individualMessageListeners) { l.received(message); }
     }
 
-    @Override public P2LFuture<Boolean> sendRaw(P2LMessage data, SocketAddress receiver) throws IOException {
-//        System.out.println("P2LNodeImpl.sendRaw");
-//        System.out.println("data = [" + data + "], receiver = [" + receiver + "]");
-        //todo: this assumes that all udp packages reach their target(which is not true)
-        //    todo has to be replaced with a small tcp like system (i.e. optional receipts for send messages, this additionally requires futures again..
-//        try (DatagramSocket sendSocket = new DatagramSocket()) { //todo reuse and bind socket for performance reasons - move to outgoing handler
+    @Override public void send(P2LMessage message, P2Link to) throws IOException {
+        send(message, getActiveConnection(to));
+    }
+    @Override public void send(P2LMessage data, SocketAddress to) throws IOException {
         DatagramPacket packet = data.getPacket();
-        incomingHandler.serverSocket.send(new DatagramPacket(packet.getData(), packet.getData().length, receiver)); //since the server socket is bound to a port, said port will be included in the udp packet
-//        }
-        return new P2LFuture<>(true); //todo
+        incomingHandler.serverSocket.send(new DatagramPacket(packet.getData(), packet.getData().length, to)); //since the server socket is bound to a port, said port will be included in the udp packet
     }
 }

@@ -16,9 +16,9 @@ public class P2L_Message_IDS {
     public static final int C_BROADCAST_MSG = -34;
 
     public static final int R_CONNECTION_DENIED_TOO_MANY_PEERS = -991;
-    public static final int R_CONNECTION_REQUEST_ANSWER = -992;
-    public static final int R_LINK_VALID = -993;
-    public static final int DEFAULT_ID = 0;
+    public static final int R_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST = -992;
+    public static final int R_CONNECTION_REQUEST_VERIFY_NONCE_ANSWER = -993;
+    public static final int R_LINK_VALID = -994;
 
     public static boolean isInternalMessageId(int msgId) {
         return msgId < 0;
