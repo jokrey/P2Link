@@ -21,11 +21,11 @@ class EstablishSingleConnectionProtocol {
             return;
         }
 
-//        if(!parent.getSelfLink().isPublicLinkKnown()) {
-//            String ip = WhoAmIProtocol.whoAmI(parent, initialRequestMessage.sender, from);
-//            System.out.println("ip = " + ip);
-//            parent.attachIpToSelfLink(ip);
-//        }
+        if(!parent.getSelfLink().isPublicLinkKnown()) {
+            String ip = WhoAmIProtocol.whoAmI(parent, initialRequestMessage.sender, from);
+            System.out.println("ip = " + ip);
+            parent.attachIpToSelfLink(ip);
+        }
 
         P2Link peerLink = new P2Link(initialRequestMessage.asBytes());
 
@@ -56,11 +56,11 @@ class EstablishSingleConnectionProtocol {
         SocketAddress outgoing = new InetSocketAddress(link.ipOrDns, link.port);
         parent.addPotentialPeer(link, outgoing);
 
-//        if(!parent.getSelfLink().isPublicLinkKnown()) {
-//            String ip = WhoAmIProtocol.whoAmI(parent, link, outgoing);
-//            System.out.println("ip = " + ip);
-//            parent.attachIpToSelfLink(ip);
-//        }
+        if(!parent.getSelfLink().isPublicLinkKnown()) {
+            String ip = WhoAmIProtocol.whoAmI(parent, link, outgoing);
+            System.out.println("ip = " + ip);
+            parent.attachIpToSelfLink(ip);
+        }
 
         parent.send(P2LMessage.createSendMessage(SL_PEER_CONNECTION_REQUEST, parent.getSelfLink().getRepresentingByteArray()), outgoing);
 
