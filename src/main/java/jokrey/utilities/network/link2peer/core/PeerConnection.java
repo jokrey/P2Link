@@ -80,7 +80,7 @@ class PeerConnectionX implements AutoCloseable {
     //as client
     static class Outgoing extends PeerConnectionX {
         Outgoing(P2LNodeInternal node, P2Link link) throws IOException {
-            super(node, link, MCNP_ClientIO.getConnectionToServer(link.ipOrDnsOrLtId, link.port, 2000));
+            super(node, link, MCNP_ClientIO.getConnectionToServer(link.ipOrDns, link.port, 2000));
         }
     }
 

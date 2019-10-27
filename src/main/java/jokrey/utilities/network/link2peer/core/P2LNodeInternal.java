@@ -35,4 +35,6 @@ interface P2LNodeInternal extends P2LNode {
      */
     void send(P2LMessage message, P2Link to) throws IOException;
     void send(P2LMessage message, SocketAddress receiver) throws IOException;
+
+    void attachIpToSelfLink(String ip);
 }

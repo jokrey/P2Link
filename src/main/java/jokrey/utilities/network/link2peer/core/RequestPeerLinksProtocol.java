@@ -11,7 +11,7 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
 class RequestPeerLinksProtocol {
     public static P2Link[] requestPeersFrom(P2LNodeInternal parent, P2Link peer) throws IOException {
         SocketAddress peerConnection = parent.getActiveConnection(peer);
-        parent.send(P2LMessage.createSendMessage(SC_REQUEST_KNOWN_ACTIVE_PEER_LINKS), peerConnection);
+        parent.send(P2LMessage.createSendMessage(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS), peerConnection);
 
         P2LMessage peerLinksMessage = parent.futureForInternal(peer, C_PEER_LINKS).get(2500);
 
@@ -21,9 +21,7 @@ class RequestPeerLinksProtocol {
             peers.add(new P2Link(raw));
         return peers.toArray(new P2Link[0]);
     }
-    public static void answerRequest(P2LNodeInternal parent, P2Link peer, Set<P2Link> activePeerLinks) throws IOException {
-        SocketAddress peerConnection = parent.getActiveConnection(peer);
-
+    public static void answerRequest(P2LNodeInternal parent, SocketAddress peerConnection, Set<P2Link> activePeerLinks) throws IOException {
         int byteCounter = 0;
         byte[][] activePeerLinksRawified = new byte[activePeerLinks.size()*2][];
         int i = 0;

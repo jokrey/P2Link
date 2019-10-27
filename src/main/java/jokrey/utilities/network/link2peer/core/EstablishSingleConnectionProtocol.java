@@ -20,14 +20,21 @@ class EstablishSingleConnectionProtocol {
             //   this can be used to simultaneous and continuously have this node open new, reverse connections
             //   with this here can only be used for slow loris, though only slow loris with 4 bytes, soooo....
             parent.send(P2LMessage.createSendMessage(R_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST), from);
+            System.out.println("refused connection request by "+from+" - max peers");
             return;
         }
 
+//        if(!parent.getSelfLink().isPublicLinkKnown()) {
+//            String ip = WhoAmIProtocol.whoAmI(parent, initialRequestMessage.sender, from);
+//            System.out.println("ip = " + ip);
+//            parent.attachIpToSelfLink(ip);
+//        }
 
         P2Link peerLink = new P2Link(initialRequestMessage.asBytes());
 
         if(! peerLink.validateResolvesTo(from)) {
             parent.send(P2LMessage.createSendMessage(R_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST), from);
+            System.out.println("refused connection request by "+from+" - does not resolve to same ip");
             return;
         }
 
@@ -49,13 +56,20 @@ class EstablishSingleConnectionProtocol {
     }
 
     public static void asRequester(P2LNodeInternal parent, P2Link link) throws IOException {
-        SocketAddress outgoing = new InetSocketAddress(link.ipOrDnsOrLtId, link.port);
+        SocketAddress outgoing = new InetSocketAddress(link.ipOrDns, link.port);
+        parent.addPotentialPeer(link, outgoing);
+
+        if(!parent.getSelfLink().isPublicLinkKnown()) {
+            String ip = WhoAmIProtocol.whoAmI(parent, link, outgoing);
+            System.out.println("ip = " + ip);
+            parent.attachIpToSelfLink(ip);
+        }
+
         parent.send(P2LMessage.createSendMessage(SL_PEER_CONNECTION_REQUEST, parent.getSelfLink().getRepresentingByteArray()), outgoing);
 
-        parent.addPotentialPeer(link, outgoing);
         byte[] verifyNonce = parent.futureForInternal(link, R_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST).get(2500).asBytes();
         boolean connectionAccepted = verifyNonce.length == 16;
-        if(connectionAccepted) {
+        if (connectionAccepted) {
             parent.send(P2LMessage.createSendMessage(R_CONNECTION_REQUEST_VERIFY_NONCE_ANSWER, verifyNonce), outgoing);
             parent.graduateToActivePeer(link);
         } else {

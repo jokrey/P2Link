@@ -29,7 +29,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     private final IncomingHandler incomingHandler;
     private final OutgoingHandler outgoingHandler;
 
-    private final P2Link selfLink;
+    private P2Link selfLink;
     private final int peerLimit;
     P2LNodeImpl(P2Link selfLink) throws IOException {
         this(selfLink, Integer.MAX_VALUE);
@@ -48,6 +48,9 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
 
     @Override public P2Link getSelfLink() { return selfLink; }
+    @Override public void attachIpToSelfLink(String ip) {
+        selfLink = selfLink.attachPublicLink(ip);
+    }
 
     @Override public boolean isConnectedTo(P2Link peerLink) {
         return activeConnections.containsKey(peerLink);

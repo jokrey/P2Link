@@ -26,7 +26,7 @@ public class RelayServer {
 
     private void startServer() {
         //general idea:
-        //    get request for connection to light(non-public) peer  (light peers have special links and can only be accessed via nodes that are already connected to them)
+        //    get request for connection to light(non-public) peer (light peers have special links and can only be accessed via nodes that are already connected to them)
         //    such request can only be received by public peers
         // !if requester is public:
         //    send light peer the requester link - if the light peer chooses, it can establish a connection to the requester

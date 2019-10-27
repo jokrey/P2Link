@@ -37,10 +37,18 @@ class IncomingHandler {
     private void handleReceivedMessage(DatagramPacket receivedPacket) throws IOException {
         P2LMessage message = P2LMessage.fromPacket(parent.getLinkForConnection(receivedPacket.getSocketAddress()), receivedPacket);
 
+
+        if(message.type == SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS) { //requires connection to receive data on the other side.....
+            RequestPeerLinksProtocol.answerRequest(parent, receivedPacket.getSocketAddress(), parent.getActivePeerLinks());
+        }
+
+
         if(message.sender == null) {
             //not connected - therefore it is a new connection
 
-            if(message.type == SL_PEER_CONNECTION_REQUEST) {
+            if(message.type == SL_WHO_AM_I) {
+                WhoAmIProtocol.asReceiver(parent, receivedPacket);
+            } else if(message.type == SL_PEER_CONNECTION_REQUEST) {
                 if(!parent.maxPeersReached()) {
                     EstablishSingleConnectionProtocol.asReceiver(parent, new InetSocketAddress(receivedPacket.getAddress(), receivedPacket.getPort()), message);
                 }
@@ -52,8 +60,6 @@ class IncomingHandler {
                     userBrdMessageQueue.handleNewMessage(received);
                     parent.notifyBroadcastMessageReceived(received);
                 }
-            } else if(message.type == SC_REQUEST_KNOWN_ACTIVE_PEER_LINKS) { //requires connection to receive data on the other side.....
-                RequestPeerLinksProtocol.answerRequest(parent, message.sender, parent.getActivePeerLinks());
             } else {
                 if(message.isInternalMessage()) {
                     internalMessageQueue.handleNewMessage(message);
@@ -72,7 +78,7 @@ class IncomingHandler {
 
         new Thread(() -> {
             while(true) {
-                //fixme 4096 is heuristic
+                //fixme 4096 is a heuristic
                 byte[] receiveBuffer = new byte[4096]; //receive buffer needs to be new for each run, otherwise handlereceivedmessages might get weird results - maximum safe size allegedly 512
                 DatagramPacket receivedPacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
                 try {

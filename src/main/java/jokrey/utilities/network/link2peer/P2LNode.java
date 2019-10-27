@@ -23,6 +23,7 @@ import java.util.Set;
  * !!!!!
  * TODO: light clients (clients without a public link, i.e. url + free port)
  * TODO: allow light clients to connect with each other (tcp hole punching or something like that)
+ *    - does this work out of the box??
  *
  * TODO: detect stale connections by pinging every 2 minutes
  * TODO: retry broken peers in increasing intervals (5 minutes the first time, then 10, then 20, etc. NO MAX!!)
@@ -42,6 +43,14 @@ import java.util.Set;
  * @author jokrey
  */
 public interface P2LNode {
+    /**
+     * @param selfLink if self link is only a port, i.e. the public ip is not currently known
+     *                 then the node will automatically fill that information when connection to the first peer
+     *                 (note that this is final, if the first peer lies then no external node can ever connect to this peer,
+     *                 but it will be detected when connecting to other peers since they will reject the peer connection request since the self given link resolves to a different ip)
+     * @return a new node at the given self link
+     * @throws IOException
+     */
     static P2LNode create(P2Link selfLink) throws IOException { return NodeCreator.create(selfLink); }
     static P2LNode create(P2Link selfLink, int peerLimit) throws IOException { return NodeCreator.create(selfLink, peerLimit); }
 
