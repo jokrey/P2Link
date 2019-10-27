@@ -56,8 +56,8 @@ public class CommandLineP2LChat {
         loop.addCommand("sendBroadcast", "Sends a string(args[0]) as a broadcast", Argument.with(String.class), args -> {
             node.sendBroadcast(P2LMessage.createSendMessage(0, args[0].getRaw()));
         }, "broadcast", "brd");
-        loop.addCommand("sendIndividualMessage", "Sends a string(args[0]) as an individual message to an active peer link(args[1])", Argument.with(String.class, String.class), args -> {
-            node.sendIndividualMessageTo(new P2Link(args[1].getRaw()), P2LMessage.createSendMessage(0, args[0].getRaw()));
+        loop.addCommand("sendIndividualMessage", "Sends a string(args[1]) as an individual message to an active peer link(args[0])", Argument.with(String.class, String.class), args -> {
+            node.sendIndividualMessageTo(new P2Link(args[0].getRaw()), P2LMessage.createSendMessage(0, args[1].getRaw()));
         }, "sendMessage", "send");
 
         loop.run();
