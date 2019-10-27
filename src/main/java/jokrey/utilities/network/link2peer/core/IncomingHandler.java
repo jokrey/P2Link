@@ -36,7 +36,8 @@ class IncomingHandler {
 
     private void handleReceivedMessage(DatagramPacket receivedPacket) throws IOException {
         P2LMessage message = P2LMessage.fromPacket(parent.getLinkForConnection(receivedPacket.getSocketAddress()), receivedPacket);
-
+        System.out.println("receivedPacket.getSocketAddress = " + receivedPacket.getSocketAddress());
+        System.out.println("received message = " + message);
 
         if(message.type == SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS) { //requires connection to receive data on the other side.....
             RequestPeerLinksProtocol.answerRequest(parent, receivedPacket.getSocketAddress(), parent.getActivePeerLinks());

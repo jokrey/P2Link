@@ -34,7 +34,7 @@ class EstablishSingleConnectionProtocol {
 
         if(! peerLink.validateResolvesTo(from)) {
             parent.send(P2LMessage.createSendMessage(R_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST), from);
-            System.out.println("refused connection request by "+from+" - does not resolve to same ip");
+            System.out.println("refused connection request by "+from+" - does not resolve to same ip (resolves to: "+new InetSocketAddress(peerLink.ipOrDns, peerLink.port)+")");
             return;
         }
 
