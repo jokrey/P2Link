@@ -16,9 +16,6 @@ class EstablishSingleConnectionProtocol {
 
     public static void asReceiver(P2LNodeInternal parent, InetSocketAddress from, P2LMessage initialRequestMessage) throws IOException {
         if(parent.maxPeersReached()) {
-            //potential exploit: a simple new connection, will cause this server to temporarily open a reverse connection to validate that the received link is actually valid
-            //   this can be used to simultaneous and continuously have this node open new, reverse connections
-            //   with this here can only be used for slow loris, though only slow loris with 4 bytes, soooo....
             parent.send(P2LMessage.createSendMessage(R_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST), from);
             System.out.println("refused connection request by "+from+" - max peers");
             return;
@@ -32,11 +29,11 @@ class EstablishSingleConnectionProtocol {
 
         P2Link peerLink = new P2Link(initialRequestMessage.asBytes());
 
-        if(! peerLink.validateResolvesTo(from)) {
-            parent.send(P2LMessage.createSendMessage(R_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST), from);
-            System.out.println("refused connection request by "+from+" - does not resolve to same ip (resolves to: "+new InetSocketAddress(peerLink.ipOrDns, peerLink.port)+")");
-            return;
-        }
+//        if(! peerLink.validateResolvesTo(from)) {
+//            parent.send(P2LMessage.createSendMessage(R_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST), from);
+//            System.out.println("refused connection request by "+from+" - does not resolve to same ip (resolves to: "+new InetSocketAddress(peerLink.ipOrDns, peerLink.port)+")");
+//            return;
+//        }
 
 
         parent.addPotentialPeer(peerLink, from);
@@ -59,11 +56,11 @@ class EstablishSingleConnectionProtocol {
         SocketAddress outgoing = new InetSocketAddress(link.ipOrDns, link.port);
         parent.addPotentialPeer(link, outgoing);
 
-        if(!parent.getSelfLink().isPublicLinkKnown()) {
-            String ip = WhoAmIProtocol.whoAmI(parent, link, outgoing);
-            System.out.println("ip = " + ip);
-            parent.attachIpToSelfLink(ip);
-        }
+//        if(!parent.getSelfLink().isPublicLinkKnown()) {
+//            String ip = WhoAmIProtocol.whoAmI(parent, link, outgoing);
+//            System.out.println("ip = " + ip);
+//            parent.attachIpToSelfLink(ip);
+//        }
 
         parent.send(P2LMessage.createSendMessage(SL_PEER_CONNECTION_REQUEST, parent.getSelfLink().getRepresentingByteArray()), outgoing);
 

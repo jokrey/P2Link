@@ -56,12 +56,11 @@ public class P2Link {
         rawBytes = raw.getBytes(StandardCharsets.UTF_8);
 
         String[] split = rawLink.split(":");
-        if (split.length ==2) {
+        if (split.length == 2) {
             ipOrDns = split[0];
             port = Integer.parseInt(split[1]);
         } else {
-            ipOrDns = null;
-            port = Integer.parseInt(rawLink);
+            throw new IllegalArgumentException("no ip given - ip visible to EVERY peer is required");
         }
         if(port < 0 || port > Short.MAX_VALUE*2)
             throw new IllegalArgumentException("port("+port+") out of bounds");
@@ -94,10 +93,5 @@ public class P2Link {
     }
     @Override public String toString() {
         return "P2Link{" + raw + '}';
-    }
-
-    public boolean validateResolvesTo(InetSocketAddress from) {
-        InetSocketAddress reResolved = new InetSocketAddress(ipOrDns, port);
-        return reResolved.getPort() == from.getPort() && reResolved.getAddress().equals(from.getAddress());
     }
 }
