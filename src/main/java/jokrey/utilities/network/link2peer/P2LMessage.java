@@ -5,11 +5,16 @@ import jokrey.utilities.encoder.as_union.li.LIPosition;
 import jokrey.utilities.encoder.as_union.li.bytes.LIbae;
 import jokrey.utilities.encoder.tag_based.implementation.paired.length_indicator.type.transformer.LITypeToBytesTransformer;
 import jokrey.utilities.encoder.type_transformer.bytes.TypeToBytesTransformer;
+import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
 import jokrey.utilities.network.link2peer.util.Hash;
 
 import java.net.DatagramPacket;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.Objects;
 
 import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.isInternalMessageId;
@@ -30,7 +35,6 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.isInternal
  * @author jokrey
  */
 public class P2LMessage {
-    public static final int HEADER_SIZE = 4;
     public static int MAX_UDP_PACKET_SIZE = 65507; //65507 is the HARD limitation on windows, the number can be set lower by the app developer to safe memory
 
     /**
@@ -38,13 +42,34 @@ public class P2LMessage {
      * for individual messages this will be the peer the message was received from
      * for broadcast messages this will be the peer that originally began distributing the message
      */
-    public final P2Link sender;
+    public final String sender;
+
+    public InetSocketAddress senderAsSocketAddress() {
+        if(sender == null) return null;
+        String[] split = sender.split(":");
+        return new InetSocketAddress(split[0], Integer.parseInt(split[1]));
+    }
 
     /**
      * Type of the message. A shortcut for applications to determine what this message represents without decoding the data field.
      * Also used to wait-for/expect certain types of messages and assigning custom handlers.
      */
     public final int type;
+    public final int conversationId;
+    public final boolean requestReceipt;
+    public final boolean isReceipt;
+
+    public static final short INSTANT_TIMEOUT = 0;
+    public static final short MAX_TIMEOUT = Short.MAX_VALUE;
+    public final short expirationTimeoutInSeconds;
+    public boolean isExpired() {
+        return receivedAt>0 && (expirationTimeoutInSeconds <= 0 || (System.currentTimeMillis() - receivedAt)/1e3 > expirationTimeoutInSeconds);
+    }
+    private long receivedAt=-1;
+    private void setReceived() {
+        if(receivedAt!=-1) throw new IllegalStateException("already marked as received");
+        receivedAt = System.currentTimeMillis();
+    }
 
     /**
      * The data field used to communicate arbitrary data between peers.
@@ -58,7 +83,7 @@ public class P2LMessage {
     /** @return a cached version of the hash of this message. The hash is 20 bytes long(sha1), usable with hash map and includes sender, type and data. */
     public Hash getHash() {
         if(hash == null)
-            hash = Hash.from(sender, raw); //no need for thread safety, same value computed in worst case
+            hash = Hash.from(sender, raw, payloadLength); //no need for thread safety, same value computed in worst case
         return hash;
     }
 
@@ -71,9 +96,15 @@ public class P2LMessage {
     }
 
     /** Create a new P2LMessage */
-    private P2LMessage(P2Link sender, int type, byte[] raw, int payloadLength, byte[] payload, Hash hash) {
+    private P2LMessage(String sender,
+                       int type, int conversationId, boolean requestReceipt, boolean isReceipt, short expirationTimeoutInSeconds,
+                       byte[] raw, int payloadLength, byte[] payload, Hash hash) {
         this.sender = sender;
         this.type = type;
+        this.conversationId = conversationId;
+        this.requestReceipt = requestReceipt;
+        this.isReceipt = isReceipt;
+        this.expirationTimeoutInSeconds = expirationTimeoutInSeconds;
         this.raw = raw;
         this.payloadLength = payloadLength;
         this.payload = payload;
@@ -90,7 +121,16 @@ public class P2LMessage {
      * @return the new message
      */
     public static P2LMessage createSendMessage(int type) {
-        return createSendMessageWith(type, 0);
+        return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, MAX_TIMEOUT, 0);
+    }
+    public static P2LMessage createSendMessage(int type, int conversationId) {
+        return createSendMessageWith(type, conversationId, MAX_TIMEOUT, 0);
+    }
+    public static P2LMessage createSendMessage(int type, short expirationTimeoutInSeconds) {
+        return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expirationTimeoutInSeconds, 0);
+    }
+    public static P2LMessage createSendMessage(int type, int conversationId, short expirationTimeoutInSeconds) {
+        return createSendMessageWith(type, conversationId, expirationTimeoutInSeconds, 0);
     }
 
     /**
@@ -100,7 +140,16 @@ public class P2LMessage {
      * @return the new message
      */
     public static P2LMessage createSendMessage(int type, byte[] payload) {
-        return createSendMessageWith(type, payload.length, payload);
+        return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, MAX_TIMEOUT, payload.length, payload);
+    }
+    public static P2LMessage createSendMessage(int type, int conversationId, byte[] payload) {
+        return createSendMessageWith(type, conversationId, MAX_TIMEOUT, payload.length, payload);
+    }
+    public static P2LMessage createSendMessage(int type, short expirationTimeoutInSeconds, byte[] payload) {
+        return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expirationTimeoutInSeconds, payload.length, payload);
+    }
+    public static P2LMessage createSendMessage(int type, int conversationId, short expirationTimeoutInSeconds, byte[] payload) {
+        return createSendMessageWith(type, conversationId, expirationTimeoutInSeconds, payload.length, payload);
     }
 
     /**
@@ -109,9 +158,9 @@ public class P2LMessage {
      * @param payloads the payloads of the message. The serialized payload is efficiently assembled from the given payload parts.
      * @return the new message
      */
-    public static P2LMessage createSendMessageWith(int type, int totalPayloadSize, byte[]... payloads) {
+    public static P2LMessage createSendMessageWith(int type, int conversationId, short expirationTimeoutInSeconds, int totalPayloadSize, byte[]... payloads) {
         byte[] raw = new byte[HEADER_SIZE + totalPayloadSize];
-        BitHelper.writeInt32(raw, 0, type);
+        writeHeader(raw, type, conversationId, false, false, expirationTimeoutInSeconds);
         int index = HEADER_SIZE;
         for(byte[] payload : payloads) {
             System.arraycopy(payload, 0, raw, index, payload.length);
@@ -121,56 +170,108 @@ public class P2LMessage {
         if(raw.length > 512)
             System.err.println("message greater than 512 bytes - this can be considered inefficient because intermediate low level protocols might break it up - size here is: "+raw.length);
 
-        return new P2LMessage(null, type, raw, totalPayloadSize, payloads.length==1?payloads[0]:null, null); //sender does not need to be set on send messages - it is automatically determined by the received from the ip header of the packet
+        return new P2LMessage(null, type, conversationId, false, false, expirationTimeoutInSeconds, raw, totalPayloadSize, payloads.length==1?payloads[0]:null, null); //sender does not need to be set on send messages - it is automatically determined by the received from the ip header of the packet
     }
 
 
-    public static <T> P2LMessage createSendMessage(int type, T payload) {
+    public static P2LMessage createSendMessage(int type, Object payload) {
         return createSendMessage(type, trans.transform(payload));
     }
-    public static <T> P2LMessage createSendMessageFrom(int type, T... payloads) {
+    public static P2LMessage createSendMessageFrom(int type, Object... payloads) {
         byte[][] total = new byte[payloads.length][];
         int sizeCounter = 0;
         for(int i=0;i<payloads.length;i++) {
             total[i] = trans.transform(payloads[i]);
             sizeCounter+=total[i].length;
         }
-        return createSendMessageWith(type, sizeCounter, total);
+        return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, MAX_TIMEOUT, sizeCounter, total);
+    }
+    public static P2LMessage createSendMessageFromVariables(int type, Object... payloads) {
+        byte[][] total = new byte[payloads.length*2][];
+        int sizeCounter = 0;
+        for(int i=0;i<total.length;i+=2) {
+            total[i+1] = trans.transform(payloads[i/2]);
+            total[i] = makeVariableIndicatorFor(total[i+1].length);
+            sizeCounter+=total[i].length + total[i+1].length;
+        }
+        return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, MAX_TIMEOUT, sizeCounter, total);
+    }
+    public static P2LMessage createSendMessageFromVariables(int type, Collection payloads) {
+        Iterator payloadsIterator = payloads.iterator();
+        byte[][] total = new byte[payloads.size()*2][];
+        int sizeCounter = 0;
+        for(int i=0;i<total.length;i+=2) {
+            total[i + 1] = trans.transform(payloadsIterator.next());
+            total[i] = makeVariableIndicatorFor(total[i + 1].length);
+            sizeCounter += total[i].length + total[i + 1].length;
+        }
+        return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, MAX_TIMEOUT, sizeCounter, total);
     }
 
-
-    public static P2LMessage createBrdMessage(P2Link sender, int brdMsgType, byte[] payload) {
+    public static P2LMessage createBroadcast(String sender, int brdMsgType, Object payload) {
+        return createBroadcast(sender, brdMsgType, trans.transform(payload));
+    }
+    public static P2LMessage createBroadcast(String sender, int brdMsgType, byte[] payload) {
         byte[] raw = new byte[HEADER_SIZE + payload.length];
-        BitHelper.writeInt32(raw, 0, brdMsgType);
+        writeHeader(raw, brdMsgType, 0, false, false, MAX_TIMEOUT);
         System.arraycopy(payload, 0, raw, HEADER_SIZE, payload.length);
-        return new P2LMessage(sender, brdMsgType, raw, payload.length, payload, null);
+        return new P2LMessage(sender, brdMsgType, P2LNode.NO_CONVERSATION_ID,false, false, MAX_TIMEOUT, raw, payload.length, payload, null);
     }
 
-    /** @return a udp datagram packet from the internal data - it can be decoded on the receiver side using {@link #fromPacket(P2Link, DatagramPacket)} */
-    public DatagramPacket getPacket() {
-        return new DatagramPacket(raw, raw.length);
+    public static P2LMessage createReceiptFor(P2LMessage message) {
+        Hash receiptHash = Hash.from(null, message.raw, HEADER_SIZE+message.payloadLength);
+        byte[] raw = new byte[HEADER_SIZE + receiptHash.length()];
+        writeHeader(raw, message.type, message.conversationId, false, true, INSTANT_TIMEOUT); //receipts instantly time out - because they are always automatically waited on by the system..
+        System.arraycopy(receiptHash.raw(), 0, raw, HEADER_SIZE, receiptHash.length());
+        return new P2LMessage(null, message.type, message.conversationId, false,true, INSTANT_TIMEOUT, raw, receiptHash.length(), receiptHash.raw(), null);
+    }
+    public boolean validateIsReceiptFor(P2LMessage message) {
+        if(!isReceipt) throw new IllegalStateException("cannot validate receipt, since this is not a receipt");
+        Hash receiptHash = Hash.from(null, message.raw, HEADER_SIZE+message.payloadLength);
+        return payloadEquals(receiptHash.raw());
+    }
+
+    /** @return a udp datagram packet from the internal data - it can be decoded on the receiver side using {@link #fromPacket(DatagramPacket)}
+     * @param to*/
+    public DatagramPacket getPacket(SocketAddress to) {
+        return new DatagramPacket(raw, raw.length, to);
     }
     /** @return Decodes a udp datagram packet into a p2l message */
-    public static P2LMessage fromPacket(P2Link sender, DatagramPacket packet) {
-        int type = BitHelper.getInt32From(packet.getData(), 0);
-
+    public static P2LMessage fromPacket(DatagramPacket packet) {
         byte[] raw = packet.getData();
+        int type = readTypeFromHeader(raw);
+        int conversationId = readConversationIdFromHeader(raw);
+        short expirationTimeoutInSeconds = readExpirationTimeoutInSeconds(raw);
+        boolean requestReceipt = readRequestReceiptFromHeader(raw);
+        boolean isReceipt = readIsReceiptFromHeader(raw);
+
         if(raw.length > packet.getLength()*2 && raw.length > 8192)
             raw =  Arrays.copyOfRange(packet.getData(), 0, packet.getLength());
-        return new P2LMessage(sender, type, raw, packet.getLength()-HEADER_SIZE, null, null); //hash and payload are only calculated if required... Preferably the 'as' methods should be used to extract data.
+        P2LMessage msg = new P2LMessage(WhoAmIProtocol.toString(packet.getSocketAddress()), type, conversationId, requestReceipt, isReceipt, expirationTimeoutInSeconds, raw, packet.getLength()-HEADER_SIZE, null, null); //hash and payload are only calculated if required... Preferably the 'as' methods should be used to extract data.
+        msg.setReceived();
+        return msg;
+    }
+
+
+    public boolean payloadEquals(byte[] o) {
+        if(payloadLength != o.length) return false;
+        for(int i=0;i<o.length;i++)
+            if(raw[HEADER_SIZE+i] != o[i])
+                return false;
+        return true;
     }
 
     @Override public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         P2LMessage that = (P2LMessage) o;
-        return Objects.equals(sender, that.sender) && Arrays.equals(raw, that.raw) && type == that.type;
+        return Objects.equals(sender, that.sender) && Arrays.equals(raw, that.raw) && type == that.type && isReceipt == that.isReceipt;
     }
     @Override public int hashCode() {
         return hash.hashCode();
     }
     @Override public String toString() {
-        return "P2LMessage{sender=" + sender + ", type=" + type + ", raw=" + Arrays.toString(raw) + ", hash=" + hash + '}';
+        return "P2LMessage{sender=" + sender + ", type=" + type + ", requestReceipt=" + requestReceipt + ", isReceipt=" + isReceipt + ", expirationTimeoutInSeconds=" + expirationTimeoutInSeconds + ", raw=" + Arrays.toString(raw) + ", hash=" + hash + '}';
     }
 
     //HELPER
@@ -254,9 +355,47 @@ public class P2LMessage {
      * @return the new message
      * @throws IllegalArgumentException if the sender of the message is not null, i.e. already set
      */
-    public P2LMessage attachSender(P2Link newSender) {
+    public P2LMessage attachSender(String newSender) {
         if(sender != null)
             throw new IllegalArgumentException("sender already known");
-        return new P2LMessage(newSender, type, raw, payloadLength, payload, hash);
+        return new P2LMessage(newSender, type, conversationId, requestReceipt, isReceipt, expirationTimeoutInSeconds, raw, payloadLength, payload, hash);
+    }
+    public P2LMessage mutateToRequestReceipt() {
+        writeHeader(raw, type, conversationId, true, isReceipt, expirationTimeoutInSeconds);//todo - MUTATES RAW!! which mutates hash, but this does not mutate hash
+        return new P2LMessage(sender, type, conversationId, true, isReceipt, expirationTimeoutInSeconds, raw, payloadLength, payload, hash);
+    }
+
+
+
+
+
+    private static final int HEADER_SIZE = 11;
+    private static final int HEADER_FLAG_BYTE_OFFSET_INDEX = 0;
+    private static final int HEADER_TYPE_BYTES_OFFSET_INDEX = 1;
+    private static final int HEADER_CONVERSATION_ID_BYTES_OFFSET_INDEX = 5;
+    private static final int HEADER_EXPIRATION_TIME_BYTES_OFFSET_INDEX = 9;
+    private static void writeHeader(byte[] raw, int type, int conversationId, boolean requestReceipt, boolean isReceipt, short expirationTimeoutInSeconds) {
+        BitHelper.writeInt32(raw, HEADER_TYPE_BYTES_OFFSET_INDEX, type);
+        BitHelper.writeInt32(raw, HEADER_CONVERSATION_ID_BYTES_OFFSET_INDEX, conversationId);
+        BitHelper.writeInt16(raw, HEADER_EXPIRATION_TIME_BYTES_OFFSET_INDEX, expirationTimeoutInSeconds);
+        byte flagByte = 0;
+        if(requestReceipt) flagByte = BitHelper.setBit(flagByte, 0);
+        if(isReceipt) flagByte = BitHelper.setBit(flagByte, 1);
+        raw[HEADER_FLAG_BYTE_OFFSET_INDEX] = flagByte;
+    }
+    private static int readTypeFromHeader(byte[] raw) {
+        return BitHelper.getInt32From(raw, HEADER_TYPE_BYTES_OFFSET_INDEX);
+    }
+    private static int readConversationIdFromHeader(byte[] raw) {
+        return BitHelper.getInt32From(raw, HEADER_CONVERSATION_ID_BYTES_OFFSET_INDEX);
+    }
+    private static short readExpirationTimeoutInSeconds(byte[] raw) {
+        return BitHelper.getInt16From(raw, HEADER_EXPIRATION_TIME_BYTES_OFFSET_INDEX);
+    }
+    private static boolean readRequestReceiptFromHeader(byte[] raw) {
+        return BitHelper.getBit(raw[HEADER_FLAG_BYTE_OFFSET_INDEX], 0) == 1;
+    }
+    private static boolean readIsReceiptFromHeader(byte[] raw) {
+        return BitHelper.getBit(raw[HEADER_FLAG_BYTE_OFFSET_INDEX], 1) == 1;
     }
 }

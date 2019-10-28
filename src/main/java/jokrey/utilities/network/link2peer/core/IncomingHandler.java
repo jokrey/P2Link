@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.concurrent.*;
 
 import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
@@ -20,67 +21,86 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
  *
  * @author jokrey
  */
-class IncomingHandler {
+public class IncomingHandler {
+    public static int INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
     private static final int MAX_POOL_SIZE = 256;
 
     DatagramSocket serverSocket;
     private P2LNodeInternal parent;
 
     P2LMessageQueue internalMessageQueue = new P2LMessageQueue();
-    P2LMessageQueue userIdvMessageQueue = new P2LMessageQueue();
+    P2LMessageQueue userMessageQueue = new P2LMessageQueue();
     P2LMessageQueue userBrdMessageQueue = new P2LMessageQueue();
-    private final BroadcastMessageProtocol.BroadcastState broadcastState = new BroadcastMessageProtocol.BroadcastState();
+    P2LMessageQueue receiptsQueue = new P2LMessageQueue();
+    final BroadcastMessageProtocol.BroadcastState broadcastState = new BroadcastMessageProtocol.BroadcastState();
+//    final RetryHandler retryHandler = new RetryHandler();
 
     private final ThreadPoolExecutor handleReceivedMessagesPool = new ThreadPoolExecutor(8/*core size*/,MAX_POOL_SIZE/*max size*/,60, TimeUnit.SECONDS/*idle timeout*/, new LinkedBlockingQueue<>(MAX_POOL_SIZE)); // queue with a size
 
 
     private void handleReceivedMessage(DatagramPacket receivedPacket) throws IOException {
-        P2LMessage message = P2LMessage.fromPacket(parent.getLinkForConnection(receivedPacket.getSocketAddress()), receivedPacket);
-        System.out.println("receivedPacket.getSocketAddress = " + receivedPacket.getSocketAddress());
-        System.out.println("received message = " + message);
+        SocketAddress from = receivedPacket.getSocketAddress();
+        P2LMessage message = P2LMessage.fromPacket(receivedPacket);
+        boolean dropped = ThreadLocalRandom.current().nextInt(0, 100) < INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE;
+//        System.out.println((dropped?" - DROPPED - ":"") + parent.getPort()+" - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
+        if(dropped) return;
 
-        if(message.type == SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS) { //requires connection to receive data on the other side.....
-            RequestPeerLinksProtocol.answerRequest(parent, receivedPacket.getSocketAddress(), parent.getActivePeerLinks());
+
+//            System.out.println(parent.getPort()+" received message = " + message);
+//            System.out.println(parent.getPort()+" from = " + from);
+
+        if(message.requestReceipt) {
+            //TODO - problem: double send receipt - i.e.
+//            if(message.isRetry) {
+//                boolean hasBeenHandled = retryHandler.hasBeenHandled(message);
+//                if(hasBeenHandled)
+//                    return;
+//            } else {
+//                retryHandler.markHandled(message);
+                parent.sendInternalMessage(P2LMessage.createReceiptFor(message), from);
+//            }
+            //todo - what if this packet is lost? then the client will resend, and potentially redo this operation
+            //todo - solve: send retryCounter
         }
-
-
-        if(message.sender == null) {
-            //not connected - therefore it is a new connection
-
-            if(message.type == SL_WHO_AM_I) {
-                WhoAmIProtocol.asReceiver(parent, receivedPacket);
-            } else if(message.type == SL_PEER_CONNECTION_REQUEST) {
-                if(!parent.maxPeersReached()) {
-                    EstablishSingleConnectionProtocol.asReceiver(parent, new InetSocketAddress(receivedPacket.getAddress(), receivedPacket.getPort()), message);
-                }
+        if(message.isReceipt)
+            receiptsQueue.handleNewMessage(message);
+        else if (message.type == SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS) { //requires connection to asAnswerer data on the other side.....
+            RequestPeerLinksProtocol.asAnswerer(parent, from);
+        } else if (message.type == SL_WHO_AM_I) {
+            WhoAmIProtocol.asAnswerer(parent, receivedPacket);
+        } else if (message.type == SL_PEER_CONNECTION_REQUEST) {
+            if (!parent.connectionLimitReached()) {
+                EstablishSingleConnectionProtocol.asReceiver(parent, new InetSocketAddress(receivedPacket.getAddress(), receivedPacket.getPort()), message);
             }
+        } else if (message.type == SC_BROADCAST) {
+            P2LMessage received = BroadcastMessageProtocol.asAnswerer(parent, broadcastState, from, message);
+            if (received != null) {
+                userBrdMessageQueue.handleNewMessage(received);
+                parent.notifyBroadcastMessageReceived(received);
+            }
+        } else if (message.type == SC_DISCONNECT) {
+            DisconnectSingleConnectionProtocol.asReceiver(parent, from);
         } else {
-            if(message.type == SC_BROADCAST) {
-                P2LMessage received = BroadcastMessageProtocol.receive(parent, broadcastState, receivedPacket.getSocketAddress(), message);
-                if(received != null) {
-                    userBrdMessageQueue.handleNewMessage(received);
-                    parent.notifyBroadcastMessageReceived(received);
-                }
+            if (message.isInternalMessage()) {
+                internalMessageQueue.handleNewMessage(message);
             } else {
-                if(message.isInternalMessage()) {
-                    internalMessageQueue.handleNewMessage(message);
-                } else {
-                    userIdvMessageQueue.handleNewMessage(message);
-                    parent.notifyIndividualMessageReceived(message);
-                }
+                userMessageQueue.handleNewMessage(message);
+                parent.notifyMessageReceived(message);
             }
         }
+
+
     }
 
     public IncomingHandler(P2LNodeInternal parentG) throws IOException {
         this.parent = parentG;
 
-        serverSocket = new DatagramSocket(parent.getSelfLink().port);
+        serverSocket = new DatagramSocket(parent.getPort());
 
         new Thread(() -> {
             while(true) {
-                //fixme 4096 is a heuristic
-                byte[] receiveBuffer = new byte[4096]; //receive buffer needs to be new for each run, otherwise handlereceivedmessages might get weird results - maximum safe size allegedly 512
+                //fixme 1024 is a heuristic
+                byte[] receiveBuffer = new byte[1024]; //asAnswerer buffer needs to be new for each run, otherwise handlereceivedmessages might get weird results - maximum safe size allegedly 512
                 DatagramPacket receivedPacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
                 try {
                     serverSocket.receive(receivedPacket);

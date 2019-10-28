@@ -1,7 +1,6 @@
 package jokrey.utilities.network.link2peer.util;
 
-import jokrey.utilities.network.link2peer.P2Link;
-
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -17,13 +16,13 @@ public class Hash {
         this.backingArray = backingArray;
     }
 
-    public static Hash from(P2Link sender, byte[] raw) {
+    public static Hash from(String sender, byte[] raw, int rawLength) {
         //fixme speed ok?
         try {
             MessageDigest hashFunction = MessageDigest.getInstance("SHA-1");
             if(sender!=null)
-                hashFunction.update(sender.getRepresentingByteArray());
-            hashFunction.update(raw);
+                hashFunction.update(sender.getBytes(StandardCharsets.UTF_8));
+            hashFunction.update(raw, 0, rawLength);
             return new Hash(hashFunction.digest());
         } catch (NoSuchAlgorithmException e) {
             throw new Error("missing critical algorithm");

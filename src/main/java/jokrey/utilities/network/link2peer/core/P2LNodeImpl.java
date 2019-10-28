@@ -2,14 +2,17 @@ package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
-import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.core.OutgoingHandler.Task;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
+import jokrey.utilities.simple.data_structure.pairs.Pair;
 
 import java.io.IOException;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.validateMsgIdNotInternal;
 
@@ -20,205 +23,233 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.validateMs
  * @author jokrey
  */
 final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
-    private final ConcurrentHashMap<P2Link, SocketAddress> activeConnections = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<SocketAddress, P2Link> activeLinks = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<P2Link, Long> historicConnections = new ConcurrentHashMap<>();
-    private final ArrayList<P2LMessageListener> individualMessageListeners = new ArrayList<>();
-    private final ArrayList<P2LMessageListener> broadcastMessageListeners = new ArrayList<>();
-
     private final IncomingHandler incomingHandler;
     private final OutgoingHandler outgoingHandler;
 
-    private P2Link selfLink;
-    private final int peerLimit;
-    P2LNodeImpl(P2Link selfLink) throws IOException {
-        this(selfLink, Integer.MAX_VALUE);
+    public final int port;
+    P2LNodeImpl(int port) throws IOException {
+        this(port, Integer.MAX_VALUE);
     }
-    P2LNodeImpl(P2Link selfLink, int peerLimit) throws IOException {
-        this.selfLink = selfLink;
-        this.peerLimit = peerLimit;
+    P2LNodeImpl(int port, int connectionLimit) throws IOException {
+        this.port = port;
+        this.connectionLimit = connectionLimit;
 
         incomingHandler = new IncomingHandler(this);
         outgoingHandler = new OutgoingHandler();
 
         new Thread(() -> {
-            //todo - historic connection retry
-            //todo - ping protocol
+            while(true) {
+                try {
+
+                    //todo - ping protocol to clean up established connections
+
+                    incomingHandler.internalMessageQueue.cleanExpiredMessages();
+                    incomingHandler.receiptsQueue.cleanExpiredMessages();
+                    incomingHandler.userBrdMessageQueue.cleanExpiredMessages();
+                    incomingHandler.userMessageQueue.cleanExpiredMessages();
+                    incomingHandler.broadcastState.clean();
+
+                    Thread.sleep(5000);
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
+            }
         }).start();
     }
 
-    @Override public P2Link getSelfLink() { return selfLink; }
-    @Override public void attachIpToSelfLink(String ip) {
-        selfLink = selfLink.attachPublicLink(ip);
-    }
+    @Override public int getPort() { return port; }
 
-    @Override public boolean isConnectedTo(P2Link peerLink) {
-        return activeConnections.containsKey(peerLink);
-    }
+    @Override public P2LFuture<Set<SocketAddress>> establishConnections(SocketAddress... addresses) {
+        Task[] tasks = new Task[addresses.length];
 
-    @Override public boolean maxPeersReached() {
-        return activeConnections.size() >= peerLimit;
-    }
-
-    @Override public Set<P2Link> connectToPeers(P2Link... peerLinks) {
-        Set<P2Link> successLinks = new HashSet<>(peerLinks.length);
-        for(P2Link peerLink : peerLinks) {
-            try {
-                if(! isConnectedTo(peerLink)) {
-                    EstablishSingleConnectionProtocol.asRequester(this, peerLink);
+        Set<SocketAddress> successes = ConcurrentHashMap.newKeySet(tasks.length);
+        for(int i=0;i<addresses.length;i++) {
+            SocketAddress address = addresses[i];
+            tasks[i] = () -> {
+                try {
+                    if(!isConnectedTo(address)) {
+                        EstablishSingleConnectionProtocol.asInitiator(this, address);
+                    }
+                    successes.add(address);
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-                successLinks.add(peerLink);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+                return false;
+            };
         }
-        return successLinks;
+
+        return outgoingHandler.executeAll(tasks).toType(p -> successes);
+    }
+    @Override public void disconnectFrom(SocketAddress address) {
+        DisconnectSingleConnectionProtocol.asInitiator(this, address);
     }
 
-    @Override public Set<P2Link> getActivePeerLinks() {
-//        System.out.println("activeConnections = " + activeConnections);
-//        System.out.println("activeLinks = " + activeLinks);
-        return activeConnections.keySet();
-    }
-
-    @Override public List<P2Link> recursiveGarnerConnections(int newConnectionLimit, P2Link... setupLinks) {
+    @Override public List<SocketAddress> recursiveGarnerConnections(int newConnectionLimit, SocketAddress... setupLinks) {
         return GarnerConnectionsRecursivelyProtocol.recursiveGarnerConnections(this, newConnectionLimit, Integer.MAX_VALUE, Arrays.asList(setupLinks));
     }
 
-    @Override public void disconnect() {
-        for(P2Link connectionLink:activeConnections.keySet()) {
-            markBrokenConnection(connectionLink);
-        }
-    }
-
-    @Override public P2LFuture<Integer> sendBroadcast(P2LMessage message) {
-        if(message.sender != null && !message.sender.equals(getSelfLink()))
-            throw new IllegalArgumentException("sender of message has to be this node's link or null");
-        if(message.sender == null)
-            message = message.attachSender(getSelfLink());
+    @Override public P2LFuture<Pair<Integer, Integer>> sendBroadcastWithReceipts(P2LMessage message) {
+        if(message.sender == null) throw new IllegalArgumentException("sender of message has to be attached in broadcasts");
         validateMsgIdNotInternal(message.type);
-        P2LMessage fMessage = message;
 
-        P2Link[] originallyActivePeers = activeConnections.keySet().toArray(new P2Link[0]);
+        SocketAddress[] originallyActivePeers = establishedConnections.toArray(new SocketAddress[0]);
         if(originallyActivePeers.length == 0)
-            return new P2LFuture<>(new Integer(0));
+            return new P2LFuture<>(new Pair<>(0 , 0));
+
+        incomingHandler.broadcastState.markAsKnown(message.getHash());
 
         Task[] tasks = new Task[originallyActivePeers.length];
         for(int i=0;i<tasks.length;i++) {
-            P2Link peer = originallyActivePeers[i];
+            SocketAddress connection = originallyActivePeers[i];
             tasks[i] = () -> {
-                BroadcastMessageProtocol.send(this, peer, fMessage);
+                BroadcastMessageProtocol.asInitiator(this, message, connection);
                 return true;
             };
         }
 
         return outgoingHandler.executeAll(tasks);
     }
-    @Override public P2LFuture<Boolean> sendIndividualMessageTo(P2Link peer, P2LMessage message) {
-        if(message.sender != null && !message.sender.equals(getSelfLink()))
-            throw new IllegalArgumentException("sender of message has to be this node's link or null");
+
+
+
+
+
+
+
+
+    //DIRECT MESSAGING:
+    @Override public void sendInternalMessage(P2LMessage message, SocketAddress to) throws IOException {
+        if(message.sender != null) throw new IllegalArgumentException("sender of message has to be this node's link or null");
+        incomingHandler.serverSocket.send(message.getPacket(to)); //since the server socket is bound to a port, said port will be included in the udp packet
+//        System.out.println(getPort()+" - P2LNodeImpl_sendInternalMessage - to = [" + to + "], message = [" + message + "]");
+    }
+    @Override public void sendMessage(SocketAddress to, P2LMessage message) throws IOException {
         validateMsgIdNotInternal(message.type);
-
-        SocketAddress connection = getActiveConnection(peer);
-        if(connection == null)
-            return new P2LFuture<>(false);
-
+        sendInternalMessage(message, to);
+    }
+    @Override public P2LFuture<Boolean> sendMessageWithReceipt(SocketAddress to, P2LMessage message) throws IOException {
+        validateMsgIdNotInternal(message.type);
+        return sendInternalMessageWithReceipt(message, to);
+    }
+    @Override public void sendMessageBlocking(SocketAddress to, P2LMessage message, int retries, int initialTimeout) throws IOException {
+        validateMsgIdNotInternal(message.type);
+        sendInternalMessageBlocking(message, to, retries, initialTimeout);
+    }
+    @Override public P2LFuture<Boolean> sendInternalMessageWithReceipt(P2LMessage origMessage, SocketAddress receiver) throws IOException {
+        P2LMessage message = origMessage.mutateToRequestReceipt();
+        sendInternalMessage(message, receiver);
+        return incomingHandler.receiptsQueue.receiptFutureFor(receiver, message.type, message.conversationId).toBooleanFuture(receipt ->
+                receipt.validateIsReceiptFor(message));
+    }
+    @Override public void sendInternalMessageBlocking(P2LMessage message, SocketAddress receiver, int retries, int initialTimeout) throws IOException {
         try {
-            send(message, connection);
-            return new P2LFuture<>(true);
-        } catch (IOException e) {
-            return new P2LFuture<>(false);
+            tryComplete(retries, initialTimeout, () -> {
+//                System.out.println(getPort()+" - "+Thread.currentThread().getId()+" - try send blocking: "+message);
+                return sendInternalMessageWithReceipt(message, receiver);
+            });
+        } catch(IOException e) {
+            markBrokenConnection(receiver, true);
+            throw e;
         }
     }
-    
-    @Override public P2LFuture<P2LMessage> expectIndividualMessage(int msgId) {
-        validateMsgIdNotInternal(msgId);
-        return incomingHandler.userIdvMessageQueue.futureFor(msgId);
+
+    @Override public P2LFuture<P2LMessage> expectInternalMessage(SocketAddress from, int msgId) {
+        return incomingHandler.internalMessageQueue.futureFor(from, msgId);
     }
-    @Override public P2LFuture<P2LMessage> expectIndividualMessage(P2Link fromPeer, int msgId) {
+    @Override public P2LFuture<P2LMessage> expectInternalMessage(SocketAddress from, int msgId, int conversationId) {
+        return incomingHandler.internalMessageQueue.futureFor(from, msgId, conversationId);
+    }
+    @Override public P2LFuture<P2LMessage> expectMessage(int msgId) {
         validateMsgIdNotInternal(msgId);
-        return incomingHandler.userIdvMessageQueue.futureFor(fromPeer, msgId);
+        return incomingHandler.userMessageQueue.futureFor(msgId);
+    }
+    public P2LFuture<P2LMessage> expectMessage(SocketAddress from, int msgId) {
+        validateMsgIdNotInternal(msgId);
+        return incomingHandler.userMessageQueue.futureFor(from, msgId);
     }
     @Override public P2LFuture<P2LMessage> expectBroadcastMessage(int msgId) {
         validateMsgIdNotInternal(msgId);
         return incomingHandler.userBrdMessageQueue.futureFor(msgId);
     }
-    @Override public P2LFuture<P2LMessage> expectBroadcastMessage(P2Link fromPeer, int msgId) {
+    @Override public P2LFuture<P2LMessage> expectBroadcastMessage(String from, int msgId) {
         validateMsgIdNotInternal(msgId);
-        return incomingHandler.userBrdMessageQueue.futureFor(fromPeer, msgId);
+        return incomingHandler.userBrdMessageQueue.futureFor(from, msgId);
     }
 
-    @Override public void addIndividualMessageListener(P2LMessageListener listener) { individualMessageListeners.add(listener); }
-    @Override public void addBroadcastListener(P2LMessageListener listener) { broadcastMessageListeners.add(listener); }
-    @Override public void removeIndividualMessageListener(P2LMessageListener listener) { individualMessageListeners.remove(listener); }
-    @Override public void removeBroadcastListener(P2LMessageListener listener) { broadcastMessageListeners.remove(listener); }
 
 
 
-    //INTERNAL::
+
+
+    //CONNECTION KEEPER::
+    private final Set<SocketAddress> establishedConnections = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<SocketAddress, Long> historicConnections = new ConcurrentHashMap<>(); //previously established connections
+    private final int connectionLimit;
+    @Override public boolean isConnectedTo(SocketAddress address) {
+        return establishedConnections.contains(address);
+    }
+    @Override public Set<SocketAddress> getEstablishedConnections() {
+        return establishedConnections;
+    }
+    @Override public boolean connectionLimitReached() {
+        return establishedConnections.size() >= connectionLimit;
+    }
     @Override public int remainingNumberOfAllowedPeerConnections() {
-        return peerLimit - activeConnections.size();
-    }
-    @Override public void addPotentialPeer(P2Link link, SocketAddress connection) throws IOException {
-//        System.out.println("P2LNodeImpl.addActivePeer");
-//        System.out.println("getSelfLink() = " + getSelfLink());
-//        System.out.println("link = [" + link + "], connection = [" + connection + "]");
-        if(activeConnections.size() + 1 > peerLimit)
-            throw new IOException("Peer limit reached");
-        SocketAddress newValue = activeConnections.computeIfAbsent(link, p2Link -> connection);
-        if(newValue != connection) { //peerLink of connection was already known and active
-            throw new IOException("Connection link("+link+") already known - this should kinda not happen if peers behave logically - selfLink: "+getSelfLink());
-        }
-        activeLinks.put(connection, link);
-    }
-    @Override public void cancelPotentialPeer(P2Link link) throws IOException {
-        SocketAddress previous = activeConnections.remove(link);
-        if(previous == null)
-            throw new IOException("cannot cancel unknown peer");
-        activeLinks.remove(previous);
+        return connectionLimit - establishedConnections.size();
     }
 
-    @Override public void graduateToActivePeer(P2Link link) throws IOException {
-        SocketAddress connection = activeConnections.get(link);
-        if(connection!=null && activeLinks.containsKey(connection))
-            historicConnections.remove(link); //if connection was previously marked as broken, it is no longer
-        else
-            throw new IOException("cannot graduate unknown peer");
+    @Override public void graduateToEstablishedConnection(SocketAddress address) {
+        establishedConnections.add(address);
+        historicConnections.remove(address);
+        notifyNewConnection(address);
     }
-    @Override public void markBrokenConnection(P2Link link) {
-        SocketAddress removed = activeConnections.remove(link);
-        if(removed == null) {
-            System.err.println(getSelfLink() + " - link("+link+") was not found - could not mark as broken (already marked??)");
-            return;
-        }
-        activeLinks.remove(removed);
-        historicConnections.put(link, System.currentTimeMillis());
+    @Override public void markBrokenConnection(SocketAddress address, boolean retry) {
+        boolean wasRemoved = establishedConnections.remove(address);
+        if(!wasRemoved) {
+            System.err.println(address+" is not an established connection - could not mark as broken (already marked??)");
+        } else
+            historicConnections.put(address, System.currentTimeMillis());
     }
-    @Override public SocketAddress getActiveConnection(P2Link peerLink) {
-        return activeConnections.get(peerLink);
-    }
-    @Override public P2Link getLinkForConnection(SocketAddress socketAddress) {
-        return activeLinks.get(socketAddress);
-    }
-    @Override public P2LFuture<P2LMessage> futureForInternal(P2Link from, int msgId) {
-        return incomingHandler.internalMessageQueue.futureFor(from, msgId);
-    }
-    @Override public P2LFuture<Integer> executeAllOnSendThreadPool(Task... tasks) {
+    @Override public P2LFuture<Pair<Integer, Integer>> executeAllOnSendThreadPool(Task... tasks) {
         return outgoingHandler.executeAll(tasks);
     }
 
+
+
+
+
+
+
+    //LISTENERS:
+    private final ArrayList<P2LMessageListener> individualMessageListeners = new ArrayList<>();
+    private final ArrayList<P2LMessageListener> broadcastMessageListeners = new ArrayList<>();
+    private final ArrayList<Consumer<SocketAddress>> newConnectionEstablishedListeners = new ArrayList<>();
+    @Override public void addMessageListener(P2LMessageListener listener) { individualMessageListeners.add(listener); }
+    @Override public void addBroadcastListener(P2LMessageListener listener) { broadcastMessageListeners.add(listener); }
+    @Override public void addNewConnectionListener(Consumer<SocketAddress> listener) { newConnectionEstablishedListeners.add(listener); }
+    @Override public void removeMessageListener(P2LMessageListener listener) { individualMessageListeners.remove(listener); }
+    @Override public void removeBroadcastListener(P2LMessageListener listener) { broadcastMessageListeners.remove(listener); }
+    @Override public void removeNewConnectionListener(Consumer<SocketAddress> listener) { newConnectionEstablishedListeners.add(listener); }
     @Override public void notifyBroadcastMessageReceived(P2LMessage message) {
         for (P2LMessageListener l : broadcastMessageListeners) { l.received(message); }
     }
-    @Override public void notifyIndividualMessageReceived(P2LMessage message) {
+    @Override public void notifyMessageReceived(P2LMessage message) {
         for (P2LMessageListener l : individualMessageListeners) { l.received(message); }
     }
 
-    @Override public void send(P2LMessage message, P2Link to) throws IOException {
-        send(message, getActiveConnection(to));
+    private void notifyNewConnection(SocketAddress newAddress) {
+        for (Consumer<SocketAddress> l : newConnectionEstablishedListeners) { l.accept(newAddress); }
     }
-    @Override public void send(P2LMessage data, SocketAddress to) throws IOException {
-        DatagramPacket packet = data.getPacket();
-        incomingHandler.serverSocket.send(new DatagramPacket(packet.getData(), packet.getData().length, to)); //since the server socket is bound to a port, said port will be included in the udp packet
+
+
+    private AtomicInteger runningConversationId = new AtomicInteger(1);
+    @Override public int createUniqueConversationId() {
+        int uniqueConvId;
+        do {
+            uniqueConvId = runningConversationId.getAndIncrement();
+        } while(uniqueConvId==NO_CONVERSATION_ID); //race condition does not matter here - maybe a number is skipped, but it is still unique
+        return uniqueConvId;//will eventually overflow - but by then the conversation has likely ended
+                                       //does not need to be unique between nodes - because it is always in combination with from(sender)+type
+                                       //potential problem:
     }
 }

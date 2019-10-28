@@ -2,26 +2,20 @@ package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
-import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
+import jokrey.utilities.simple.data_structure.pairs.Pair;
 
 import java.io.IOException;
 import java.net.SocketAddress;
 
 interface P2LNodeInternal extends P2LNode {
-    void addPotentialPeer(P2Link link, SocketAddress outgoing) throws IOException;
-    void cancelPotentialPeer(P2Link link) throws IOException;
-    void graduateToActivePeer(P2Link link) throws IOException;
-    void markBrokenConnection(P2Link link);
+    void graduateToEstablishedConnection(SocketAddress address);
+    void markBrokenConnection(SocketAddress address, boolean retry);
     int remainingNumberOfAllowedPeerConnections();
-    SocketAddress getActiveConnection(P2Link peerLink);
-    P2Link getLinkForConnection(SocketAddress socketAddress);
 
-    P2LFuture<P2LMessage> futureForInternal(P2Link from, int msgId);
-    P2LFuture<Integer> executeAllOnSendThreadPool(OutgoingHandler.Task... tasks);
-
-    void notifyBroadcastMessageReceived(P2LMessage message);
-    void notifyIndividualMessageReceived(P2LMessage message);
+    P2LFuture<P2LMessage> expectInternalMessage(SocketAddress from, int msgId);
+    P2LFuture<P2LMessage> expectInternalMessage(SocketAddress from, int msgId, int conversationId);
+    P2LFuture<Pair<Integer, Integer>> executeAllOnSendThreadPool(OutgoingHandler.Task... tasks);
 
     /**
      * Sends a udp packet to the given peer link.
@@ -33,8 +27,12 @@ interface P2LNodeInternal extends P2LNode {
      * @param to receiver link
      * @throws IOException if sending fails
      */
-    void send(P2LMessage message, P2Link to) throws IOException;
-    void send(P2LMessage message, SocketAddress receiver) throws IOException;
+    void sendInternalMessage(P2LMessage message, SocketAddress receiver) throws IOException;
+    P2LFuture<Boolean> sendInternalMessageWithReceipt(P2LMessage message, SocketAddress receiver) throws IOException;
+    void sendInternalMessageBlocking(P2LMessage message, SocketAddress receiver, int retries, int initialTimeout) throws IOException;
 
-    void attachIpToSelfLink(String ip);
+    void notifyBroadcastMessageReceived(P2LMessage message);
+    void notifyMessageReceived(P2LMessage message);
+
+    int createUniqueConversationId();
 }
