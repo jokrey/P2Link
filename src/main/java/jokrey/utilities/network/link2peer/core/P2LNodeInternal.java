@@ -3,7 +3,7 @@ package jokrey.utilities.network.link2peer.core;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
-import jokrey.utilities.simple.data_structure.pairs.Pair;
+import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -15,7 +15,7 @@ interface P2LNodeInternal extends P2LNode {
 
     P2LFuture<P2LMessage> expectInternalMessage(SocketAddress from, int msgId);
     P2LFuture<P2LMessage> expectInternalMessage(SocketAddress from, int msgId, int conversationId);
-    P2LFuture<Pair<Integer, Integer>> executeAllOnSendThreadPool(OutgoingHandler.Task... tasks);
+    P2LFuture<Boolean> executeAllOnSendThreadPool(P2LThreadPool.Task... tasks);
 
     /**
      * Sends a udp packet to the given peer link.

@@ -19,7 +19,6 @@ import java.util.function.Function;
  * This class is thread safe in respect to its methods.
  *
  *
- * TODO: make cancelable
  *
  * @author jokrey
  */

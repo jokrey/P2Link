@@ -1,16 +1,15 @@
 package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.P2LNode;
-import jokrey.utilities.network.link2peer.core.OutgoingHandler.Task;
 import jokrey.utilities.network.link2peer.util.Hash;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
+import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Set;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
 
@@ -18,9 +17,9 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
  * @author jokrey
  */
 class BroadcastMessageProtocol {
-    static void asInitiator(P2LNodeInternal parent, P2LMessage message, SocketAddress to) throws IOException {
+    private static void asInitiator(P2LNodeInternal parent, P2LMessage message, SocketAddress to) throws IOException {
         parent.tryComplete(3, 500, () -> {
-            parent.sendInternalMessage(P2LMessage.createSendMessage(SC_BROADCAST, message.getHash().raw()), to);
+            parent.sendInternalMessage(P2LMessage.createSendMessage(SC_BROADCAST, message.getContentHash().raw()), to);
 
             return parent.expectInternalMessage(to, C_BROADCAST_MSG_KNOWLEDGE_RETURN).combine(peerHashKnowledgeOfMessage_msg -> {
                 boolean peerHashKnowledgeOfMessage = peerHashKnowledgeOfMessage_msg.nextBool();
@@ -72,7 +71,7 @@ class BroadcastMessageProtocol {
                     return null;
 
                 P2LMessage receivedMessage = P2LMessage.createBroadcast(sender, brdMsgType, data);
-                relayBroadcast(receivedMessage, parent, from);
+                relayBroadcast(parent, receivedMessage, from);
     //            System.out.println("receiving message at " + parent.getSelfLink() + " - relayed broadcast");
 
                 return receivedMessage;
@@ -85,38 +84,42 @@ class BroadcastMessageProtocol {
         }
     }
 
-    //outgoing thread pool
-    public static void relayBroadcast(P2LMessage message, P2LNodeInternal node, SocketAddress directlyReceivedFrom) {
-        Set<SocketAddress> establishedConnections = node.getEstablishedConnections();
-        ArrayList<SocketAddress> establishedConnectionsExcept = new ArrayList<>(establishedConnections.size()-1);//not guaranteed that orig message sender is a direct peer, so NOT -2
-        for(SocketAddress l:establishedConnections)
-            if(!WhoAmIProtocol.toString(l).equals(message.sender) && !l.equals(directlyReceivedFrom))
-                establishedConnectionsExcept.add(l);
+    static P2LFuture<Boolean> relayBroadcast(P2LNodeInternal parent, P2LMessage message) {
+        return relayBroadcast(parent, message, null);
+    }
+    private static P2LFuture<Boolean> relayBroadcast(P2LNodeInternal parent, P2LMessage message, SocketAddress directlyReceivedFrom) {
+        SocketAddress[] originallyEstablishedConnections = parent.getEstablishedConnections().toArray(new SocketAddress[0]);
 
-        Task[] tasks = new Task[establishedConnectionsExcept.size()];
+        ArrayList<SocketAddress> establishedConnectionsExcept = new ArrayList<>(originallyEstablishedConnections.length);
+        for(SocketAddress established:originallyEstablishedConnections)
+            if(!WhoAmIProtocol.toString(established).equals(message.sender) && !Objects.equals(established, directlyReceivedFrom))
+                establishedConnectionsExcept.add(established);
+
+        if(establishedConnectionsExcept.isEmpty())
+            return new P2LFuture<>(true);
+
+        P2LThreadPool.Task[] tasks = new P2LThreadPool.Task[establishedConnectionsExcept.size()];
         for (int i = 0; i < establishedConnectionsExcept.size(); i++) {
             SocketAddress connection = establishedConnectionsExcept.get(i);
-            tasks[i] = () -> {
-                asInitiator(node, message, connection);
-                return true;
-            };
+            tasks[i] = () -> asInitiator(parent, message, connection);
         }
-        node.executeAllOnSendThreadPool(tasks); //required, because send also waits for a response...
+
+        return parent.executeAllOnSendThreadPool(tasks); //required, because send also waits for a response...
+
         //TODO: 'short' broadcasts that do not do the hash thing (in that case it is not required to wait for a response...)
         //TODO: evolve the protocol into a protocol that breaks up very long messages into multiple udp packages...
     }
 
 
-    public static class BroadcastState {
+    static class BroadcastState {
         private ConcurrentHashMap<Hash, Long> knownMessageHashes = new ConcurrentHashMap<>();
-        public boolean isKnown(Hash hash) {
+        boolean isKnown(Hash hash) {
             return knownMessageHashes.containsKey(hash);
         }
         //return if it was previously known
-        public boolean markAsKnown(Hash hash) {
+        boolean markAsKnown(Hash hash) {
             long currentTime = System.currentTimeMillis();
             Long oldVal = knownMessageHashes.put(hash, currentTime);
-//            System.out.println("hash = " + hash + " - oldVal: "+oldVal);
 
             if(knownMessageHashes.size() > 500) { //threshold to keep the remove if loop from being run always, maybe 'outsource' the clean up into a background thread
                 //older than two minutes - honestly should be much more than enough to finish propagating a message
@@ -126,14 +129,14 @@ class BroadcastMessageProtocol {
             return oldVal != null; //there was a previous mapping - i.e. the message was previously known
         }
 
-        public void markAsUnknown(Hash hash) {
+        void markAsUnknown(Hash hash) {
             knownMessageHashes.remove(hash);
         }
 
 
         //FIXME - all of these are barely researched heuristics
         long lastClean = -1;
-        public void clean() {
+        void clean() {
             long currentTime = System.currentTimeMillis();
             if(lastClean==-1 || (currentTime - lastClean) / 1000.0 > 30 || knownMessageHashes.size() > 3500) {//only clean every thirty seconds, otherwise it might be spammed
                 lastClean=currentTime;

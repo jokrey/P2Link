@@ -2,14 +2,12 @@ package jokrey.utilities.network.link2peer;
 
 import jokrey.utilities.network.link2peer.core.NodeCreator;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
-import jokrey.utilities.simple.data_structure.pairs.Pair;
 
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 /**
  * This Interface is the Alpha and the Omega of the P2L Network.
@@ -33,7 +31,6 @@ import java.util.function.Function;
  * TODO: retry broken peers in increasing intervals (5 minutes the first time, then 10, then 20, etc. NO MAX!!)
  *
  *
- * TODO: out of the box and optional: detect lost packet and retry message protocols
  *
  *
  * LATER:
@@ -126,7 +123,7 @@ public interface P2LNode {
      * @return a future that is set to complete when attempts were made to send to all
      * @throws IllegalArgumentException if the message has an invalid sender(!= null and not equal to getSelfLink())
      */
-    P2LFuture<Pair<Integer, Integer>> sendBroadcastWithReceipts(P2LMessage message);
+    P2LFuture<Boolean> sendBroadcastWithReceipts(P2LMessage message);
     P2LFuture<P2LMessage> expectBroadcastMessage(int msgId);
     P2LFuture<P2LMessage> expectBroadcastMessage(String from, int msgId);
 
@@ -135,6 +132,7 @@ public interface P2LNode {
     void sendMessageBlocking(SocketAddress to, P2LMessage message, int retries, int initialTimeout) throws IOException; //initial timeout is doubled
     P2LFuture<P2LMessage> expectMessage(int msgId);
     P2LFuture<P2LMessage> expectMessage(SocketAddress address, int msgId);
+    P2LFuture<P2LMessage> expectMessage(SocketAddress address, int msgId, int conversationId);
 
     void addMessageListener(P2LMessageListener listener);
     void addBroadcastListener(P2LMessageListener listener);

@@ -1,6 +1,7 @@
 package jokrey.utilities.network.link2peer.util;
 
 import java.util.*;
+import java.util.function.Supplier;
 
 /**
  * todo WAY TOO MUCH SYNCHRONIZED (everything is locked
@@ -10,7 +11,7 @@ import java.util.*;
 public class P2LThreadPool {
     private final int coreThreads, maxThreads, maxQueuedTasks;
     private List<P2LThread> pool;
-    private Queue<Runnable> queuedTasks = new LinkedList<>();
+    private Queue<P2LTask> queuedTasks = new LinkedList<>();
 
     public P2LThreadPool(int coreThreads, int maxThreads) {
         this(coreThreads, maxThreads, Integer.MAX_VALUE);
@@ -28,14 +29,14 @@ public class P2LThreadPool {
     private boolean shutdown = false;
     public synchronized void shutdown() {
         shutdown = true;
-        for(P2LThread t:pool) t.cancel();
+        for(P2LThread t:pool) t.shutdown();
         pool.clear();
         queuedTasks.clear();
     }
     private synchronized void taskFinished(P2LThread noLongerOccupied) {
         if(shutdown) return;
 
-        Runnable unstartedTask = queuedTasks.poll();
+        P2LTask unstartedTask = queuedTasks.poll();
         if(unstartedTask==null) {
             synchronized (this) {
                 if (pool.size() > coreThreads)
@@ -45,56 +46,84 @@ public class P2LThreadPool {
             noLongerOccupied.runTask(unstartedTask);
     }
 
-    public synchronized void execute(Runnable r) {
-        if(shutdown) return;
+    public synchronized P2LFuture<Boolean> execute(Task... tasks) {
+        ArrayList<P2LFuture<Boolean>> futures = new ArrayList<>(tasks.length);
+        for(Task task:tasks) {
+            futures.add(execute(task));
+        }
+        return P2LFuture.combine(futures, P2LFuture.COMBINE_AND);
+    }
+    public synchronized P2LTask<Boolean> execute(Task task) {
+        return execute(() -> {
+            try {
+                task.run();
+                return true;
+            } catch (Throwable t) {
+                t.printStackTrace();
+                return false;
+            }
+        });
+    }
+    public synchronized <R>P2LTask<R> execute(ProvidingTask<R> task) {
+        return execute(new P2LTask<R>() {
+            @Override protected R run() {
+                try {
+                    return task.run();
+                } catch (Throwable throwable) {
+                    throwable.printStackTrace();
+                    cancel();
+                    return null;
+                }
+            }
+        });
+    }
+    public synchronized <R>P2LTask<R> execute(P2LTask<R> task) {
+        if(shutdown) throw new ShutDownException();
 
         int size = pool.size();
+        boolean isCommitted = false;
         Iterator<P2LThread> poolIterator = pool.iterator();
         while (poolIterator.hasNext()) {
             P2LThread thread = poolIterator.next();
-            if (r != null && thread.runTask(r)) {
-                r = null;
-//                    System.out.println("running on existing");
-            } else if (size > coreThreads && thread.cancel()) {
+            if (!isCommitted && thread.runTask(task)) {
+                isCommitted = true;
+            } else if (size > coreThreads && thread.shutdown()) {
                 poolIterator.remove();
                 size--;
-//                    System.out.println("clean one");
             }
         }
-        if(r!=null) {
+        if(!isCommitted) {
             if(size<maxThreads) {
-//                    System.out.println("creating thread");
-                pool.add(new P2LThread(r));
+                pool.add(new P2LThread(task));
             } else if(queuedTasks.size() < maxQueuedTasks) {
-//                    System.out.println("enqueuing");
-                queuedTasks.offer(r);
+                queuedTasks.offer(task);
             } else {
                 throw new CapacityReachedException();
             }
         }
-//        System.out.println("queuedTasks.size = " + queuedTasks.size());
-//        System.out.println("pool.size() = " + pool.size());
+
+        return task;
     }
 
     class P2LThread implements Runnable {
-        boolean canceled = false;
-        private Runnable task;
+        boolean shutdown = false;
+        private P2LTask task;
         P2LThread() { this(null); }
-        P2LThread(Runnable task) {
+        P2LThread(P2LTask task) {
             new Thread(this).start();
             runTask(task);
         }
 
-        synchronized boolean cancel() {
+        synchronized boolean shutdown() {
             if(task!=null) return false;
-            canceled = true;
+            shutdown = true;
             notify();
             return true;
         }
 
-        synchronized boolean runTask(Runnable r) {
+        synchronized boolean runTask(P2LTask t) {
             if(task == null) {
-                task = r;
+                task = t;
                 notify();
                 return true;
             }
@@ -102,10 +131,10 @@ public class P2LThreadPool {
         }
 
         @Override public void run() {
-            while(!canceled) {
+            while(!shutdown) {
                 if(task!=null) {
                     try {
-                        task.run();
+                        task.start();
                     } catch (Throwable t) {t.printStackTrace();}
                     task = null;
                     taskFinished(this);
@@ -118,5 +147,12 @@ public class P2LThreadPool {
                 }
             }
         }
+    }
+
+    public interface Task {
+        void run() throws Throwable;
+    }
+    public interface ProvidingTask<R> {
+        R run() throws Throwable;
     }
 }

@@ -7,7 +7,6 @@ import jokrey.utilities.network.link2peer.util.CanceledException;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
-import jokrey.utilities.simple.data_structure.pairs.Pair;
 import org.junit.jupiter.api.Test;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
@@ -21,14 +20,13 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class IntermediateTests {
-    @Test public void p2lFutureTest_get() {
+class IntermediateTests {
+    @Test void p2lFutureTest_get() {
         System.out.println("t1("+System.currentTimeMillis()+") init");
 
         P2LFuture<Integer> p2lF = new P2LFuture<>();
@@ -42,7 +40,7 @@ public class IntermediateTests {
         System.out.println("t1("+System.currentTimeMillis()+") - x = "+x);
         assertEquals(123, x);
     }
-    @Test public void p2lFutureTest_MULTIPLE_GET() {
+    @Test void p2lFutureTest_MULTIPLE_GET() {
         System.out.println("t1("+System.currentTimeMillis()+") init");
 
         P2LFuture<Integer> p2lF = new P2LFuture<>();
@@ -82,7 +80,7 @@ public class IntermediateTests {
         System.out.println("t1("+System.currentTimeMillis()+") - x = "+x);
         sleep(1000);
     }
-    @Test public void p2lFutureTest_callMeBack() {
+    @Test void p2lFutureTest_callMeBack() {
         System.out.println("t1("+System.currentTimeMillis()+") init");
 
         P2LFuture<Integer> p2lF = new P2LFuture<>();
@@ -98,7 +96,7 @@ public class IntermediateTests {
         sleep(250); // without this the thread is killed automatically when this method returns
         System.out.println("t1 completed");
     }
-    @Test public void p2lFutureTest_timeout() {
+    @Test void p2lFutureTest_timeout() {
         System.out.println("t1("+System.currentTimeMillis()+") init");
 
         P2LFuture<Integer> p2lF = new P2LFuture<>();
@@ -113,7 +111,7 @@ public class IntermediateTests {
         assertThrows(TimeoutException.class, () -> p2lF.get(100));
         System.out.println("t1("+System.currentTimeMillis()+") completed");
     }
-    @Test public void p2lFutureTest_combine() {
+    @Test void p2lFutureTest_combine() {
         System.out.println("t1("+System.currentTimeMillis()+") init");
 
         P2LFuture<Integer> p2lF1 = new P2LFuture<>();
@@ -133,7 +131,7 @@ public class IntermediateTests {
 
 
 
-    @Test public void establishConnectionProtocolTest() throws IOException {
+    @Test void establishConnectionProtocolTest() throws IOException {
         P2LNode node1 = P2LNode.create(53189); //creates server thread
         P2LNode node2 = P2LNode.create(53188); //creates server thread
 
@@ -146,7 +144,7 @@ public class IntermediateTests {
 
 
 
-    @Test public void garnerConnectionProtocolTest() throws IOException {
+    @Test void garnerConnectionProtocolTest() throws IOException {
         {
             P2LNode[] nodes = generateNodes(10, 60300);
 
@@ -236,7 +234,7 @@ public class IntermediateTests {
     }
 
 
-    @Test public void individualMessageTest() throws IOException {
+    @Test void individualMessageTest() throws IOException {
         Map<SocketAddress, Integer> nodesAndNumberOfReceivedMessages = new ConcurrentHashMap<>();
 
         byte[] idvMsgToSend = new byte[] {17,32,37,45,5,99,33,55,16,43,127};
@@ -295,11 +293,9 @@ public class IntermediateTests {
     }
 
 
-    @Test public void futureIdvMsgText() throws IOException {
+    @Test void futureIdvMsgText() throws IOException {
         int p1 = 34189;
         int p2 = 34188;
-        SocketAddress l1 = new InetSocketAddress("localhost", p1);
-        SocketAddress l2 = new InetSocketAddress("localhost", p2);
         P2LNode node1 = P2LNode.create(p1); //creates server thread
         P2LNode node2 = P2LNode.create(p2); //creates server thread
 
@@ -341,7 +337,7 @@ public class IntermediateTests {
     }
 
 
-    @Test public void broadcastMessageTest() throws IOException {
+    @Test void broadcastMessageTest() throws IOException {
         Map<SocketAddress, Integer> nodesAndNumberOfReceivedMessages = new ConcurrentHashMap<>();
 
         AtomicReference<byte[]> brdMsgToSend = new AtomicReference<>(new byte[] {17,32,37,45,5,99,33,55,16,43,127});
@@ -367,7 +363,7 @@ public class IntermediateTests {
         });
 
         sleep(100); //let nodes start
-        P2LFuture<Pair<Integer, Integer>> sendResult;
+        P2LFuture<Boolean> sendResult;
 
         printPeers(senderNode);
         printPeers(nodes);
@@ -380,7 +376,7 @@ public class IntermediateTests {
 
         TimeDiffMarker.setMark("line + garner 4");
         sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.createBroadcast(WhoAmIProtocol.toString(senderLink), 0, brdMsgToSend.get()));
-        assertEquals(new Pair<>(4, 4), sendResult.get(1000));
+        assertEquals(true, sendResult.get(1000));
 
         System.out.println("broadcast send done");
 
@@ -409,7 +405,7 @@ public class IntermediateTests {
         brdMsgToSend.set(new byte[] {1,2,3,4,5});
         TimeDiffMarker.setMark("sender + ring");
         sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.createBroadcast(WhoAmIProtocol.toString(senderLink), 0, brdMsgToSend.get()));
-        assertEquals(new Pair<>(1, 1), sendResult.get(1000));
+        assertEquals(true, sendResult.get(1000));
 
         while(nodesAndNumberOfReceivedMessages.size() < nodes.length) {
             sleep(10);
@@ -434,7 +430,7 @@ public class IntermediateTests {
         brdMsgToSend.set(new byte[] {1,2,3,4,5,6,7,8});
         TimeDiffMarker.setMark("ring");
         sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.createBroadcast(WhoAmIProtocol.toString(senderLink), 0, brdMsgToSend.get()));
-        assertEquals(new Pair<>(2, 2), sendResult.get(1000));
+        assertEquals(true, sendResult.get(1000));
 
 
         while(nodesAndNumberOfReceivedMessages.size() < nodes.length) {
@@ -468,7 +464,7 @@ public class IntermediateTests {
 
         TimeDiffMarker.setMark("full");
         sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.createBroadcast(WhoAmIProtocol.toString(senderLink), 0, brdMsgToSend.get()));
-        assertEquals(new Pair<>(10, 10), sendResult.get(1000));
+        assertEquals(true, sendResult.get(1000));
 
 
         while(nodesAndNumberOfReceivedMessages.size() < nodes.length) {
@@ -502,7 +498,7 @@ public class IntermediateTests {
         brdMsgToSend.set(new byte[] {1,2,3,4,5,6,7,8,9}); //note that it is the same message as before, the hash nonetheless changes...
 
         sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.createBroadcast(WhoAmIProtocol.toString(senderLink), 10, brdMsgToSend.get())); //IF NOT SUPPLYING A MESSAGE ID, THE OLD MESSAGES WILL BE RECEIVED HERE FIRST....
-        assertEquals(new Pair<>(10, 10), sendResult.get(1000));
+        assertEquals(true, sendResult.get(1000));
 
         for(P2LNode node:nodes) {
             if(new Random().nextBoolean()) {
@@ -527,7 +523,7 @@ public class IntermediateTests {
             assertEquals(new Integer(1), numberOfReceivedMessages);
     }
 
-    @Test public void messagePassingWithTypeConvertedFutureWorks() throws IOException {
+    @Test void messagePassingWithTypeConvertedFutureWorks() throws IOException {
         P2LNode[] nodes = generateNodes(2, 62000);
         ArrayList<P2LFuture<Integer>> fs = new ArrayList<>();
         for(int i=0;i<3;i++) {
@@ -537,21 +533,21 @@ public class IntermediateTests {
         Integer result = P2LFuture.combine(fs, P2LFuture.COMBINE_PLUS).get();
         assertEquals(3, result.intValue());
     }
-    @Test public void messagePassingWithEarlyFutureWorks() throws IOException {
+    @Test void messagePassingWithEarlyFutureWorks() throws IOException {
         P2LNode[] nodes = generateNodes(2, 62010);
         P2LFuture<P2LMessage> earlyFuture = nodes[1].expectMessage(1);
         sleep(500);
         nodes[0].sendMessage(local(nodes[1]), P2LMessage.createSendMessage(1, new Integer(142)));
         assertEquals(142, earlyFuture.get(100).nextInt());
     }
-    @Test public void messagePassingWithExpiredFutureWorks() throws IOException {
+    @Test void messagePassingWithExpiredFutureWorks() throws IOException {
         P2LNode[] nodes = generateNodes(2, 62020);
         assertThrows(TimeoutException.class, () -> nodes[1].expectMessage(1).get(20)); //expires, and the internal message queue throws it away
         sleep(500);
         nodes[0].sendMessage(local(nodes[1]), P2LMessage.createSendMessage(1, new Integer(142)));
         assertEquals(142, nodes[1].expectMessage(1).get(100).nextInt());
     }
-    @Test public void messagePassingWithCanceledFutureWorks() throws IOException {
+    @Test void messagePassingWithCanceledFutureWorks() throws IOException {
         P2LNode[] nodes = generateNodes(2, 62030);
         AtomicReference<P2LFuture<P2LMessage>> future = new AtomicReference<>();
         AtomicInteger successCounter = new AtomicInteger(0);
@@ -568,7 +564,7 @@ public class IntermediateTests {
         assertEquals(142, nodes[1].expectMessage(1).get(100).nextInt());
         assertEquals(1, successCounter.get());
     }
-    @Test public void messagePassingWithCallMeBackFutureWorks() throws IOException {
+    @Test void messagePassingWithCallMeBackFutureWorks() throws IOException {
         P2LNode[] nodes = generateNodes(2, 64000);
         nodes[1].expectMessage(1).callMeBack(m -> {
             System.out.println("CALLED!!!!!");
@@ -580,56 +576,43 @@ public class IntermediateTests {
         assertThrows(TimeoutException.class, () -> nodes[1].expectMessage(1).get(100));
     }
 
-    @Test public void stillWorksWithDroppedPackagesTest() throws IOException {
-        IncomingHandler.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
+    @Test void stillWorksWithDroppedPackagesTest() throws IOException {
+        IncomingHandler.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 10;
 
-        //TODO: why does this not work, but practically the same scenario now works in broadcast test.....???
-//         it is not the port numbers
         P2LNode[] nodes = generateNodes(10, 61408);
 
-//        P2LFuture<Boolean> f = connectAsRing(nodes);
-//        f.get(8000);
-//        printPeers(nodes);
+//        P2LFuture<Boolean> f = fullConnect(nodes);
 //        assertTrue(f.get());
-
-        sleep(1000);
-
-        P2LFuture<Boolean> f = fullConnect(nodes);
-        Boolean result = f.get();
-        printPeers(nodes);
-        assertTrue(result);
-
-
-//        connectAsRing(nodes);
-//        Set<SocketAddress> successes = nodes[0].establishConnections(local(nodes[2])).get();
-//        System.err.println("successes = " + successes);
-//        assertEquals(1, successes.size());
-//        nodes[0].establishConnections(local(nodes[2]), local(nodes[4]), local(nodes[5]), local(nodes[7]));
-//        nodes[2].establishConnections(local(nodes[9]), local(nodes[6]), local(nodes[8]), local(nodes[7]));
-//        nodes[5].establishConnections(local(nodes[1]), local(nodes[2]), local(nodes[9]), local(nodes[8]));
-//        nodes[6].establishConnections(local(nodes[0]), local(nodes[2]), local(nodes[9]), local(nodes[7]));
-//        nodes[8].establishConnections(local(nodes[3]));
 //        printPeers(nodes);
-//
-//
-//        for(P2LNode node:nodes)
-//            node.addBroadcastListener(message -> System.out.println("message = " + message));
-//
-//        nodes[0].sendMessageBlocking(local(nodes[1]), P2LMessage.createSendMessage(1, "sup"), 3, 500); //not even an established connection
-//        nodes[0].sendMessageBlocking(local(nodes[2]), P2LMessage.createSendMessage(1, "sup"), 3, 500);
-//        assertEquals("sup", nodes[1].expectMessage(1).get(1).asString());
-//        assertEquals("sup", nodes[2].expectMessage(1).get(1).asString());
-//        assertThrows(TimeoutException.class, () -> nodes[3].expectMessage(1).get(1));
-//
-//        nodes[6].sendBroadcastWithReceipts(P2LMessage.createBroadcast(WhoAmIProtocol.toString(local(nodes[6])), 1, "sup")).waitForIt();
-//
-//        for(P2LNode node:nodes)
-//            if(node != nodes[6])
-//                node.expectBroadcastMessage(1).get(1000);
+
+
+        connectAsRing(nodes);
+        nodes[0].establishConnections(local(nodes[2]), local(nodes[4]), local(nodes[5]), local(nodes[7])).waitForIt();
+        nodes[2].establishConnections(local(nodes[9]), local(nodes[6]), local(nodes[8]), local(nodes[7])).waitForIt();
+        nodes[5].establishConnections(local(nodes[1]), local(nodes[2]), local(nodes[9]), local(nodes[8])).waitForIt();
+        nodes[6].establishConnections(local(nodes[0]), local(nodes[2]), local(nodes[9]), local(nodes[7])).waitForIt();
+        nodes[8].establishConnections(local(nodes[3])).waitForIt();
+        printPeers(nodes);
+
+        for(P2LNode node:nodes)
+            node.addBroadcastListener(message -> System.out.println("message = " + message));
+
+        nodes[0].sendMessageBlocking(local(nodes[1]), P2LMessage.createSendMessage(1, "sup"), 3, 500); //not even an established connection
+        nodes[0].sendMessageBlocking(local(nodes[2]), P2LMessage.createSendMessage(1, "sup"), 3, 500);
+        assertEquals("sup", nodes[1].expectMessage(1).get(1).asString());
+        assertEquals("sup", nodes[2].expectMessage(1).get(1).asString());
+        assertThrows(TimeoutException.class, () -> nodes[3].expectMessage(1).get(1));
+
+        nodes[6].sendBroadcastWithReceipts(P2LMessage.createBroadcast(WhoAmIProtocol.toString(local(nodes[6])), 1, "sup")).waitForIt();
+
+        for(P2LNode node:nodes)
+            if(node != nodes[6])
+                node.expectBroadcastMessage(1).get(1000);
+
         IncomingHandler.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
     }
 
-    @Test public void stressTest() {
+    @Test void stressTest() {
 
         //todo do CRAZY STUFF
 
@@ -682,7 +665,7 @@ public class IntermediateTests {
     }
 
 
-    @Test public void p2lThreadPoolTest() {
+    @Test void p2lThreadPoolTest() {
         TimeDiffMarker.setMark(5331);
         {
             P2LThreadPool pool = new P2LThreadPool(2, 32);

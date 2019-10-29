@@ -24,7 +24,6 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
  */
 public class IncomingHandler {
     public static int INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
-    private static final int MAX_POOL_SIZE = 256;
 
     DatagramSocket serverSocket;
     private P2LNodeInternal parent;
@@ -44,9 +43,13 @@ public class IncomingHandler {
     private void handleReceivedMessage(DatagramPacket receivedPacket) throws IOException {
         SocketAddress from = receivedPacket.getSocketAddress();
         P2LMessage message = P2LMessage.fromPacket(receivedPacket);
-        boolean dropped = ThreadLocalRandom.current().nextInt(0, 100) < INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE;
-//        System.out.println((dropped?" - DROPPED - ":"") + parent.getPort()+" - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
-        if(dropped) return;
+        if(INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE>0) {
+            boolean dropped = ThreadLocalRandom.current().nextInt(0, 100) < INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE;
+            if (dropped) {
+                System.out.println((dropped ? " - DROPPED - " : "") + parent.getPort() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
+                return;
+            }
+        }
 
 
 //            System.out.println(parent.getPort()+" received message = " + message);
@@ -63,7 +66,7 @@ public class IncomingHandler {
                 parent.sendInternalMessage(P2LMessage.createReceiptFor(message), from);
 //            }
             //todo - what if this packet is lost? then the client will resend, and potentially redo this operation
-            //todo - solve: send retryCounter
+            //todo - solve: send retryCounter (or rather conversation id)
         }
         if(message.isReceipt)
             receiptsQueue.handleNewMessage(message);
@@ -108,9 +111,7 @@ public class IncomingHandler {
                 try {
                     serverSocket.receive(receivedPacket);
 
-                    handleReceivedMessagesPool.execute(
-//                    new Thread(
-                        () -> {
+                    handleReceivedMessagesPool.execute(() -> {
                         //has to be on a thread, because most protocols also wait for an answer - that has to be done outside of the thread that receives the answer (the outer thread here...)
                         //    ((( DOS mitigation:: could be exploited by sending(for example) many broadcast supercauses, but not sending anything else.. (the thread would hang for 5000 ms because it waits for the data to be send...)
 
@@ -119,9 +120,7 @@ public class IncomingHandler {
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
-                    })
-//                    .start()
-                    ;
+                    });
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
