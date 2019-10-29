@@ -1,12 +1,12 @@
 package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.P2LNode;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+
 import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.R_WHO_AM_I_ANSWER;
 import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.SL_WHO_AM_I;
 
@@ -16,12 +16,12 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.SL_WHO_AM_
 public class WhoAmIProtocol {
     public static String asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
         return parent.tryReceive(3, 500, () -> {
-            parent.sendInternalMessage(P2LMessage.createSendMessageFrom(SL_WHO_AM_I), to);
+            parent.sendInternalMessage(P2LMessage.Factory.createSendMessageFrom(SL_WHO_AM_I), to);
             return parent.expectInternalMessage(to, R_WHO_AM_I_ANSWER);
         }).asString();
     }
-    public static void asAnswerer(P2LNodeInternal parent, DatagramPacket receivedPacket) throws IOException {
-        parent.sendInternalMessage(P2LMessage.createSendMessage(R_WHO_AM_I_ANSWER, toString(receivedPacket.getSocketAddress())), receivedPacket.getSocketAddress());
+    static void asAnswerer(P2LNodeInternal parent, DatagramPacket receivedPacket) throws IOException {
+        parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_WHO_AM_I_ANSWER, toString(receivedPacket.getSocketAddress())), receivedPacket.getSocketAddress());
     }
 
 
@@ -30,6 +30,7 @@ public class WhoAmIProtocol {
         return f.getAddress().getCanonicalHostName()+":"+f.getPort();
     }
     public static InetSocketAddress fromString(String str) {
+        if(str == null) return null;
         String[] split = str.split(":");
         return new InetSocketAddress(split[0], Integer.parseInt(split[1]));
     }

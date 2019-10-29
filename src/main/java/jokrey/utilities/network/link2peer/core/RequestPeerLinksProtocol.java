@@ -1,7 +1,6 @@
 package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.P2LNode;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -11,9 +10,9 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.C_PEER_LIN
 import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS;
 
 class RequestPeerLinksProtocol {
-    public static String[] asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
+    static String[] asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
         return parent.tryReceive(3, 500, () -> {
-            parent.sendInternalMessage(P2LMessage.createSendMessage(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS), to);
+            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS), to);
             return parent.expectInternalMessage(to, C_PEER_LINKS).toType(message -> {
                 ArrayList<String> peers = new ArrayList<>();
                 String raw;
@@ -23,13 +22,13 @@ class RequestPeerLinksProtocol {
             });
         });
     }
-    public static void asAnswerer(P2LNodeInternal parent, SocketAddress from) throws IOException {
+    static void asAnswerer(P2LNodeInternal parent, SocketAddress from) throws IOException {
         SocketAddress[] origEstablishedConnections = parent.getEstablishedConnections().toArray(new SocketAddress[0]);
         ArrayList<String> establishedAsStrings = new ArrayList<>(origEstablishedConnections.length);
         for (SocketAddress origEstablishedConnection : origEstablishedConnections)
             if (!origEstablishedConnection.equals(from))
                 establishedAsStrings.add(WhoAmIProtocol.toString(origEstablishedConnection));
 
-        parent.sendInternalMessage(P2LMessage.createSendMessageFromVariables(C_PEER_LINKS, establishedAsStrings), from);
+        parent.sendInternalMessage(P2LMessage.Factory.createSendMessageFromVariables(C_PEER_LINKS, establishedAsStrings), from);
     }
 }

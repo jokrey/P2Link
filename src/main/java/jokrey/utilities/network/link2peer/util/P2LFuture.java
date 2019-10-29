@@ -66,15 +66,13 @@ public class P2LFuture<T> {
     private final AtomicReference<T> result = new AtomicReference<>(null);
 
     /** @return whether anyone is waiting for the future in a blocking fashion */
-    public boolean isBlockingWaiting() { return isGetWaiting; }
+    private boolean isBlockingWaiting() { return isGetWaiting; } //outsider should not make a difference between blocking and unblocking waiting (type conversion and combine kinda rely on that)
     /** @return whether anyone is waiting for the future in an unblocking fashion */
-    public boolean isUnblockingWaiting() {
-        return resultCallbacks.size()>0;
-    }
+    private boolean isUnblockingWaiting() { return resultCallbacks.size()>0; } //outsider should not make a difference between blocking and unblocking waiting (type conversion and combine kinda rely on that)
     /** @return whether anyone is waiting for the future */
     public boolean isWaiting() { return !isCanceled && (isBlockingWaiting() || isUnblockingWaiting()); }
     /** @return whether the result is available */
-    public boolean isCompleted() { return result.get() != null; }
+    public boolean isCompleted() { return getResult() != null; }
     /** @return whether the result will ever be available */
     public boolean isCanceled() { return isCanceled; }
     /** @return whether the result will ever be available */
@@ -164,7 +162,7 @@ public class P2LFuture<T> {
                 }
             }
             if(isCanceled) return null;
-            return result.get();
+            return getResult();
         } catch (InterruptedException e) {
             e.printStackTrace();
             cancel();
@@ -183,7 +181,6 @@ public class P2LFuture<T> {
      * @throws AlreadyCompletedException if the result was already set.
      */
     public void setCompleted(T result) {
-//        System.out.println("P2LFuture.setCompleted: "+result);
         if(result == null) throw new NullPointerException("result cannot be null");
         if(isCanceled) throw new CanceledException();
         if(this.result.compareAndSet(null, result)) { //only if result previously not set
@@ -216,33 +213,13 @@ public class P2LFuture<T> {
         hasTimedOut = true;
     }
 
-    public P2LFuture<Boolean> toBooleanFuture(Function<T, Boolean> toBooleanConverter) {
-        return toType(toBooleanConverter);
+    public P2LFuture<Boolean> toBooleanFuture(Function<T, Boolean> converter) {
+        return toType(converter);
     }
-    public <U> P2LFuture<U> toType(Function<T, U> toTypeConverter) {
-        P2LFuture<U> f = new P2LFuture<>();
-        callMeBack(t -> f.setCompleted(toTypeConverter.apply(t)));
-//        System.out.println("toType - isUnblockingWaiting() = " + isUnblockingWaiting());
+    public <R> P2LFuture<R> toType(Function<T, R> converter) {
+        P2LFuture<R> f = new P2LFuture<>();
+        callMeBack(t -> f.setCompleted(converter.apply(t)));
         return f;
-//        return new P2LFuture<U>() {
-//            @Override public U getOrNull(long timeout_ms) {
-//                System.out.println("P2LFuture.toType.getOrNull");
-//                isGetWaiting = true;
-//                T t = P2LFuture.this.getOrNull(timeout_ms);
-//                isGetWaiting = false;
-//                System.out.println("P2LFuture.toType.getOrNull - t: "+t);
-//                if(t==null) return null;
-//                return toTypeConverter.apply(t);
-//            }
-//            @Override public void callMeBack(Consumer<U> callback) {
-//                P2LFuture.this.callMeBack(t -> {
-//                    if(isWaiting()) //only if anyone else is still waiting do the thing... If this future has timed out, do not do it
-//                        callback.accept(toTypeConverter.apply(t));
-//                });
-//            }
-//        isBlockingWaiting()
-//        isUnblockingWaiting()
-//        };
     }
 
 
@@ -252,22 +229,6 @@ public class P2LFuture<T> {
         P2LFuture<U> f = new P2LFuture<>();
         callMeBack(t -> next.apply(t).callMeBack(f::setCompleted));
         return f;
-//        return new P2LFuture<U>() { //does not properly work, because incorrect return of isWaiting etc...
-//            @Override public U getOrNull(long timeout_ms) {
-//                long before = System.currentTimeMillis();
-//                T t = P2LFuture.this.getOrNull(timeout_ms);
-//                if(t == null) return null;
-//                long remaining_ms = timeout_ms - (System.currentTimeMillis()-before);
-//                return next.apply(t).getOrNull(remaining_ms);
-//            }
-//
-//            @Override public void callMeBack(Consumer<U> callback) {
-//                P2LFuture.this.callMeBack(t -> {
-//                    if(isWaiting()) //only if anyone else is still waiting do the thing... If this future has timed out, do not do it
-//                        next.apply(t).callMeBack(this::setCompleted);
-//                });
-//            }
-//        };
     }
 
     public static final BiFunction<Boolean, Boolean, Boolean> COMBINE_AND = (a, b) -> a && b;
@@ -279,33 +240,24 @@ public class P2LFuture<T> {
         P2LFuture<R> f = new P2LFuture<>();
         callMeBack(t -> next.callMeBack(u -> f.setCompleted(combineFunction.apply(t, u))));
         return f;
-
-//        return new P2LFuture<R>() { //does not properly work, because incorrect return of isWaiting etc...
-//            @Override public R getOrNull(long timeout_ms) {
-//                long before = System.currentTimeMillis();
-//                T t = P2LFuture.this.getOrNull(timeout_ms);
-//                if(t == null) return null;
-//                long remaining_ms = timeout_ms - (System.currentTimeMillis()-before);
-//                U u = next.getOrNull(remaining_ms);
-//                if(u == null) return null;
-//                return combineFunction.apply(t, u);
-//            }
-//
-//            @Override public void callMeBack(Consumer<R> callback) {
-//                P2LFuture.this.callMeBack(t -> {
-//                    if(isWaiting()) //only if anyone else is still waiting do the thing... If this future has timed out, do not do it
-//                        next.callMeBack(u -> setCompleted(combineFunction.apply(t, u)));
-//                });
-//            }
-//        };
     }
-    public static <T> P2LFuture<T> combine(Collection<P2LFuture<T>> futures, BiFunction<T, T, T> combineFunction) {
+    public static <T> P2LFuture<T> reduce(Collection<P2LFuture<T>> futures, BiFunction<T, T, T> combineFunction) {
         P2LFuture<T> last = null;
         for(P2LFuture<T> next:futures) {
             if(last == null)
                 last=next;
             else
                 last = last.combine(next, combineFunction);
+        }
+        return last;
+    }
+    public static <T, R> P2LFuture<R> reduceConvert(Collection<P2LFuture<T>> futures, Function<T, R> converter, BiFunction<R, R, R> reduceFunction) {
+        P2LFuture<R> last = null;
+        for(P2LFuture<T> next:futures) {
+            if(last == null)
+                last=next.toType(converter);
+            else
+                last = last.combine(next.toType(converter), reduceFunction);
         }
         return last;
     }

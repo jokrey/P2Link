@@ -56,11 +56,11 @@ public class CommandLineP2LChat {
         loop.addCommand("printOwnPort", "Prints own nodes link", Argument.noargs(), args -> System.out.println(node.getPort()),
                 "self", "port");
         loop.addCommand("sendBroadcast", "Sends a string(args[0]) as a broadcast", Argument.with(String.class), args ->
-                node.sendBroadcastWithReceipts(P2LMessage.createSendMessage(0, args[0].getRaw())), "broadcast", "brd");
+                node.sendBroadcastWithReceipts(P2LMessage.Factory.createSendMessage(0, args[0].getRaw())), "broadcast", "brd");
         loop.addCommand("sendIndividualMessage", "Sends a string(args[1]) as an individual message to an active peer link(args[0])", Argument.with(String.class, String.class), args -> {
             SocketAddress to = WhoAmIProtocol.fromString(args[0].getRaw());
             try {
-                P2LFuture<Boolean> success = node.sendMessageWithReceipt(to, P2LMessage.createSendMessage(0, args[1].getRaw()));
+                P2LFuture<Boolean> success = node.sendMessageWithReceipt(to, P2LMessage.Factory.createSendMessage(0, args[1].getRaw()));
                 System.out.println(success.get(250)?"successfully send":"could not send");
             } catch (IOException e) {
                 e.printStackTrace();

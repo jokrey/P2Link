@@ -8,6 +8,7 @@ import java.net.SocketAddress;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * This Interface is the Alpha and the Omega of the P2L Network.
@@ -58,93 +59,86 @@ import java.util.function.Consumer;
  * @author jokrey
  */
 public interface P2LNode {
+    int NO_CONVERSATION_ID = 0;
+
     /**
-     * @param port if self link is only a port, i.e. the public ip is not currently known
-     *                 then the node will automatically fill that information when connection to the first peer
-     *                 (note that this is final, if the first peer lies then no external node can ever connect to this peer,
-     *                 but it will be detected when connecting to other peers since they will reject the peer connection request since the self given link resolves to a different ip)
-     * @return a new node at the given self link
-     * @throws IOException
+     * @param port port on which this node should listen for messages
+     * @return a new node listening to the given port
+     * @throws IOException if the port is unavailable
      */
     static P2LNode create(int port) throws IOException { return NodeCreator.create(port); }
+
+    /**
+     * @param port port on which this node should listen for messages
+     * @param peerLimit final peer limit for this node, this node will never maintain more connections that the given limit - any more connections will be not established or rejected
+     * @return a new node listening to the given port
+     * @throws IOException if the port is unavailable
+     */
     static P2LNode create(int port, int peerLimit) throws IOException { return NodeCreator.create(port, peerLimit); }
 
 
+    /** @return the port on which this node is listening - an ip or dns plus this port and be used to connect to this node */
     int getPort();
+    /** Irreversibly closes this node and unbinds its server socket */
+    void close();
+
+    /**
+     * Creates a unique conversation id(terms and conditions apply - i.e. cycles after 2^32-1 calls).
+     * Guaranteed to never equal {@link #NO_CONVERSATION_ID}, i.e. 0.
+     * Conversation id's are used to create unambiguous message requests in conversations.
+     * When multiple conversations of the same type are run concurrently, for example through retrying after dropped packages or in slow connections,
+     *    then it is required to still handle them separately.
+     * Conversation id's should be created and send by the conversation initiator.
+     * @return the created id
+     */
+    int createUniqueConversationId();
+
+
     /**
      * @return currently active peer links, the links can be used as ids to identify individual peer nodes
      * Note: It is not guaranteed that any peer in the returned set is still active when used.
      */
     Set<SocketAddress> getEstablishedConnections();
+    /**
+     * @return addresses of peers that this node had previously maintained an established connection, the connections however have since timed out or proven to be unreliable and were therefore closed
+     */
+    Set<SocketAddress> getPreviouslyEstablishedConnections();
 
+    /** @return whether any more connections can be established or the final limit has already been reached */
     boolean connectionLimitReached();
 
+    /**
+     * Attempts to establish a connection to the given address.
+     * Returns true when the connection was already established
+     * @param to address of the node to establish a connection to
+     * @return a future of whether it was possible to establish the connection to parameter to
+     */
     P2LFuture<Boolean> establishConnection(SocketAddress to);
 //    {
 //        return establishConnections(to).toBooleanFuture(success -> success.size()==1 && success.contains(to));
 //    }
     /**
-     * Internally connects to given peer links
-     * Returns list of successful connections (will not throw an exception for unsuccessful attempts)
-     * If the connection is already active, it is returned in the success link - but the connection is not reestablished and not tested
-     * returned list should be in returned set of {@link #getEstablishedConnections()}, however it is possible that the connection drops in the meantime
+     * Attempts to establish a connection to the given addresses.
+     * Returns future of a subset of connections from given addresses to which the node now maintains a connection.
+     * If the connection is already active, it is returned in the successful connection - but the connection is not reestablished and not tested
+     * returned set should be as subset of {@link #getEstablishedConnections()}, however it is possible that the connection drops in the meantime
      * @param addresses to connect to
-     * @return list of new(!), successful connections
+     * @return future set of established given connections
      */
     P2LFuture<Set<SocketAddress>> establishConnections(SocketAddress... addresses);
 
     /**
-     * Answers the question of whether this node currently maintains an active connection to the given link.
-     * @param peerLink
-     * @return
+     * @param to is connected to?
+     * @return whether this node is connected to to
      */
-    boolean isConnectedTo(SocketAddress peerLink);
-
-    void disconnectFrom(SocketAddress address);
-//    Future<Boolean> disconnectFromWithReceipt(SocketAddress address);
+    boolean isConnectedTo(SocketAddress to);
 
     /**
-     * Will establish a connection to every given setup link and request their peers.
-     *
-     * From then it will recursively attempt to establish connections to randomly selected received peers, until the new connection limit is reached.
-     * If the connection limit is smaller than the number of setup links, not all setup links may be connected to
-     *
-     * The max peer limit in the constructor is being respected at all times
-     *
-     * @param newConnectionLimit
-     * @param setupLinks
-     * @return newly, successfully connected links
+     * Sends a disconnect request to the node at the given address.
+     * Additionally it marks from as a broken connection and removes it from established connections.
+     * @param from node address to disconnect from
      */
-    List<SocketAddress> recursiveGarnerConnections(int newConnectionLimit, SocketAddress... setupLinks);
-
-
-    /**
-     * @param message message to be send, sender field can be null in that case it will be filled automatically
-     * @return a future that is set to complete when attempts were made to send to all
-     * @throws IllegalArgumentException if the message has an invalid sender(!= null and not equal to getSelfLink())
-     */
-    P2LFuture<Boolean> sendBroadcastWithReceipts(P2LMessage message);
-    P2LFuture<P2LMessage> expectBroadcastMessage(int msgId);
-    P2LFuture<P2LMessage> expectBroadcastMessage(String from, int msgId);
-
-    void sendMessage(SocketAddress to, P2LMessage message) throws IOException;
-    P2LFuture<Boolean> sendMessageWithReceipt(SocketAddress to, P2LMessage message) throws IOException;
-    void sendMessageBlocking(SocketAddress to, P2LMessage message, int retries, int initialTimeout) throws IOException; //initial timeout is doubled
-    P2LFuture<P2LMessage> expectMessage(int msgId);
-    P2LFuture<P2LMessage> expectMessage(SocketAddress address, int msgId);
-    P2LFuture<P2LMessage> expectMessage(SocketAddress address, int msgId, int conversationId);
-
-    void addMessageListener(P2LMessageListener listener);
-    void addBroadcastListener(P2LMessageListener listener);
-    void addNewConnectionListener(Consumer<SocketAddress> listener);
-    void removeMessageListener(P2LMessageListener listener);
-    void removeBroadcastListener(P2LMessageListener listener);
-    void removeNewConnectionListener(Consumer<SocketAddress> listener);
-
-    interface P2LMessageListener {
-        void received(P2LMessage message);
-    }
-
+    void disconnectFrom(SocketAddress from);
 
     /**
      * Gracefully closes all connections to peers and makes sure to add them to the list of historic connections.
@@ -157,35 +151,166 @@ public interface P2LNode {
     }
 
 
+    /** @see jokrey.utilities.network.link2peer.core.GarnerConnectionsRecursivelyProtocol */
+    List<SocketAddress> recursiveGarnerConnections(int newConnectionLimit, SocketAddress... setupLinks);
 
-    default <T> T tryReceive(int retries, int initialTimeout, Request<T> f) throws IOException {
+
+
+    /**
+     * Sends the given message to the given address.
+     * Non-Blocking. After this methods returns it is not guaranteed that the receiver has or will ever receive the send message(udp maybe semantic).
+     * @param to address to send to
+     * @param message message to send
+     * @throws IOException if the send went to garbage
+     */
+    void sendMessage(SocketAddress to, P2LMessage message) throws IOException;
+    /**
+     * Sends the given message to the given address and request a receipt.
+     * Non-Blocking. After this methods returns it is not guaranteed that the receiver has or will ever receive the send message(udp maybe semantic).
+     * The returned future represents request for a received receipt of the message.
+     * Not guaranteed to ever complete. If either send or receipt package is lost, the future will never complete.
+     * However if the future never completes, this does not indicate that the other node has not received and handled the message.
+     * It is possible that only the receipt package has been lost.
+     * @param to address to send to
+     * @param message message to send
+     * @return a future indicating the receival of a receipt for the send message
+     * @throws IOException if the send went to garbage
+     */
+    P2LFuture<Boolean> sendMessageWithReceipt(SocketAddress to, P2LMessage message) throws IOException;
+    /**
+     * Sends the given message to the given address.
+     * Additionally block as long as no receipt for the given message has been received.
+     * Additionally retry a given number of times after a given timeout. After each retry the given initial timeout is doubled (compare tcp's reasoning for a similar behaviour).
+     * If the the receipt was still not received after all retries, the connection is marked as broken.
+     *
+     * CURRENTLY: no handling of double message. Double received message in the context of a retry are handled twice (in case the receive drops)
+     *
+     * @param to address to send to
+     * @param message message to send
+     * @param retries total number of REtries (i.e. will do a total of 1 + retries attempts)
+     * @param initialTimeout initial timeout - since doubled with each retry, max timeout is: (initialTimeout * 2^retries)
+     * @throws IOException if any send went to garbage
+     */
+    void sendMessageBlocking(SocketAddress to, P2LMessage message, int retries, int initialTimeout) throws IOException; //initial timeout is doubled
+
+    /**
+     * Creates a future for an expected message with the given messageType.
+     * @param messageType a message type of user privileges (i.e. that {@link jokrey.utilities.network.link2peer.core.P2L_Message_IDS#isInternalMessageId(int)} does not hold)
+     * @return the created future
+     */
+    P2LFuture<P2LMessage> expectMessage(int messageType);
+    /**
+     * Creates a future for an expected message with the given sender and messageType.
+     * @param from the sender of the broadcast message (decoded from the raw ip packet)
+     * @param messageType a message type of user privileges (i.e. that {@link jokrey.utilities.network.link2peer.core.P2L_Message_IDS#isInternalMessageId(int)} does not hold)
+     * @return the created future
+     */
+    P2LFuture<P2LMessage> expectMessage(SocketAddress from, int messageType);
+    /**
+     * Creates a future for an expected message with the given sender, messageType and conversationId (see {@link #createUniqueConversationId()}).
+     * @param from the sender of the broadcast message (decoded from the raw ip packet)
+     * @param messageType a message type of user privileges (i.e. that {@link jokrey.utilities.network.link2peer.core.P2L_Message_IDS#isInternalMessageId(int)} does not hold)
+     * @param conversationId the conversation id of the message
+     * @return the created future
+     */
+    P2LFuture<P2LMessage> expectMessage(SocketAddress from, int messageType, int conversationId);
+
+
+    /**
+     * @param message message to be send, sender field can be null in that case it will be filled automatically
+     * @return a future that is set to complete when attempts were made to send to all
+     * @throws IllegalArgumentException if the message has an invalid sender(!= null and not equal to getSelfLink())
+     */
+    P2LFuture<Integer> sendBroadcastWithReceipts(P2LMessage message);
+    /**
+     * Creates a future for an expected broadcast message with the given messageType.
+     * @param messageType a message type of user privileges (i.e. that {@link jokrey.utilities.network.link2peer.core.P2L_Message_IDS#isInternalMessageId(int)} does not hold)
+     * @return the created future
+     */
+    P2LFuture<P2LMessage> expectBroadcastMessage(int messageType);
+    /**
+     * Creates a future for an expected broadcast message with the given sender and messageType.
+     * @param from the self named sender of the broadcast message (never validated to be anything)
+     * @param messageType a message type of user privileges (i.e. that {@link jokrey.utilities.network.link2peer.core.P2L_Message_IDS#isInternalMessageId(int)} does not hold)
+     * @return the created future
+     */
+    P2LFuture<P2LMessage> expectBroadcastMessage(String from, int messageType);
+
+
+    /**
+     * Retry feature for more complex conversations.
+     * Conversations with a retry feature should always use a conversation id (see {@link #createUniqueConversationId()}).
+     * @param retries total number of REtries (i.e. will do a total of 1 + retries attempts)
+     * @param initialTimeout initial timeout - since doubled with each retry, max timeout is: (initialTimeout * 2^retries)
+     * @param conversationWithResult function that produces future which represents a result.
+     *                               Complex conversations will likely want to chain that future, with each waiting for a message as a combined future.
+     *                               For this purpose {@link P2LFuture#combine(Function)} can be used.
+     * @return the received final result
+     * @throws IOException if no result could be obtained after given number of retries or the send went to garbage
+     */
+    default <T> T tryReceive(int retries, int initialTimeout, Request<T> conversationWithResult) throws IOException {
         int timeout = initialTimeout;
         for(int retryCounter=0; retryCounter<retries; retryCounter++) {
             try {
-                T gotten = f.request().getOrNull(timeout);
+                T gotten = conversationWithResult.request().getOrNull(timeout);
                 if (gotten != null) return gotten;
             } catch (IOException ignore) {}
             timeout *= 2;
         }
         throw new IOException(getPort()+" could not get result after "+retries+" retries");
     }
-    default void tryComplete(int retries, int initialTimeout, Request<Boolean> f) throws IOException {
+    /**
+     * Like {@link #tryReceive(int, int, Request)}, except that the conversation produces a boolean representing success.
+     * Unlike {@link #tryReceive(int, int, Request)} this method allows triggering a retry early, by setting the returned future to false.
+     * @param retries total number of REtries (i.e. will do a total of 1 + retries attempts)
+     * @param initialTimeout initial timeout - since doubled with each retry, max timeout is: (initialTimeout * 2^retries)
+     * @param conversation function that can succeed, but if it does not can be at least retried.
+     * @throws IOException if no result could be obtained after given number of retries or the send went to garbage
+     */
+    default void tryComplete(int retries, int initialTimeout, Request<Boolean> conversation) throws IOException {
         int timeout = initialTimeout;
         for(int retryCounter=-1; retryCounter<retries; retryCounter++) {
             try {
-                Boolean success = f.request().getOrNull(timeout);
-//                System.out.println(getPort()+" "+Thread.currentThread().getId()+" - tryComplete: success = "+success+", retryCounter="+retryCounter);
+                Boolean success = conversation.request().getOrNull(timeout);
                 if(success!=null && success) return;
-            } catch (IOException ignore) {ignore.printStackTrace();}
+            } catch (IOException ignore) {}
             timeout *= 2;
         }
         throw new IOException(getPort()+" could not get result after "+retries+" retries");
     }
-    interface Request<T> {
-        P2LFuture<T> request() throws IOException;
-    }
+    /** Function producing something in the future */
+    interface Request<T> { P2LFuture<T> request() throws IOException;}
 
 
 
-    int NO_CONVERSATION_ID = 0;
+    /**
+     * This method provides another possibility of asynchronously receiving messages.
+     * All user level message will be received by the given listener.
+     * The message will nonetheless remain receivable by the more exact 'expect' futures.
+     * @param listener listener to add
+     */
+    void addMessageListener(P2LMessageListener listener);
+    /**
+     * This method provides another possibility of asynchronously receiving broadcasts.
+     * All user level broadcasts will be received by the given listener.
+     * The broadcast will nonetheless remain receivable by the more exact 'expect' futures.
+     * @param listener listener to add
+     */
+    void addBroadcastListener(P2LMessageListener listener);
+    /**
+     * The given listener will receive all newly established connections.
+     * @param listener listener to add
+     */
+    void addNewConnectionListener(Consumer<SocketAddress> listener);
+    /** Removes a previously assigned listener, by raw reference (i.e. ==)
+     * @param listener listener to remove */
+    void removeMessageListener(P2LMessageListener listener);
+    /** Removes a previously assigned listener, by raw reference (i.e. ==)
+     * @param listener listener to remove */
+    void removeBroadcastListener(P2LMessageListener listener);
+    /** Removes a previously assigned listener, by raw reference (i.e. ==)
+     * @param listener listener to remove */
+    void removeNewConnectionListener(Consumer<SocketAddress> listener);
+    /** Trivial message listener - dual use for direct messages and broadcasts */
+    interface P2LMessageListener { void received(P2LMessage message);}
 }

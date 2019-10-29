@@ -8,7 +8,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.util.concurrent.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
 
@@ -35,8 +35,6 @@ public class IncomingHandler {
     final BroadcastMessageProtocol.BroadcastState broadcastState = new BroadcastMessageProtocol.BroadcastState();
 //    final RetryHandler retryHandler = new RetryHandler();
 
-//    private final ThreadPoolExecutor handleReceivedMessagesPool = new ThreadPoolExecutor(4/*core size*/, MAX_POOL_SIZE/*max size*/, 60, TimeUnit.SECONDS/*idle timeout*/, new LinkedBlockingQueue<>(MAX_POOL_SIZE * 2),
-//            r -> new Thread()); // queue with a size
     private final P2LThreadPool handleReceivedMessagesPool = new P2LThreadPool(4, 64);
 
 
@@ -46,14 +44,12 @@ public class IncomingHandler {
         if(INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE>0) {
             boolean dropped = ThreadLocalRandom.current().nextInt(0, 100) < INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE;
             if (dropped) {
-                System.out.println((dropped ? " - DROPPED - " : "") + parent.getPort() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
+                System.out.print(" - DROPPED - ");
+                System.out.println(parent.getPort() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
                 return;
             }
         }
 
-
-//            System.out.println(parent.getPort()+" received message = " + message);
-//            System.out.println(parent.getPort()+" from = " + from);
 
         if(message.requestReceipt) {
             //TODO - problem: double send receipt - i.e.
@@ -98,15 +94,15 @@ public class IncomingHandler {
 
     }
 
-    public IncomingHandler(P2LNodeInternal parentG) throws IOException {
+    IncomingHandler(P2LNodeInternal parentG) throws IOException {
         this.parent = parentG;
 
         serverSocket = new DatagramSocket(parent.getPort());
 
         new Thread(() -> {
-            while(true) {
+            while(!serverSocket.isClosed()) {
                 //fixme 1024 is a heuristic
-                byte[] receiveBuffer = new byte[1024]; //asAnswerer buffer needs to be new for each run, otherwise handlereceivedmessages might get weird results - maximum safe size allegedly 512
+                byte[] receiveBuffer = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT]; //asAnswerer buffer needs to be new for each run, otherwise handlereceivedmessages might get weird results - maximum safe size allegedly 512
                 DatagramPacket receivedPacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
                 try {
                     serverSocket.receive(receivedPacket);
@@ -126,5 +122,12 @@ public class IncomingHandler {
                 }
             }
         }).start();
+    }
+
+    void close() {
+        serverSocket.close();
+    }
+    boolean isClosed() {
+        return serverSocket.isClosed();
     }
 }

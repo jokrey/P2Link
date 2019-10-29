@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+
 import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
 
 /**
@@ -19,7 +20,7 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
 class BroadcastMessageProtocol {
     private static void asInitiator(P2LNodeInternal parent, P2LMessage message, SocketAddress to) throws IOException {
         parent.tryComplete(3, 500, () -> {
-            parent.sendInternalMessage(P2LMessage.createSendMessage(SC_BROADCAST, message.getContentHash().raw()), to);
+            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SC_BROADCAST, message.getContentHash().raw()), to);
 
             return parent.expectInternalMessage(to, C_BROADCAST_MSG_KNOWLEDGE_RETURN).combine(peerHashKnowledgeOfMessage_msg -> {
                 boolean peerHashKnowledgeOfMessage = peerHashKnowledgeOfMessage_msg.nextBool();
@@ -28,7 +29,7 @@ class BroadcastMessageProtocol {
                     byte[] senderBytes = message.sender.getBytes(StandardCharsets.UTF_8);
                     try {
                         parent.sendInternalMessage(
-                                P2LMessage.createSendMessageFrom(C_BROADCAST_MSG, message.type,
+                                P2LMessage.Factory.createSendMessageFrom(C_BROADCAST_MSG, message.type,
                                         P2LMessage.makeVariableIndicatorFor(senderBytes.length), senderBytes,
                                         P2LMessage.makeVariableIndicatorFor(message.payloadLength), message.asBytes()),
                                 to);
@@ -52,13 +53,13 @@ class BroadcastMessageProtocol {
         if(state.isKnown(brdMessageHash)) {
 //        if(wasKnown) {
 //            System.out.println("receiving message at " + parent.getSelfLink() + " - known - sending msg knowledge return");
-            parent.sendInternalMessage(P2LMessage.createSendMessage(C_BROADCAST_MSG_KNOWLEDGE_RETURN, true), from);
+            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(C_BROADCAST_MSG_KNOWLEDGE_RETURN, true), from);
 //            System.out.println("receiving message at " + parent.getSelfLink() + " - known - send msg knowledge return");
             return null; //do not tell application about broadcast again
         } else {
             try {
     //            System.out.println("receiving message at " + parent.getSelfLink() + " - NOT known - sending msg knowledge return - hash: "+ Arrays.toString(initialMessage.asBytes()));
-                parent.sendInternalMessage(P2LMessage.createSendMessage(C_BROADCAST_MSG_KNOWLEDGE_RETURN, false), from);
+                parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(C_BROADCAST_MSG_KNOWLEDGE_RETURN, false), from);
     //            System.out.println("receiving message at " + parent.getSelfLink() + " - NOT known - send msg knowledge return");
 
                 P2LMessage message = parent.expectInternalMessage(from, C_BROADCAST_MSG).get(2500);
@@ -66,11 +67,15 @@ class BroadcastMessageProtocol {
                 String sender = message.nextVariableString();
                 byte[] data = message.nextVariable();
     //            System.out.println("receiving message at " + parent.getSelfLink() + " - read data");
+                if(sender == null || data == null) {
+                    state.markAsUnknown(brdMessageHash);
+                    return null;
+                }
 
                 if(state.markAsKnown(brdMessageHash)) // while receiving this message, this node has received it from somewhere else
                     return null;
 
-                P2LMessage receivedMessage = P2LMessage.createBroadcast(sender, brdMsgType, data);
+                P2LMessage receivedMessage = P2LMessage.Factory.createBroadcast(sender, brdMsgType, data);
                 relayBroadcast(parent, receivedMessage, from);
     //            System.out.println("receiving message at " + parent.getSelfLink() + " - relayed broadcast");
 
@@ -84,10 +89,10 @@ class BroadcastMessageProtocol {
         }
     }
 
-    static P2LFuture<Boolean> relayBroadcast(P2LNodeInternal parent, P2LMessage message) {
+    static P2LFuture<Integer> relayBroadcast(P2LNodeInternal parent, P2LMessage message) {
         return relayBroadcast(parent, message, null);
     }
-    private static P2LFuture<Boolean> relayBroadcast(P2LNodeInternal parent, P2LMessage message, SocketAddress directlyReceivedFrom) {
+    private static P2LFuture<Integer> relayBroadcast(P2LNodeInternal parent, P2LMessage message, SocketAddress directlyReceivedFrom) {
         SocketAddress[] originallyEstablishedConnections = parent.getEstablishedConnections().toArray(new SocketAddress[0]);
 
         ArrayList<SocketAddress> establishedConnectionsExcept = new ArrayList<>(originallyEstablishedConnections.length);
@@ -96,7 +101,7 @@ class BroadcastMessageProtocol {
                 establishedConnectionsExcept.add(established);
 
         if(establishedConnectionsExcept.isEmpty())
-            return new P2LFuture<>(true);
+            return new P2LFuture<>(new Integer(0));
 
         P2LThreadPool.Task[] tasks = new P2LThreadPool.Task[establishedConnectionsExcept.size()];
         for (int i = 0; i < establishedConnectionsExcept.size(); i++) {

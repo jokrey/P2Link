@@ -1,7 +1,6 @@
 package jokrey.utilities.network.link2peer.core;
 
 import java.io.IOException;
-import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -16,11 +15,11 @@ class GarnerConnectionsRecursivelyProtocol {
      *
      * The max peer limit in the constructor is being respected at all times
      *
-     * @param newConnectionLimit
-     * @param setupLinks
+     * @param newConnectionLimit maximum number of new connections, after this limit is reached the algorithm will terminate
+     * @param setupLinks links to begin discovering connections from, setup links are connected to and count as new connections in the newConnectionLimit
      * @return newly, successfully connected links
      */
-    public static List<SocketAddress> recursiveGarnerConnections(P2LNodeInternal parent, int newConnectionLimit, int newConnectionLimitPerRecursion, List<SocketAddress> setupLinks) {
+    static List<SocketAddress> recursiveGarnerConnections(P2LNodeInternal parent, int newConnectionLimit, int newConnectionLimitPerRecursion, List<SocketAddress> setupLinks) {
         //also naturally limited by peerLimit set in constructor (and ram cap)
 
         if(setupLinks.isEmpty() || newConnectionLimit <=0)

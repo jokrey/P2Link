@@ -1,7 +1,8 @@
 package jokrey.utilities.network.link2peer.util;
 
+import jokrey.utilities.network.link2peer.P2LMessage;
+
 import java.util.*;
-import java.util.function.Supplier;
 
 /**
  * todo WAY TOO MUCH SYNCHRONIZED (everything is locked
@@ -46,12 +47,11 @@ public class P2LThreadPool {
             noLongerOccupied.runTask(unstartedTask);
     }
 
-    public synchronized P2LFuture<Boolean> execute(Task... tasks) {
+    public synchronized P2LFuture<Integer> execute(Task... tasks) {
         ArrayList<P2LFuture<Boolean>> futures = new ArrayList<>(tasks.length);
-        for(Task task:tasks) {
+        for(Task task:tasks)
             futures.add(execute(task));
-        }
-        return P2LFuture.combine(futures, P2LFuture.COMBINE_AND);
+        return P2LFuture.reduceConvert(futures, b -> b?1:0, P2LFuture.COMBINE_PLUS);
     }
     public synchronized P2LTask<Boolean> execute(Task task) {
         return execute(() -> {
@@ -78,6 +78,7 @@ public class P2LThreadPool {
         });
     }
     public synchronized <R>P2LTask<R> execute(P2LTask<R> task) {
+        if(task == null) throw new NullPointerException();
         if(shutdown) throw new ShutDownException();
 
         int size = pool.size();
@@ -105,7 +106,7 @@ public class P2LThreadPool {
         return task;
     }
 
-    class P2LThread implements Runnable {
+    private class P2LThread implements Runnable {
         boolean shutdown = false;
         private P2LTask task;
         P2LThread() { this(null); }
@@ -137,7 +138,7 @@ public class P2LThreadPool {
                         task.start();
                     } catch (Throwable t) {t.printStackTrace();}
                     task = null;
-                    taskFinished(this);
+                    P2LThreadPool.this.taskFinished(this);
                 } else {
                     synchronized (this) {
                         try {
@@ -149,9 +150,11 @@ public class P2LThreadPool {
         }
     }
 
+    @FunctionalInterface
     public interface Task {
         void run() throws Throwable;
     }
+    @FunctionalInterface
     public interface ProvidingTask<R> {
         R run() throws Throwable;
     }

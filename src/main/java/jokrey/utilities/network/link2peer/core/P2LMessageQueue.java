@@ -13,42 +13,39 @@ import java.util.*;
  * TODO PROBLEM:
  *   if someone expects a message - times out and THEN the message is received -> the message will remain in the maps  (solution timeouts for messages - given by client with max)
  *   if someone expects the same message later, it will find this message, despite it not being the expected message (stack mildly mitigates this problem, but not a lot)
+ *
+ * TODO: clean up canceled/timed out receivers
  */
 class P2LMessageQueue {
     private final Map<MessageRequest, Stack<P2LFuture<P2LMessage>>> waitingReceivers = new HashMap<>();
     private final Map<MessageRequest, List<P2LMessage>> unconsumedMessages_byExactRequest = new HashMap<>();
     private final Map<Integer, List<P2LMessage>> unconsumedMessages_byId = new HashMap<>();
-    synchronized P2LFuture<P2LMessage> futureFor(int msgId) {
-        //System.out.println("futureFor1 - msgId = [" + msgId + "]");
+    synchronized P2LFuture<P2LMessage> futureFor(int messageType) {
         P2LFuture<P2LMessage> future = new P2LFuture<>();
-        List<P2LMessage> unconsumedMessagesForId = unconsumedMessages_byId.get(msgId);
+        List<P2LMessage> unconsumedMessagesForId = unconsumedMessages_byId.get(messageType);
         if(unconsumedMessagesForId == null || unconsumedMessagesForId.isEmpty()) {
-            waitingReceivers.computeIfAbsent(new MessageRequest(msgId), (k) -> new LinkedStack<>()).push(future);
+            waitingReceivers.computeIfAbsent(new MessageRequest(messageType), (k) -> new LinkedStack<>()).push(future);
         } else {
             P2LMessage consumedMessage = unconsumedMessagesForId.remove(0);
             unconsumedMessages_byExactRequest.get(new MessageRequest(consumedMessage)).remove(consumedMessage);
             future.setCompleted(consumedMessage);
         }
-        //System.out.println("futureFor1 - waitingReceivers = " + waitingReceivers);
-        //System.out.println("futureFor1 - unconsumedMessages_byId = " + unconsumedMessages_byId);
-        //System.out.println("futureFor1 - unconsumedMessages_byExactRequest = " + unconsumedMessages_byExactRequest);
         return future;
     }
-    synchronized P2LFuture<P2LMessage> futureFor(SocketAddress from, int msgId) {
-        return futureFor(WhoAmIProtocol.toString(from), msgId);
+    synchronized P2LFuture<P2LMessage> futureFor(SocketAddress from, int messageType) {
+        return futureFor(WhoAmIProtocol.toString(from), messageType);
     }
-    synchronized P2LFuture<P2LMessage> futureFor(String from, int msgId) {
-        if(from == null) return futureFor(msgId);
-        return futureFor(from, msgId, P2LNode.NO_CONVERSATION_ID);
+    synchronized P2LFuture<P2LMessage> futureFor(String from, int messageType) {
+        if(from == null) return futureFor(messageType);
+        return futureFor(from, messageType, P2LNode.NO_CONVERSATION_ID);
     }
-    synchronized P2LFuture<P2LMessage> futureFor(SocketAddress from, int msgId, int convId) {
-        return futureFor(WhoAmIProtocol.toString(from), msgId, convId);
+    synchronized P2LFuture<P2LMessage> futureFor(SocketAddress from, int messageType, int conversationId) {
+        return futureFor(WhoAmIProtocol.toString(from), messageType, conversationId);
     }
-    synchronized P2LFuture<P2LMessage> futureFor(String from, int msgId, int convId) {
+    private synchronized P2LFuture<P2LMessage> futureFor(String from, int messageType, int conversationId) {
         if(from == null) throw new NullPointerException("from cannot be null here");
-        //System.out.println("futureFor2 - "+"from = [" + from + "], "+"msgId = [" + msgId + "], "+"convId = [" + convId + "]");
 
-        MessageRequest request = new MessageRequest(from, msgId, convId, false);
+        MessageRequest request = new MessageRequest(from, messageType, conversationId, false);
 
         P2LFuture<P2LMessage> future = new P2LFuture<>();
         List<P2LMessage> unconsumedMessagesForRequest = unconsumedMessages_byExactRequest.get(request);
@@ -59,15 +56,12 @@ class P2LMessageQueue {
             unconsumedMessages_byId.get(consumedMessage.type).remove(consumedMessage);
             future.setCompleted(consumedMessage);
         }
-        //System.out.println("futureFor2 - waitingReceivers = " + waitingReceivers);
-        //System.out.println("futureFor2 - unconsumedMessages_byId = " + unconsumedMessages_byId);
-        //System.out.println("futureFor2 - unconsumedMessages_byExactRequest = " + unconsumedMessages_byExactRequest);
         return future;
     }
 
-    synchronized P2LFuture<P2LMessage> receiptFutureFor(SocketAddress from, int msgId, int convId) {
-        if(from == null) return futureFor(msgId);
-        MessageRequest request = new MessageRequest(WhoAmIProtocol.toString(from), msgId, convId, true);
+    synchronized P2LFuture<P2LMessage> receiptFutureFor(SocketAddress from, int messageType, int conversationId) {
+        if(from == null) return futureFor(messageType);
+        MessageRequest request = new MessageRequest(WhoAmIProtocol.toString(from), messageType, conversationId, true);
 
         P2LFuture<P2LMessage> future = new P2LFuture<>();
         List<P2LMessage> unconsumedMessagesForRequest = unconsumedMessages_byExactRequest.get(request);
@@ -76,7 +70,6 @@ class P2LMessageQueue {
         return future;
     }
     synchronized void handleNewMessage(P2LMessage received) {
-        //System.out.println("P2LMessageQueue.handleNewMessage - received = [" + received + "]");
         MessageRequest answersRequest = new MessageRequest(received);
 
         Stack<P2LFuture<P2LMessage>> waitingForMessage = waitingReceivers.get(answersRequest); //higher priority
@@ -85,29 +78,22 @@ class P2LMessageQueue {
         P2LFuture<P2LMessage> toComplete;
         while (true) {
             toComplete = waitingForMessage==null?null:waitingForMessage.pop();
-            //System.out.println("1 toComplete = " + toComplete);
             if (toComplete == null)
                 toComplete = waitingForMessageId==null?null:waitingForMessageId.pop();
-            //System.out.println("2 toComplete = " + toComplete);
 
             if (toComplete == null) {
                 if(! received.isExpired()) {
-                    unconsumedMessages_byId.computeIfAbsent(answersRequest.msgId, (k) -> new LinkedList<>()).add(received);
+                    unconsumedMessages_byId.computeIfAbsent(answersRequest.messageType, (k) -> new LinkedList<>()).add(received);
                     unconsumedMessages_byExactRequest.computeIfAbsent(answersRequest, (k) -> new LinkedList<>()).add(received);
                 }
                 break;
             } else {
-                //System.out.println("3 toComplete.isWaiting = " + toComplete.isWaiting());
                 if(!toComplete.isCanceled() && (!toComplete.hasTimedOut() || toComplete.isWaiting())) {
                     toComplete.setCompleted(received);
                     break;
                 }
             }
         }
-
-        //System.out.println("handleNewMessage - waitingReceivers = " + waitingReceivers);
-        //System.out.println("handleNewMessage - unconsumedMessages_byId = " + unconsumedMessages_byId);
-        //System.out.println("handleNewMessage - unconsumedMessages_byExactRequest = " + unconsumedMessages_byExactRequest);
     }
 
 
@@ -127,22 +113,21 @@ class P2LMessageQueue {
     }
 
 
-    private class MessageRequest {
+    private static class MessageRequest {
         private final String from;
-        private final int msgId;
-        private final int convId;
+        private final int messageType;
+        private final int conversationId;
         private final boolean msgIsReceipt;
-
-        public MessageRequest(int msgId) {
-            this(null, msgId, P2LNode.NO_CONVERSATION_ID, false);
+        private MessageRequest(int messageType) {
+            this(null, messageType, P2LNode.NO_CONVERSATION_ID, false);
         }
-        public MessageRequest(String from, int msgId, int convId, boolean msgIsReceipt) {
+        private MessageRequest(String from, int messageType, int conversationId, boolean msgIsReceipt) {
             this.from = from;
-            this.msgId = msgId;
-            this.convId = convId;
+            this.messageType = messageType;
+            this.conversationId = conversationId;
             this.msgIsReceipt = msgIsReceipt;
         }
-        public MessageRequest(P2LMessage msg) {
+        private MessageRequest(P2LMessage msg) {
             this(msg.sender, msg.type, msg.conversationId, msg.isReceipt);
         }
 
@@ -150,11 +135,11 @@ class P2LMessageQueue {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             MessageRequest that = (MessageRequest) o;
-            return msgId == that.msgId && Objects.equals(from, that.from) && msgIsReceipt == that.msgIsReceipt && convId == that.convId;
+            return messageType == that.messageType && Objects.equals(from, that.from) && msgIsReceipt == that.msgIsReceipt && conversationId == that.conversationId;
         }
-        @Override public int hashCode() { return Objects.hash(from, msgId, convId, msgIsReceipt); }
+        @Override public int hashCode() { return Objects.hash(from, messageType, conversationId, msgIsReceipt); }
         @Override public String toString() {
-            return "MessageRequest{from=" + from + ", msgId=" + msgId + ", convId=" + convId + ", msgIsReceipt=" + msgIsReceipt + '}';
+            return "MessageRequest{from=" + from + ", messageType=" + messageType + ", conversationId=" + conversationId + ", msgIsReceipt=" + msgIsReceipt + '}';
         }
     }
 }
