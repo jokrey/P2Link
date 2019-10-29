@@ -79,7 +79,7 @@ class EstablishSingleConnectionProtocol {
 //            System.err.println(parent.getPort()+"("+Thread.currentThread().getId()+")" + " refused connection request by " + from + " - wrong nonce");
 //        }
 //    }
-    public static void asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
+    public static boolean asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
 //        if(!parent.getSelfLink().isPublicLinkKnown()) {
 //            String ip = WhoAmIProtocol.asInitiator(parent, link, outgoing);
 //            System.out.println("ip = " + ip);
@@ -114,6 +114,7 @@ class EstablishSingleConnectionProtocol {
 
         if(success)
             parent.graduateToEstablishedConnection(to);
+        return success;
     }
 
     public static void asReceiver(P2LNodeInternal parent, InetSocketAddress from, P2LMessage initialRequestMessage) throws IOException {

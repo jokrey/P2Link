@@ -5,6 +5,7 @@ import jokrey.utilities.network.link2peer.core.IncomingHandler;
 import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
 import jokrey.utilities.network.link2peer.util.CanceledException;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
+import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
 import jokrey.utilities.simple.data_structure.pairs.Pair;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,9 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
@@ -591,7 +595,7 @@ public class IntermediateTests {
         sleep(1000);
 
         P2LFuture<Boolean> f = fullConnect(nodes);
-        Boolean result = f.get(16000);
+        Boolean result = f.get();
         printPeers(nodes);
         assertTrue(result);
 
@@ -654,14 +658,55 @@ public class IntermediateTests {
     private P2LFuture<Boolean> fullConnect(P2LNode[] nodes) {
         System.err.println("full connect begin");
         ArrayList<P2LFuture<Boolean>> connectionFutures = new ArrayList<>(nodes.length);
-        for(int i=0; i<nodes.length; i++)
-            for(int ii=i+1;ii<nodes.length;ii++) {
-                System.err.println(nodes[i].getPort()+" -establishTo- "+nodes[ii].getPort());
+//        for(int i=0; i<nodes.length; i++) {
+////        for(int i=nodes.length-1; i>=0; i--) {
+//            for (int ii = i + 1; ii < nodes.length; ii++) {
+//                System.err.println(nodes[i].getPort() + " -establishTo- " + nodes[ii].getPort());
+////                nodes[i].establishConnection(local(nodes[ii]));
+//                connectionFutures.add(nodes[i].establishConnection(local(nodes[ii])));
+//            }
+//        }
+
+        for(int i=0; i<nodes.length; i++) {
+//        for(int i=nodes.length-1; i>=0; i--) {
+            for (int ii = i + 1; ii < nodes.length; ii++) {
+                System.err.println(nodes[i].getPort() + " -establishTo- " + nodes[ii].getPort());
 //                nodes[i].establishConnection(local(nodes[ii]));
-                connectionFutures.add(nodes[i].establishConnection(local(nodes[ii])));
+//                connectionFutures.add(nodes[i].establishConnection(local(nodes[ii])));
+                connectionFutures.add(nodes[ii].establishConnection(local(nodes[i])));
             }
+        }
         System.err.println("full connect end");
         return P2LFuture.combine(connectionFutures, P2LFuture.COMBINE_AND);
 //        return new P2LFuture<>(true);
+    }
+
+
+    @Test public void p2lThreadPoolTest() {
+        TimeDiffMarker.setMark(5331);
+        {
+            P2LThreadPool pool = new P2LThreadPool(2, 32);
+            AtomicInteger counter = new AtomicInteger(1);
+            for (int i = 0; i < 100; i++)
+                pool.execute(() -> {
+                    sleep(100);
+                    counter.getAndIncrement();
+                });
+            while (counter.get() < 100) sleep(10);
+        }
+        TimeDiffMarker.println(5331, "custom took: ");
+
+        TimeDiffMarker.setMark(5331);
+        {
+            ThreadPoolExecutor pool = new ThreadPoolExecutor(2, 32, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(100));
+            AtomicInteger counter = new AtomicInteger(1);
+            for (int i = 0; i < 100; i++)
+                pool.execute(() -> {
+                    sleep(100);
+                    counter.getAndIncrement();
+                });
+            while (counter.get() < 100) sleep(10);
+        }
+        TimeDiffMarker.println(5331, "custom took: ");
     }
 }

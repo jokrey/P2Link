@@ -82,9 +82,10 @@ public interface P2LNode {
 
     boolean connectionLimitReached();
 
-    default P2LFuture<Boolean> establishConnection(SocketAddress to) {
-        return establishConnections(to).toBooleanFuture(success -> success.size()==1 && success.contains(to));
-    }
+    P2LFuture<Boolean> establishConnection(SocketAddress to);
+//    {
+//        return establishConnections(to).toBooleanFuture(success -> success.size()==1 && success.contains(to));
+//    }
     /**
      * Internally connects to given peer links
      * Returns list of successful connections (will not throw an exception for unsuccessful attempts)

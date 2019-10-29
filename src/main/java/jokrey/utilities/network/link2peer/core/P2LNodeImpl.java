@@ -59,6 +59,9 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
 
     @Override public int getPort() { return port; }
 
+    @Override public P2LFuture<Boolean> establishConnection(SocketAddress to) {
+        return outgoingHandler.execute(() -> isConnectedTo(to) || EstablishSingleConnectionProtocol.asInitiator(P2LNodeImpl.this, to));
+    }
     @Override public P2LFuture<Set<SocketAddress>> establishConnections(SocketAddress... addresses) {
         Task[] tasks = new Task[addresses.length];
 

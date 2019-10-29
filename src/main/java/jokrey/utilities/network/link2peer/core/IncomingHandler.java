@@ -1,6 +1,7 @@
 package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -35,7 +36,9 @@ public class IncomingHandler {
     final BroadcastMessageProtocol.BroadcastState broadcastState = new BroadcastMessageProtocol.BroadcastState();
 //    final RetryHandler retryHandler = new RetryHandler();
 
-    private final ThreadPoolExecutor handleReceivedMessagesPool = new ThreadPoolExecutor(8/*core size*/,MAX_POOL_SIZE/*max size*/,60, TimeUnit.SECONDS/*idle timeout*/, new LinkedBlockingQueue<>(MAX_POOL_SIZE)); // queue with a size
+//    private final ThreadPoolExecutor handleReceivedMessagesPool = new ThreadPoolExecutor(4/*core size*/, MAX_POOL_SIZE/*max size*/, 60, TimeUnit.SECONDS/*idle timeout*/, new LinkedBlockingQueue<>(MAX_POOL_SIZE * 2),
+//            r -> new Thread()); // queue with a size
+    private final P2LThreadPool handleReceivedMessagesPool = new P2LThreadPool(4, 64);
 
 
     private void handleReceivedMessage(DatagramPacket receivedPacket) throws IOException {
@@ -105,7 +108,9 @@ public class IncomingHandler {
                 try {
                     serverSocket.receive(receivedPacket);
 
-                    handleReceivedMessagesPool.execute(() -> {
+                    handleReceivedMessagesPool.execute(
+//                    new Thread(
+                        () -> {
                         //has to be on a thread, because most protocols also wait for an answer - that has to be done outside of the thread that receives the answer (the outer thread here...)
                         //    ((( DOS mitigation:: could be exploited by sending(for example) many broadcast supercauses, but not sending anything else.. (the thread would hang for 5000 ms because it waits for the data to be send...)
 
@@ -114,7 +119,9 @@ public class IncomingHandler {
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
-                    });
+                    })
+//                    .start()
+                    ;
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
