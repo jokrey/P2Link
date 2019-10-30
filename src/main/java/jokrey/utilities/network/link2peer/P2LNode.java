@@ -31,6 +31,8 @@ import java.util.function.Function;
  * TODO: detect stale connections by pinging every 2 minutes
  * TODO: retry broken peers in increasing intervals (5 minutes the first time, then 10, then 20, etc. NO MAX!!)
  *
+ * TODO: streamed messages (i.e. longer messages broken up into pieces)
+ *    with conversation id, a counter and an intelligent retry function pretty much exactly like tcp
  *
  *
  *

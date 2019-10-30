@@ -1,7 +1,5 @@
 package jokrey.utilities.network.link2peer.util;
 
-import jokrey.utilities.network.link2peer.P2LMessage;
-
 import java.util.*;
 
 /**
@@ -51,7 +49,7 @@ public class P2LThreadPool {
         ArrayList<P2LFuture<Boolean>> futures = new ArrayList<>(tasks.length);
         for(Task task:tasks)
             futures.add(execute(task));
-        return P2LFuture.reduceConvert(futures, b -> b?1:0, P2LFuture.COMBINE_PLUS);
+        return P2LFuture.reduceConvertWhenCompleted(futures, b -> b?1:0, P2LFuture.PLUS);
     }
     public synchronized P2LTask<Boolean> execute(Task task) {
         return execute(() -> {
@@ -69,10 +67,9 @@ public class P2LThreadPool {
             @Override protected R run() {
                 try {
                     return task.run();
-                } catch (Throwable throwable) {
-                    throwable.printStackTrace();
-                    cancel();
-                    return null;
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                    return null;//sets task to canceled
                 }
             }
         });
@@ -134,9 +131,7 @@ public class P2LThreadPool {
         @Override public void run() {
             while(!shutdown) {
                 if(task!=null) {
-                    try {
-                        task.start();
-                    } catch (Throwable t) {t.printStackTrace();}
+                    task.start();
                     task = null;
                     P2LThreadPool.this.taskFinished(this);
                 } else {

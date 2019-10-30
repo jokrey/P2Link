@@ -1,3 +1,4 @@
+import jokrey.utilities.debug_analysis_helper.AverageCallTimeMarker;
 import jokrey.utilities.debug_analysis_helper.TimeDiffMarker;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
@@ -109,11 +110,9 @@ class IntermediateTests {
         System.out.println("t1("+System.currentTimeMillis()+") completed");
     }
     @Test void p2lFutureTest_combine() {
-        System.out.println("t1("+System.currentTimeMillis()+") init");
-
         P2LFuture<Integer> p2lF1 = new P2LFuture<>();
         P2LFuture<Integer> p2lF2 = new P2LFuture<>();
-        P2LFuture<Integer> combine = p2lF1.combine(p2lF2, P2LFuture.COMBINE_PLUS);
+        P2LFuture<Integer> combine = p2lF1.combine(p2lF2, P2LFuture.PLUS);
         new Thread(() -> {
             p2lF1.setCompleted(1);
             sleep(1000);
@@ -125,6 +124,23 @@ class IntermediateTests {
         assertEquals(new Integer(3), p2lF2.get(1500));
         assertEquals(new Integer(4), combine.get(1500));
     }
+    @Test void p2lFutureTest_cancelCombine() {
+        P2LFuture<Integer> p2lF1 = new P2LFuture<>();
+        P2LFuture<Integer> p2lF2 = new P2LFuture<>();
+        P2LFuture<Integer> combine = p2lF1.combine(p2lF2, P2LFuture.PLUS);
+        new Thread(() -> {
+            p2lF1.setCompleted(1);
+            sleep(1000);
+            p2lF2.setCompleted(3);
+        }).start();
+
+        assertThrows(TimeoutException.class, () -> combine.get(100));
+        assertEquals(new Integer(1), p2lF1.get(500));
+        assertThrows(AlreadyCompletedException.class, p2lF1::cancel);
+        p2lF2.cancel();
+        assertThrows(CanceledException.class, combine::get);
+        assertThrows(CanceledException.class, p2lF2::get);
+    }
     @Test void p2lFutureTest_cannotCompleteTwice() {
         P2LFuture<Integer> p2lF = new P2LFuture<>();
         new Thread(() -> p2lF.setCompleted(1)).start();
@@ -134,9 +150,59 @@ class IntermediateTests {
         assertThrows(AlreadyCompletedException.class, () -> p2lF.setCompleted(3));
         assertEquals(new Integer(1), p2lF.get(500));
     }
+    @Test void p2lFutureTest_reducePerformanceComparison() {
+        int iterations = 1000000;
+
+        reduceUsingCombine(iterations);
+        reduceUsingWhenCompleted(iterations);
+
+        for(int repeatCounter=0;repeatCounter<33;repeatCounter++) {
+            AverageCallTimeMarker.mark_call_start("reduce using combine");
+            reduceUsingCombine(iterations);
+            AverageCallTimeMarker.mark_call_end("reduce using combine");
+
+            AverageCallTimeMarker.mark_call_start("reduce using when completed");
+            reduceUsingWhenCompleted(iterations);
+            AverageCallTimeMarker.mark_call_end("reduce using when completed");
+        }
+        AverageCallTimeMarker.print_all();
+        AverageCallTimeMarker.clear();
+    }
+    private static void reduceUsingCombine(int iterations) {
+        List<P2LFuture<Integer>> list = new ArrayList<>(iterations);
+        for (int i = 0; i < iterations; i++)
+            list.add(new P2LFuture<>(new Integer(1)));
+
+        P2LFuture<Integer> reduced = P2LFuture.reduce(list, P2LFuture.PLUS);
+        assertEquals(iterations, reduced.get().intValue());
+    }
+    private static void reduceUsingWhenCompleted(int iterations) {
+        List<P2LFuture<Integer>> list = new ArrayList<>(iterations);
+        for (int i = 0; i < iterations; i++)
+            list.add(new P2LFuture<>(new Integer(1)));
+
+        P2LFuture<Integer> reduced = P2LFuture.reduceWhenCompleted(list, P2LFuture.PLUS);
+        assertEquals(iterations, reduced.get().intValue());
+    }
 
 
     @Test void p2lThreadPoolTest() {
+        TimeDiffMarker.setMark(5331);
+        {
+            ArrayList<P2LFuture<Boolean>> allFs = new ArrayList<>(100);
+            P2LThreadPool pool = new P2LThreadPool(2, 32);
+            AtomicInteger counter = new AtomicInteger(0);
+            for (int i = 0; i < 100; i++)
+                allFs.add(pool.execute(() -> {
+                    sleep(100);
+                    counter.getAndIncrement();
+                }));
+            assertTrue(P2LFuture.reduce(allFs, P2LFuture.AND).get());
+            assertEquals(counter.get(), 100);
+        }
+        TimeDiffMarker.println(5331, "custom 1 took: ");
+
+
         TimeDiffMarker.setMark(5331);
         {
             P2LThreadPool pool = new P2LThreadPool(2, 32);
@@ -149,7 +215,7 @@ class IntermediateTests {
             while (counter.get() < 100) sleep(10);
             assertEquals(counter.get(), 100);
         }
-        TimeDiffMarker.println(5331, "custom took: ");
+        TimeDiffMarker.println(5331, "custom 2 took: ");
 
         TimeDiffMarker.setMark(5331);
         {
@@ -576,7 +642,7 @@ class IntermediateTests {
             nodes[0].sendMessage(local(nodes[1]), P2LMessage.Factory.createSendMessage(i, new byte[1]));
             fs.add(nodes[1].expectMessage(i).toType(m -> 1));
         }
-        Integer result = P2LFuture.reduce(fs, P2LFuture.COMBINE_PLUS).get();
+        Integer result = P2LFuture.reduce(fs, P2LFuture.PLUS).get();
         assertEquals(3, result.intValue());
         close(nodes);
     }
@@ -701,11 +767,11 @@ class IntermediateTests {
         ArrayList<P2LFuture<Boolean>> connectionFutures = new ArrayList<>(nodes.length);
         for(int i=0; i<nodes.length-1; i++)
             connectionFutures.add(nodes[i].establishConnection(local(nodes[i+1])));
-        return P2LFuture.reduce(connectionFutures, P2LFuture.COMBINE_AND);
+        return P2LFuture.reduce(connectionFutures, P2LFuture.AND);
     }
     private static P2LFuture<Boolean> connectAsRing(P2LNode... nodes) {
         P2LFuture<Boolean> connectedAsLine = connectAsLine(nodes);
-        return nodes[0].establishConnection(local(nodes[nodes.length-1])).combine(connectedAsLine, P2LFuture.COMBINE_AND);
+        return nodes[0].establishConnection(local(nodes[nodes.length-1])).combine(connectedAsLine, P2LFuture.AND);
     }
     private static P2LFuture<Boolean> connectAsRing(P2LNode node0, P2LNode... nodes) {
         P2LNode[] allNodes = new P2LNode[nodes.length+1];
@@ -735,7 +801,7 @@ class IntermediateTests {
             }
         }
         System.err.println("full connect end");
-        return P2LFuture.reduce(connectionFutures, P2LFuture.COMBINE_AND);
+        return P2LFuture.reduce(connectionFutures, P2LFuture.AND);
 //        return new P2LFuture<>(true);
     }
     private static void close(P2LNode... nodes) {
