@@ -5,6 +5,7 @@ import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.core.IncomingHandler;
 import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
 import jokrey.utilities.network.link2peer.util.*;
+import jokrey.utilities.network.link2peer.util.TimeoutException;
 import org.junit.jupiter.api.Test;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
@@ -12,10 +13,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -416,8 +414,6 @@ class IntermediateTests {
         boolean connected = node1.establishConnection(local(node2)).get(1000);
         assertTrue(connected);
 
-        System.out.println("t2");
-
         printPeers(node1, node2);
 
         P2LFuture<Boolean> sendResult;
@@ -425,43 +421,65 @@ class IntermediateTests {
         assertTrue(sendResult.get(200));
         sendResult = node1.sendMessageWithReceipt(local(node2), P2LMessage.Factory.createSendMessage(1, "welt"));
         assertTrue(sendResult.get(200));
-        System.out.println("t3");
 
         String node2Received = node2.expectMessage(1).get(200).asString();
         assertEquals("welt", node2Received);
         String node1Received = node1.expectMessage(1).get(200).asString();
         assertEquals("hallo", node1Received);
-        System.out.println("t4");
 
         sendResult = node2.sendMessageWithReceipt(local(node1), P2LMessage.Factory.createSendMessage(25, "hallo welt!"));
         assertTrue(sendResult.get(200));
-        System.out.println("t5");
 
         assertThrows(TimeoutException.class, () -> {
             node1.expectMessage(1).get(100); //will timeout, because message was consumed
         });
-        System.out.println("t6-0");
 
         sendResult = node2.sendMessageWithReceipt(local(node1), P2LMessage.Factory.createSendMessage(1, "hallo welt"));
-        System.out.println("t6-1");
         assertTrue(sendResult.get(200));
-        System.out.println("t6-2");
         String node1Received2 = node1.expectMessage(1).get(100).asString(); //no longer times out, because node 2 has send another message now
-        System.out.println("t6-3");
         assertEquals("hallo welt", node1Received2);
 
-        System.out.println("t6-4");
         assertThrows(TimeoutException.class, () -> {
             node1.expectMessage(local(node1), 25).get(100); //will timeout, because the message is not from node1...
         });
-        System.out.println("t6-5");
         String node1Received3 = node1.expectMessage(local(node2), 25).get(100).asString();
-        System.out.println("t6-6");
         assertEquals("hallo welt!", node1Received3);
-        System.out.println("t7");
 
         close(node1, node2);
-        System.out.println("t8");
+    }
+
+    @Test void longMessageTest() throws IOException {
+        int p1 = 34191;
+        int p2 = 34192;
+        P2LNode node1 = P2LNode.create(p1); //creates server thread
+        P2LNode node2 = P2LNode.create(p2); //creates server thread
+
+        byte[] toSend_1To2 = new byte[(P2LMessage.CUSTOM_RAW_SIZE_LIMIT - P2LMessage.HeaderUtil.HEADER_SIZE_LONG_MESSAGE) * 2];
+        byte[] toSend_2To1 = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT * 20];
+        ThreadLocalRandom.current().nextBytes(toSend_1To2);
+        ThreadLocalRandom.current().nextBytes(toSend_2To1);
+        int randomType = ThreadLocalRandom.current().nextInt(1, 400000);
+
+        boolean connected = node1.establishConnection(local(node2)).get(1000);
+        assertTrue(connected);
+
+        printPeers(node1, node2);
+
+        P2LFuture<Boolean> sendResult;
+        sendResult = node1.sendMessageWithReceipt(local(node2), P2LMessage.Factory.createSendMessage(randomType, toSend_1To2));
+        assertTrue(sendResult.get(2000));
+        sendResult = node2.sendMessageWithReceipt(local(node1), P2LMessage.Factory.createSendMessage(randomType, toSend_2To1));
+        assertTrue(sendResult.get(2000));
+
+        P2LMessage message = node1.expectMessage(randomType).get(200);
+        assertTrue(message.payloadEquals(toSend_2To1)); //more efficient
+        assertArrayEquals(toSend_2To1, message.asBytes());
+
+        message = node2.expectMessage(randomType).get(200);
+        assertTrue(message.payloadEquals(toSend_1To2)); //more efficient
+        assertArrayEquals(toSend_1To2, message.asBytes());
+
+        close(node1, node2);
     }
 
 

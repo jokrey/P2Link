@@ -31,6 +31,7 @@ public class IncomingHandler {
     final P2LMessageQueue userBrdMessageQueue = new P2LMessageQueue();
     final P2LMessageQueue receiptsQueue = new P2LMessageQueue();
     final BroadcastMessageProtocol.BroadcastState broadcastState = new BroadcastMessageProtocol.BroadcastState();
+    final LongMessageHandler longMessageHandler = new LongMessageHandler();
 //    final RetryHandler retryHandler = new RetryHandler();
 
     final P2LThreadPool handleReceivedMessagesPool = new P2LThreadPool(4, 64);
@@ -50,7 +51,12 @@ public class IncomingHandler {
 
         parent.notifyPacketReceivedFrom(from);
 
-        if(message.requestReceipt) {
+        if(message.isLongPart) {
+            message = longMessageHandler.received(message.toLongMessagePart());
+            if(message == null) return; //not yet entire message received
+        }
+
+        if (message.requestReceipt) {
             //TODO - problem: double send receipt - i.e.
 //            if(message.isRetry) {
 //                boolean hasBeenHandled = retryHandler.hasBeenHandled(message);
@@ -58,12 +64,12 @@ public class IncomingHandler {
 //                    return;
 //            } else {
 //                retryHandler.markHandled(message);
-                parent.sendInternalMessage(P2LMessage.createReceiptFor(message), from);
+            parent.sendInternalMessage(P2LMessage.createReceiptFor(message), from);
 //            }
             //todo - what if this packet is lost? then the client will resend, and potentially redo this operation
             //todo - solve: send retryCounter (or rather conversation id)
         }
-        if(message.isReceipt)
+        if (message.isReceipt)
             receiptsQueue.handleNewMessage(message);
         else if (message.type == SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS) { //requires connection to asAnswerer data on the other side.....
             RequestPeerLinksProtocol.asAnswerer(parent, from);
@@ -93,7 +99,6 @@ public class IncomingHandler {
                 parent.notifyMessageReceived(message);
             }
         }
-
 
     }
 

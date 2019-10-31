@@ -117,8 +117,14 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     //DIRECT MESSAGING:
     @Override public void sendInternalMessage(P2LMessage message, SocketAddress to) throws IOException {
         if(message.sender != null) throw new IllegalArgumentException("sender of message has to be this null and will be automatically set by the sender");
-        incomingHandler.serverSocket.send(message.getPacket(to)); //since the server socket is bound to a port, said port will be included in the udp packet
 //        System.out.println(getPort()+" - P2LNodeImpl_sendInternalMessage - to = [" + to + "], message = [" + message + "]");
+
+        //todo - is it really desirable to have packages be broken up THIS automatically???
+        //todo    - like it is cool that breaking up packages does not make a difference, but... like it is so transparent it could lead to inefficiencies
+        if(message.canBeSentInSinglePacket())
+            incomingHandler.serverSocket.send(message.toPacket(to)); //since the server socket is bound to a port, said port will be included in the udp packet
+        else
+            incomingHandler.longMessageHandler.send(this, message, to);
     }
     @Override public void sendMessage(SocketAddress to, P2LMessage message) throws IOException {
         validateMsgIdNotInternal(message.type);
@@ -134,9 +140,16 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
     @Override public P2LFuture<Boolean> sendInternalMessageWithReceipt(P2LMessage origMessage, SocketAddress to) throws IOException {
         P2LMessage message = origMessage.mutateToRequestReceipt();
-        sendInternalMessage(message, to);
-        return incomingHandler.receiptsQueue.receiptFutureFor(to, message.type, message.conversationId).toBooleanFuture(receipt ->
-                receipt.validateIsReceiptFor(message));
+        try {
+            return incomingHandler.receiptsQueue.receiptFutureFor(to, message.type, message.conversationId)
+                    .nowOrCancel(() -> sendInternalMessage(message, to)) //weird syntax, but we have to make sure we already wait for the receipt when we send the message (receipt expire instantly
+                    .toBooleanFuture(receipt -> receipt.validateIsReceiptFor(message));
+        } catch (IOException t) {
+            throw t;
+        } catch (Throwable t) {
+            t.printStackTrace();
+            throw new IOException(t.getClass()+" - "+t.getMessage());
+        }
     }
     @Override public void sendInternalMessageBlocking(P2LMessage message, SocketAddress to, int attempts, int initialTimeout) throws IOException {
         try {

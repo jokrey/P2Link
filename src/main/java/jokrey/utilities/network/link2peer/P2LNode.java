@@ -33,6 +33,7 @@ import java.util.function.Function;
  *
  *
  * LATER:
+ * TODO? support for multicast - usage instead of broadcast when multiple peers in same local network?
  * TODO: fixed size networks (with much improved broadcast efficiency and maybe send to type(instead of send to link))
  * TODO:     improving upon fixed size: limit size networks..
  *
