@@ -151,5 +151,9 @@ class BroadcastMessageProtocol {
         public void clear() {
             knownMessageHashes.clear();
         }
+
+        public String debugString() {
+            return knownMessageHashes.toString();
+        }
     }
 }

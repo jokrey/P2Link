@@ -51,14 +51,16 @@ public class CommandLineP2LChat {
             List<SocketAddress> newlyConnected = node.recursiveGarnerConnections(limit, garnerFrom);
             System.out.println("Newly connected to: " + newlyConnected);
         },"garner");
-        loop.addCommand("disconnectFromAll", "Closes all connections to peers", Argument.noargs(), args -> node.disconnectFromAll(),
-                "disconnect", "close");
+        loop.addCommand("disconnectFromAll", "Closes all connections to peers", Argument.noargs(), args -> node.disconnectFromAll());
+        loop.addCommand("close", "closes this node and kills the process", args -> {
+            node.close();System.exit(0);
+        }, "exit");
         loop.addCommand("printActivePeers", "Prints all active peer links", Argument.noargs(), args -> System.out.println(node.getEstablishedConnections()),
                 "peers");
         loop.addCommand("printOwnPort", "Prints own nodes link", Argument.noargs(), args -> System.out.println(node.getPort()),
                 "self", "port");
         loop.addCommand("sendBroadcast", "Sends a string(args[0]) as a broadcast", Argument.with(String.class), args ->
-                node.sendBroadcastWithReceipts(P2LMessage.Factory.createSendMessage(0, args[0].getRaw())), "broadcast", "brd");
+                node.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast("iam"+port, 0, args[0].getRaw())), "broadcast", "brd");
         loop.addCommand("sendIndividualMessage", "Sends a string(args[1]) as an individual message to an active peer link(args[0])", Argument.with(String.class, String.class), args -> {
             SocketAddress to = WhoAmIProtocol.fromString(args[0].getRaw());
             try {
@@ -69,6 +71,7 @@ public class CommandLineP2LChat {
                 e.printStackTrace();
             }
         }, "sendMessage", "send");
+        loop.addCommand("printDebugInformation", "Prints debug information", Argument.noargs(), args -> node.printDebugInformation());
 
         loop.run();
     }

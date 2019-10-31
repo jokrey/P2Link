@@ -83,6 +83,9 @@ public interface P2LNode {
     /** Irreversibly closes this node and unbinds its server socket */
     void close();
 
+    /** Prints all debug information */
+    void printDebugInformation();
+
     /**
      * Creates a unique conversation id(terms and conditions apply - i.e. cycles after 2^32-1 calls).
      * Guaranteed to never equal {@link #NO_CONVERSATION_ID}, i.e. 0.
@@ -281,6 +284,7 @@ public interface P2LNode {
         }
         throw new IOException(getPort()+" could not get result after "+attempts+" attempts");
     }
+
     /** Function producing something in the future */
     interface Request<T> { P2LFuture<T> request() throws Throwable;}
 

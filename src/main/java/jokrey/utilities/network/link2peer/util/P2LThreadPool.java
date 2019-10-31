@@ -159,4 +159,16 @@ public class P2LThreadPool {
     public interface ProvidingTask<R> {
         R run() throws Throwable;
     }
+
+
+    public String debugString() {
+        return "P2LThreadPool{" +
+                "coreThreads=" + coreThreads +
+                ", maxThreads=" + maxThreads +
+                ", maxQueuedTasks=" + maxQueuedTasks +
+                ", pool.size=" + pool.size() +
+                ", queuedTasks.size=" + queuedTasks.size() +
+                ", isShutdown?=" + shutdown +
+                '}';
+    }
 }

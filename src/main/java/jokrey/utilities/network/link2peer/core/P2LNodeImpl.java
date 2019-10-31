@@ -294,4 +294,22 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
                                        //does not need to be unique between nodes - because it is always in combination with from(sender)+type
                                        //potential problem:
     }
+
+
+    @Override public void printDebugInformation() {
+        System.out.println("----- DEBUG INFORMATION -----");
+        System.out.println("isClosed = "+incomingHandler.isClosed());
+        System.out.println("incomingHandler.broadcastState = " + incomingHandler.broadcastState.debugString());
+        System.out.println("incomingHandler.internalMessageQueue.debugString() = " + incomingHandler.internalMessageQueue.debugString());
+        System.out.println("incomingHandler.receiptsQueue.debugString() = " + incomingHandler.receiptsQueue.debugString());
+        System.out.println("incomingHandler.userMessageQueue.debugString() = " + incomingHandler.userMessageQueue.debugString());
+        System.out.println("incomingHandler.userBrdMessageQueue.debugString() = " + incomingHandler.userBrdMessageQueue.debugString());
+        System.out.println("outgoingPool = " + outgoingPool.toString());
+        System.out.println("individualMessageListeners = " + individualMessageListeners);
+        System.out.println("broadcastMessageListeners = " + broadcastMessageListeners);
+        System.out.println("newConnectionEstablishedListeners = " + newConnectionEstablishedListeners);
+        System.out.println("connectionDisconnectedListeners = " + connectionDisconnectedListeners);
+        System.out.println("runningConversationId = " + runningConversationId.get());
+        System.out.println("-END- DEBUG INFORMATION -END-");
+    }
 }
