@@ -8,7 +8,7 @@ import java.util.List;
 
 class GarnerConnectionsRecursivelyProtocol {
     /**
-     * Will establish a connection to every given setup link and request their peers.
+     * Will establish a connection to every given setup link and request their peers in a BLOCKING fashion.
      *
      * From then it will recursively attempt to establish connections to randomly selected received peers, until the new connection limit is reached.
      * If the connection limit is smaller than the number of setup links, not all setup links may be connected to
@@ -53,7 +53,7 @@ class GarnerConnectionsRecursivelyProtocol {
                         foundUnconnectedLinks.add(address);
                 }
                 if (i + 1 > 3 && foundUnconnectedLinks.size() > 2 * parent.remainingNumberOfAllowedPeerConnections()) { //fixme heuristic
-                    //assume that one of 3 peers is honest and that at least half unconnected links are valid...
+                    //assume that one of 3 peers is honest and that at least half unconnected links are still valid...
                     break;
                 }
             } catch (IOException e) {

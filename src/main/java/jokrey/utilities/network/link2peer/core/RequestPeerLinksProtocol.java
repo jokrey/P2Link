@@ -11,7 +11,7 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.SL_REQUEST
 
 class RequestPeerLinksProtocol {
     static String[] asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
-        return parent.tryReceive(3, 500, () ->
+        return parent.tryReceive(P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT, () ->
                 parent.expectInternalMessage(to, C_PEER_LINKS)
                 .nowOrCancel(() -> parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS), to))
                 .toType(message -> {

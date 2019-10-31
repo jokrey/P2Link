@@ -4,6 +4,7 @@ import jokrey.utilities.command.line.helper.Argument;
 import jokrey.utilities.command.line.helper.CommandLoop;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
+import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
@@ -62,8 +63,9 @@ public class CommandLineP2LChat {
             SocketAddress to = WhoAmIProtocol.fromString(args[0].getRaw());
             try {
                 P2LFuture<Boolean> success = node.sendMessageWithReceipt(to, P2LMessage.Factory.createSendMessage(0, args[1].getRaw()));
-                System.out.println(success.get(250)?"successfully send":"could not send");
+                System.out.println(success.get(P2LHeuristics.DEFAULT_PROTOCOL_ANSWER_RECEIVE_TIMEOUT)?"successfully send":"no response (peer did not receive)");
             } catch (IOException e) {
+                System.err.println("error sending message "+e.getMessage());
                 e.printStackTrace();
             }
         }, "sendMessage", "send");

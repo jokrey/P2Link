@@ -19,7 +19,7 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
  */
 class BroadcastMessageProtocol {
     private static void asInitiator(P2LNodeInternal parent, P2LMessage message, SocketAddress to) throws IOException {
-        parent.tryComplete(3, 500, () ->
+        parent.tryComplete(P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT, () ->
                 parent.expectInternalMessage(to, C_BROADCAST_MSG_KNOWLEDGE_RETURN)
                 .nowOrCancel(() -> parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SC_BROADCAST, message.getContentHash().raw()), to))
                 .combine(peerHashKnowledgeOfMessage_msg -> {
@@ -63,7 +63,7 @@ class BroadcastMessageProtocol {
 
                 P2LMessage message = parent.expectInternalMessage(from, C_BROADCAST_MSG)
                         .nowOrCancel(()-> parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(C_BROADCAST_MSG_KNOWLEDGE_RETURN, P2LMessage.EXPIRE_INSTANTLY, false), from))
-                        .get(2500);
+                        .get(P2LHeuristics.DEFAULT_PROTOCOL_ANSWER_RECEIVE_TIMEOUT);
                 int brdMsgType = message.nextInt();
                 String sender = message.nextVariableString();
                 byte[] data = message.nextVariable();
@@ -113,7 +113,6 @@ class BroadcastMessageProtocol {
         return parent.executeAllOnSendThreadPool(tasks); //required, because send also waits for a response...
 
         //TODO: 'short' broadcasts that do not do the hash thing (in that case it is not required to wait for a response...)
-        //TODO: evolve the protocol into a protocol that breaks up very long messages into multiple udp packages...
     }
 
 
@@ -127,10 +126,7 @@ class BroadcastMessageProtocol {
             long currentTime = System.currentTimeMillis();
             Long oldVal = knownMessageHashes.put(hash, currentTime);
 
-            if(knownMessageHashes.size() > 500) { //threshold to keep the remove if loop from being run always, maybe 'outsource' the clean up into a background thread
-                //older than two minutes - honestly should be much more than enough to finish propagating a message
-                clean();
-            }
+            clean(false);//only cleans when it gets bad or it has
 
             return oldVal != null; //there was a previous mapping - i.e. the message was previously known
         }
@@ -140,13 +136,13 @@ class BroadcastMessageProtocol {
         }
 
 
-        //FIXME - all of these are barely researched heuristics
         long lastClean = -1;
-        void clean() {
+        void clean(boolean considerTime) {
             long currentTime = System.currentTimeMillis();
-            if(lastClean==-1 || (currentTime - lastClean) / 1000.0 > 30 || knownMessageHashes.size() > 3500) {//only clean every thirty seconds, otherwise it might be spammed
+            if((considerTime && (lastClean==-1 || (currentTime - lastClean) > P2LHeuristics.BROADCAST_STATE_ATTEMPT_CLEAN_TIMEOUT_TRIGGER_MS))
+                    || knownMessageHashes.size() > P2LHeuristics.BROADCAST_STATE_ATTEMPT_CLEAN_KNOWN_HASH_COUNT_TRIGGER) {//only clean every thirty seconds, otherwise it might be spammed
                 lastClean=currentTime;
-                knownMessageHashes.entrySet().removeIf(entry -> (currentTime - entry.getValue()) / 1000.0 > 60 * 2);
+                knownMessageHashes.entrySet().removeIf(entry -> (currentTime - entry.getValue()) > P2LHeuristics.BROADCAST_STATE_KNOWN_HASH_TIMEOUT_MS);
                 //removes all hashes older than 2 minute - i.e. the same broadcast can be send every roughly 2 minutes
                 //also means that a broadcast has to pass through(and fade, i.e. no longer redistributed) the network within 2 minutes
             }

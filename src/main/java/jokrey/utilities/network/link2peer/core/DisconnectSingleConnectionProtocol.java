@@ -11,7 +11,7 @@ class DisconnectSingleConnectionProtocol {
     static void asInitiator(P2LNodeInternal parent, SocketAddress to) {
         parent.markBrokenConnection(to, false);
         try {
-            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SC_DISCONNECT), to);
+            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SC_DISCONNECT), to); //if this message fails, the other node will ping and it will automatically disconnect then ( this is just a courtesy)
         } catch (IOException ignored) { }
     }
 

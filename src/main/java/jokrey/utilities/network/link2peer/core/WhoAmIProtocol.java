@@ -15,7 +15,7 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.SL_WHO_AM_
  */
 public class WhoAmIProtocol {
     public static String asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
-        return parent.tryReceive(3, 500, () ->
+        return parent.tryReceive(P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT, () ->
                 parent.expectInternalMessage(to, R_WHO_AM_I_ANSWER)
                 .nowOrCancel(() -> parent.sendInternalMessage(P2LMessage.Factory.createSendMessageFrom(SL_WHO_AM_I), to))
         ).asString();

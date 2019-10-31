@@ -152,7 +152,9 @@ public interface P2LNode {
     }
 
 
-    /** @see jokrey.utilities.network.link2peer.core.GarnerConnectionsRecursivelyProtocol */
+    /**
+     * Blocking
+     * @see jokrey.utilities.network.link2peer.core.GarnerConnectionsRecursivelyProtocol */
     List<SocketAddress> recursiveGarnerConnections(int newConnectionLimit, SocketAddress... setupLinks);
 
 
@@ -188,11 +190,11 @@ public interface P2LNode {
      *
      * @param to address to send to
      * @param message message to send
-     * @param retries total number of REtries (i.e. will do a total of 1 + retries attempts)
+     * @param attempts total number of attempts (i.e. 0 will mean no attempt will be made at all)
      * @param initialTimeout initial timeout - since doubled with each retry, max timeout is: (initialTimeout * 2^retries)
      * @throws IOException if any send went to garbage
      */
-    void sendMessageBlocking(SocketAddress to, P2LMessage message, int retries, int initialTimeout) throws IOException; //initial timeout is doubled
+    void sendMessageBlocking(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) throws IOException; //initial timeout is doubled
 
     /**
      * Creates a future for an expected message with the given messageType.
@@ -241,7 +243,7 @@ public interface P2LNode {
     /**
      * Retry feature for more complex conversations.
      * Conversations with a retry feature should always use a conversation id (see {@link #createUniqueConversationId()}).
-     * @param retries total number of REtries (i.e. will do a total of 1 + retries attempts)
+     * @param attempts total number of attempts (i.e. 0 will mean no attempt will be made at all)
      * @param initialTimeout initial timeout - since doubled with each retry, max timeout is: (initialTimeout * 2^retries)
      * @param conversationWithResult function that produces future which represents a result.
      *                               Complex conversations will likely want to chain that future, with each waiting for a message as a combined future.
@@ -249,35 +251,35 @@ public interface P2LNode {
      * @return the received final result
      * @throws IOException if no result could be obtained after given number of retries or the send went to garbage
      */
-    default <T> T tryReceive(int retries, int initialTimeout, Request<T> conversationWithResult) throws IOException {
+    default <T> T tryReceive(int attempts, int initialTimeout, Request<T> conversationWithResult) throws IOException {
         int timeout = initialTimeout;
-        for(int retryCounter=0; retryCounter<retries; retryCounter++) {
+        for(int attempt=0; attempt<attempts; attempt++) {
             try {
                 T gotten = conversationWithResult.request().getOrNull(timeout);
                 if (gotten != null) return gotten;
             } catch (Throwable ignore) {}
             timeout *= 2;
         }
-        throw new IOException(getPort()+" could not get result after "+retries+" retries");
+        throw new IOException(getPort()+" could not get result after "+attempts+" attempts");
     }
     /**
      * Like {@link #tryReceive(int, int, Request)}, except that the conversation produces a boolean representing success.
      * Unlike {@link #tryReceive(int, int, Request)} this method allows triggering a retry early, by setting the returned future to false.
-     * @param retries total number of REtries (i.e. will do a total of 1 + retries attempts)
+     * @param attempts total number of attempts (i.e. 0 will mean no attempt will be made at all)
      * @param initialTimeout initial timeout - since doubled with each retry, max timeout is: (initialTimeout * 2^retries)
      * @param conversation function that can succeed, but if it does not can be at least retried.
      * @throws IOException if no result could be obtained after given number of retries or the send went to garbage
      */
-    default void tryComplete(int retries, int initialTimeout, Request<Boolean> conversation) throws IOException {
+    default void tryComplete(int attempts, int initialTimeout, Request<Boolean> conversation) throws IOException {
         int timeout = initialTimeout;
-        for(int retryCounter=-1; retryCounter<retries; retryCounter++) {
+        for(int attempt=0; attempt<attempts; attempt++) {
             try {
                 Boolean success = conversation.request().getOrNull(timeout);
                 if(success!=null && success) return;
             } catch (Throwable ignore) {}
             timeout *= 2;
         }
-        throw new IOException(getPort()+" could not get result after "+retries+" retries");
+        throw new IOException(getPort()+" could not get result after "+attempts+" attempts");
     }
     /** Function producing something in the future */
     interface Request<T> { P2LFuture<T> request() throws Throwable;}

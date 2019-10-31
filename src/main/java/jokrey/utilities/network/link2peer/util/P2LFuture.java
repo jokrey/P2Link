@@ -145,6 +145,7 @@ public class P2LFuture<T> {
      * if no value was given in the constructor, get waits indefinitely until the result is available
      *
      * @return the result, once it is available
+     * @throws CanceledException if the future was canceled
      * @throws TimeoutException if the result is not available after the default timeout set in the constructor
      */
     public T get() {
@@ -160,7 +161,8 @@ public class P2LFuture<T> {
      *
      * @param timeout_ms number of milliseconds to wait before timing out
      * @return the result, once it is available
-     * @throws TimeoutException if the result is not available after the default timeout set in the constructor
+     * @throws CanceledException if the future was canceled
+     * @throws TimeoutException if the result is not available after the given timeout
      */
     public T get(long timeout_ms) {
         T result = getOrNull(timeout_ms);
@@ -181,6 +183,8 @@ public class P2LFuture<T> {
     /**
      * Other name for get, which ignores the results.
      * In other words block until the result is available.
+     * @throws CanceledException if the future was canceled
+     * @throws TimeoutException if the result is not available after the default timeout set in the constructor
      */
     public void waitForIt() {
         get();
@@ -190,6 +194,8 @@ public class P2LFuture<T> {
      * Other name for get, which ignores the results.
      * In other words block until the result is available or it times out.
      * @param timeToDaryInMs time until timeout in milliseconds
+     * @throws CanceledException if the future was canceled
+     * @throws TimeoutException if the result is not available after the given timeout
      */
     public void waitForIt(long timeToDaryInMs) {
         get(timeToDaryInMs);
@@ -292,6 +298,10 @@ public class P2LFuture<T> {
     }
 
 
+
+
+
+
     /**
      * Executes the given task instantly.
      * Useful when this future has to exist for the task to be safely executed(for example because it cause the future to be conceptually complete),
@@ -354,6 +364,7 @@ public class P2LFuture<T> {
 
 
 
+
     /**
      * Converts the given future to a boolean future using the given converter function
      *
@@ -365,7 +376,8 @@ public class P2LFuture<T> {
     }
 
     /**
-     * Converts the given future to a future of type R using the given converter function
+     * todo if f is canceled, cancel this
+     * Converts the this future to a future of type R using the given converter function
      * @param converter T to R converter function
      * @return the newly created future of type R
      */
