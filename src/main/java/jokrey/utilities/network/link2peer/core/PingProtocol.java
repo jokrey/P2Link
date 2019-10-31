@@ -2,10 +2,12 @@ package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
+
 import java.io.IOException;
 import java.net.SocketAddress;
 
-import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
+import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.R_PONG;
+import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.SL_PING;
 
 /**
  * @author jokrey

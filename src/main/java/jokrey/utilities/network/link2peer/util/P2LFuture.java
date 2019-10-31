@@ -1,13 +1,12 @@
 package jokrey.utilities.network.link2peer.util;
 
 import jokrey.utilities.network.link2peer.util.P2LThreadPool.Task;
-import jokrey.utilities.simple.data_structure.stack.LFStack;
-import jokrey.utilities.simple.data_structure.stack.Stack;
 import jokrey.utilities.simple.data_structure.stack.LinkedStack;
+import jokrey.utilities.simple.data_structure.stack.Stack;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;

@@ -4,9 +4,9 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.util.*;
-
-import static jokrey.utilities.network.link2peer.tcp_punching.ClientBehindNAT.RELAY_SERVER_PORT;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 
 /** from: http://blog.boehme.me/2011/06/nat-holepunch-solution-in-java.html */

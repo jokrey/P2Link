@@ -4,9 +4,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
 
 /** from: http://blog.boehme.me/2011/06/nat-holepunch-solution-in-java.html */
 public class ClientBehindNAT {
