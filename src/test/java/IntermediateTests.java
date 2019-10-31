@@ -1,4 +1,3 @@
-import jdk.nashorn.internal.ir.annotations.Ignore;
 import jokrey.utilities.debug_analysis_helper.AverageCallTimeMarker;
 import jokrey.utilities.debug_analysis_helper.TimeDiffMarker;
 import jokrey.utilities.network.link2peer.P2LMessage;
@@ -222,19 +221,19 @@ class IntermediateTests {
         }
         TimeDiffMarker.println(5331, "custom 2 took: ");
 
-//        TimeDiffMarker.setMark(5331);
-//        {
-//            ThreadPoolExecutor pool = new ThreadPoolExecutor(2, 32, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(100));
-//            AtomicInteger counter = new AtomicInteger(0);
-//            for (int i = 0; i < 100; i++)
-//                pool.execute(() -> {
-//                    sleep(100);
-//                    counter.getAndIncrement();
-//                });
-//            while (counter.get() < 100) sleep(10);
-//            assertEquals(counter.get(), 100);
-//        }
-//        TimeDiffMarker.println(5331, "custom took: ");
+        TimeDiffMarker.setMark(5331);
+        {
+            ThreadPoolExecutor pool = new ThreadPoolExecutor(2, 32, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(100));
+            AtomicInteger counter = new AtomicInteger(0);
+            for (int i = 0; i < 100; i++)
+                pool.execute(() -> {
+                    sleep(100);
+                    counter.getAndIncrement();
+                });
+            while (counter.get() < 100) sleep(10);
+            assertEquals(counter.get(), 100);
+        }
+        TimeDiffMarker.println(5331, "custom took: ");
     }
     @Test void p2lThreadPoolTest_capacity() {
         P2LThreadPool pool = new P2LThreadPool(1, 1, 1);

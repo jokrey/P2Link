@@ -4,6 +4,7 @@ package jokrey.utilities.network.link2peer.core;
  * Can be changed by node operator - but always with care and knowledge(please)
  */
 public class P2LHeuristics {
+    public static int ORIGINAL_RETRY_HISTORIC_TIMEOUT_MS = 60*1000;
     public static int DEFAULT_PROTOCOL_ATTEMPT_COUNT = 3;
     public static int DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT = 500;
     public static int DEFAULT_PROTOCOL_ANSWER_RECEIVE_TIMEOUT = DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT*2;

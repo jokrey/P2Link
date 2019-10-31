@@ -71,7 +71,7 @@ public class CommandLineP2LChat {
                 e.printStackTrace();
             }
         }, "sendMessage", "send");
-        loop.addCommand("printDebugInformation", "Prints debug information", Argument.noargs(), args -> node.printDebugInformation());
+        loop.addCommand("printDebugInformation", "Prints debug information", Argument.noargs(), args -> node.printDebugInformation(), "debug");
 
         loop.run();
     }

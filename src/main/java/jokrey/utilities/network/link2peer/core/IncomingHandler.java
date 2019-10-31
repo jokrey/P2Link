@@ -16,9 +16,7 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
  * Protocol:
  * UDP
  * Packet structure(inside udp):
- * 0-4 bytes: cause - int32 which determines the message cause/type
- * 5-(udp_len-4) bytes: data
- *
+ * see header
  *
  * @author jokrey
  */
@@ -28,14 +26,14 @@ public class IncomingHandler {
     DatagramSocket serverSocket;
     private P2LNodeInternal parent;
 
-    P2LMessageQueue internalMessageQueue = new P2LMessageQueue();
-    P2LMessageQueue userMessageQueue = new P2LMessageQueue();
-    P2LMessageQueue userBrdMessageQueue = new P2LMessageQueue();
-    P2LMessageQueue receiptsQueue = new P2LMessageQueue();
+    final P2LMessageQueue internalMessageQueue = new P2LMessageQueue();
+    final P2LMessageQueue userMessageQueue = new P2LMessageQueue();
+    final P2LMessageQueue userBrdMessageQueue = new P2LMessageQueue();
+    final P2LMessageQueue receiptsQueue = new P2LMessageQueue();
     final BroadcastMessageProtocol.BroadcastState broadcastState = new BroadcastMessageProtocol.BroadcastState();
 //    final RetryHandler retryHandler = new RetryHandler();
 
-    private final P2LThreadPool handleReceivedMessagesPool = new P2LThreadPool(4, 64);
+    final P2LThreadPool handleReceivedMessagesPool = new P2LThreadPool(4, 64);
 
 
     private void handleReceivedMessage(DatagramPacket receivedPacket) throws Throwable {

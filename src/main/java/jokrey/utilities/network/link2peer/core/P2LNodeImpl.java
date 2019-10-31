@@ -46,7 +46,6 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
                     for(SocketAddress retryable:retryableHistoricConnections)
                         outgoingPool.execute(() -> EstablishSingleConnectionProtocol.asInitiator(this, retryable, 1, P2LHeuristics.RETRY_HISTORIC_CONNECTION_TIMEOUT_MS)); //result does not matter - initiator will internally graduate a successful connection - and the timeout is much less than 10000
 
-                    //todo test clean up (verify it does what it is supposed to...)
                     incomingHandler.internalMessageQueue.cleanExpiredMessages();
                     incomingHandler.receiptsQueue.cleanExpiredMessages();
                     incomingHandler.userBrdMessageQueue.cleanExpiredMessages();
@@ -234,13 +233,14 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
                 dormantConnections.add(e.getKey());
         return dormantConnections;
     }
+    /** Already sets the new retry time - so after using this method it is mandatory to actually retry the given connections  */
     private List<SocketAddress> getRetryableHistoricConnections() {
         ArrayList<SocketAddress> retryableHistoricConnections = new ArrayList<>(Math.min(16, historicConnections.size()));
         for(Map.Entry<SocketAddress, Pair<Long, Integer>> e:historicConnections.entrySet()) {
             long nextRetry = e.getValue().l;
             int totalNumberOfPreviousRetries = e.getValue().r;
             if(nextRetry <= System.currentTimeMillis()) {
-                e.setValue(new Pair<>((long) (nextRetry + 60*1000 * Math.pow(2, totalNumberOfPreviousRetries)), totalNumberOfPreviousRetries+1));
+                e.setValue(new Pair<>(Math.min(Long.MAX_VALUE, (long) (nextRetry + P2LHeuristics.ORIGINAL_RETRY_HISTORIC_TIMEOUT_MS * Math.pow(2, totalNumberOfPreviousRetries))), totalNumberOfPreviousRetries+1));
 
                 retryableHistoricConnections.add(e.getKey());
             }
@@ -299,12 +299,16 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     @Override public void printDebugInformation() {
         System.out.println("----- DEBUG INFORMATION -----");
         System.out.println("isClosed = "+incomingHandler.isClosed());
+        System.out.println("connectionLimit = " + connectionLimit);
+        System.out.println("establishedConnections("+establishedConnections.size()+") = " + establishedConnections);
+        System.out.println("historicConnections("+historicConnections.size()+") = " + historicConnections);
         System.out.println("incomingHandler.broadcastState = " + incomingHandler.broadcastState.debugString());
         System.out.println("incomingHandler.internalMessageQueue.debugString() = " + incomingHandler.internalMessageQueue.debugString());
         System.out.println("incomingHandler.receiptsQueue.debugString() = " + incomingHandler.receiptsQueue.debugString());
         System.out.println("incomingHandler.userMessageQueue.debugString() = " + incomingHandler.userMessageQueue.debugString());
         System.out.println("incomingHandler.userBrdMessageQueue.debugString() = " + incomingHandler.userBrdMessageQueue.debugString());
-        System.out.println("outgoingPool = " + outgoingPool.toString());
+        System.out.println("incomingHandler.handleReceivedMessagesPool = " + incomingHandler.handleReceivedMessagesPool.debugString());
+        System.out.println("outgoingPool = " + outgoingPool.debugString());
         System.out.println("individualMessageListeners = " + individualMessageListeners);
         System.out.println("broadcastMessageListeners = " + broadcastMessageListeners);
         System.out.println("newConnectionEstablishedListeners = " + newConnectionEstablishedListeners);
