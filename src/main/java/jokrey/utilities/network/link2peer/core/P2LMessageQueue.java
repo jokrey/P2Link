@@ -77,15 +77,24 @@ class P2LMessageQueue {
     }
     synchronized void handleNewMessage(P2LMessage received) {
         MessageRequest answersRequest = new MessageRequest(received);
+        MessageRequest answersTypeRequest = new MessageRequest(received.type);
 
         Stack<P2LFuture<P2LMessage>> waitingForMessage = waitingReceivers.get(answersRequest); //higher priority
-        Stack<P2LFuture<P2LMessage>> waitingForMessageId = waitingReceivers.get(new MessageRequest(received.type));
+        Stack<P2LFuture<P2LMessage>> waitingForMessageId = waitingReceivers.get(answersTypeRequest);
 
         P2LFuture<P2LMessage> toComplete;
         while (true) {
-            toComplete = waitingForMessage==null?null:waitingForMessage.pop();
-            if (toComplete == null)
-                toComplete = waitingForMessageId==null?null:waitingForMessageId.pop();
+            toComplete = null;
+            if(waitingForMessage!=null) {
+                toComplete = waitingForMessage.pop();
+                if(waitingForMessage.isEmpty())
+                    waitingReceivers.remove(answersRequest, waitingForMessage);
+            }
+            if (toComplete == null && waitingForMessageId != null) {
+                toComplete = waitingForMessageId.pop();
+                if(waitingForMessageId.isEmpty())
+                    waitingReceivers.remove(answersTypeRequest, waitingForMessageId);
+            }
 
             if (toComplete == null) {
                 if(! received.isExpired()) {
@@ -147,5 +156,15 @@ class P2LMessageQueue {
         @Override public String toString() {
             return "MessageRequest{from=" + from + ", messageType=" + messageType + ", conversationId=" + conversationId + ", msgIsReceipt=" + msgIsReceipt + '}';
         }
+    }
+
+
+
+    public String debugString() {
+        return "P2LMessageQueue{" +
+                "waitingReceivers("+waitingReceivers.size()+")=" + waitingReceivers +
+                ", unconsumedMessages_byExactRequest("+unconsumedMessages_byExactRequest.size()+")=" + unconsumedMessages_byExactRequest +
+                ", unconsumedMessages_byId("+unconsumedMessages_byExactRequest.size()+")=" + unconsumedMessages_byId +
+                '}';
     }
 }
