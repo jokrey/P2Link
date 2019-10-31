@@ -50,6 +50,7 @@ public class IncomingHandler {
             }
         }
 
+        parent.notifyPacketReceivedFrom(from);
 
         if(message.requestReceipt) {
             //TODO - problem: double send receipt - i.e.
@@ -71,7 +72,9 @@ public class IncomingHandler {
         } else if (message.type == SL_WHO_AM_I) {
             WhoAmIProtocol.asAnswerer(parent, receivedPacket);
         } else if (message.type == SL_PING) {
-            PingProtocol.asAnswerer(parent, from, message);
+            PingProtocol.asAnswerer(parent, from);
+        } else if (message.type == SL_PONG) {
+            //already notify packet received from called, i.e. it is no longer marked as dormant
         } else if (message.type == SL_PEER_CONNECTION_REQUEST) {
             if (!parent.connectionLimitReached()) {
                 EstablishSingleConnectionProtocol.asAnswerer(parent, new InetSocketAddress(receivedPacket.getAddress(), receivedPacket.getPort()), message);
@@ -103,7 +106,6 @@ public class IncomingHandler {
 
         new Thread(() -> {
             while(!serverSocket.isClosed()) {
-                //fixme 1024 is a heuristic
                 byte[] receiveBuffer = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT]; //asAnswerer buffer needs to be new for each run, otherwise handlereceivedmessages might get weird results - maximum safe size allegedly 512
                 DatagramPacket receivedPacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
                 try {

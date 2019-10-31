@@ -4,6 +4,7 @@ import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
+import jokrey.utilities.simple.data_structure.pairs.Pair;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -35,41 +36,28 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         incomingHandler = new IncomingHandler(this);
 
         new Thread(() -> {
-            long lastPing = System.currentTimeMillis();
             while(!incomingHandler.isClosed()) {
-                long startTime = System.currentTimeMillis();
+                long now = System.currentTimeMillis();
                 try {
-
-                    //todo test ping protocol - reset last ping after
-                    SocketAddress[] origEstablished = null;
-                    ArrayList<P2LFuture<SocketAddress>> pingedList = null;
-                    if((System.currentTimeMillis()-lastPing)/1e3 > 2*60) {
-                        origEstablished = getEstablishedConnections().toArray(new SocketAddress[0]);
-                        pingedList = new ArrayList<>(origEstablished.length);
-                        for(SocketAddress established:origEstablished)
-                            pingedList.add(PingProtocol.asInitiator(this, established));
-                    }
-
-                    //maybe retry historic connections (based on their timeout value)
+                    List<SocketAddress> dormantEstablishedBeforePing = getDormantEstablishedConnections(now);
+                    for(SocketAddress dormant:dormantEstablishedBeforePing)
+                        PingProtocol.asInitiator(this, dormant);
+                    List<SocketAddress> retryableHistoricConnections = getRetryableHistoricConnections();
+                    for(SocketAddress retryable:retryableHistoricConnections)
+                        outgoingPool.execute(() -> EstablishSingleConnectionProtocol.asInitiator(this, retryable, 1, P2LHeuristics.RETRY_HISTORIC_CONNECTION_TIMEOUT_MS)); //result does not matter - initiator will internally graduate a successful connection - and the timeout is much less than 10000
 
                     //todo test clean up (verify it does what it is supposed to...)
                     incomingHandler.internalMessageQueue.cleanExpiredMessages();
                     incomingHandler.receiptsQueue.cleanExpiredMessages();
                     incomingHandler.userBrdMessageQueue.cleanExpiredMessages();
                     incomingHandler.userMessageQueue.cleanExpiredMessages();
-                    incomingHandler.broadcastState.clean();
+                    incomingHandler.broadcastState.clean(true);
 
-                    if(pingedList != null) {
-                        Collection<SocketAddress> stillEstablishedConnections = P2LFuture.waitForEm(pingedList, 10000);
+                    Thread.sleep(P2LHeuristics.MAIN_NODE_SLEEP_TIMEOUT_MS);
 
-                        for(SocketAddress established:origEstablished)
-                            if(!stillEstablishedConnections.contains(established))
-                                markBrokenConnection(established, true);
-
-                        lastPing = System.currentTimeMillis();
-                    }
-                    long elapsed = System.currentTimeMillis() - startTime;
-                    Thread.sleep(Math.max(10, 10000 - elapsed));
+                    List<SocketAddress> dormantEstablishedAfterPing = getDormantEstablishedConnections(now);
+                    for(SocketAddress stillDormant:dormantEstablishedAfterPing)
+                        markBrokenConnection(stillDormant, true);
                 } catch (Throwable t) {
                     t.printStackTrace();
                 }
@@ -141,9 +129,9 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         validateMsgIdNotInternal(message.type);
         return sendInternalMessageWithReceipt(message, to);
     }
-    @Override public void sendMessageBlocking(SocketAddress to, P2LMessage message, int retries, int initialTimeout) throws IOException {
+    @Override public void sendMessageBlocking(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) throws IOException {
         validateMsgIdNotInternal(message.type);
-        sendInternalMessageBlocking(message, to, retries, initialTimeout);
+        sendInternalMessageBlocking(message, to, attempts, initialTimeout);
     }
     @Override public P2LFuture<Boolean> sendInternalMessageWithReceipt(P2LMessage origMessage, SocketAddress to) throws IOException {
         P2LMessage message = origMessage.mutateToRequestReceipt();
@@ -151,9 +139,9 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         return incomingHandler.receiptsQueue.receiptFutureFor(to, message.type, message.conversationId).toBooleanFuture(receipt ->
                 receipt.validateIsReceiptFor(message));
     }
-    @Override public void sendInternalMessageBlocking(P2LMessage message, SocketAddress to, int retries, int initialTimeout) throws IOException {
+    @Override public void sendInternalMessageBlocking(P2LMessage message, SocketAddress to, int attempts, int initialTimeout) throws IOException {
         try {
-            tryComplete(retries, initialTimeout, () -> sendInternalMessageWithReceipt(message, to));
+            tryComplete(attempts, initialTimeout, () -> sendInternalMessageWithReceipt(message, to));
         } catch(IOException e) {
             markBrokenConnection(to, true);
             throw e;
@@ -193,14 +181,22 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
 
 
     //CONNECTION KEEPER::
-    private final Set<SocketAddress> establishedConnections = ConcurrentHashMap.newKeySet();
-    private final ConcurrentHashMap<SocketAddress, Long> historicConnections = new ConcurrentHashMap<>(); //previously established connections
+    /**
+     * established connections
+     * the value(the long) here indicates the last time a message was received from the connection - NOT THE LAST TIME A MESSAGE WAS SENT
+     */
+    private final ConcurrentHashMap<SocketAddress, Long> establishedConnections = new ConcurrentHashMap<>();
+    /**
+     * previously established connections
+     * the value(the long) here indicates the time in ms since 1970, at which point a retry connection attempt should be made to the connection
+     */
+    private final ConcurrentHashMap<SocketAddress, Pair<Long, Integer>> historicConnections = new ConcurrentHashMap<>();
     private final int connectionLimit;
     @Override public boolean isConnectedTo(SocketAddress address) {
-        return establishedConnections.contains(address);
+        return establishedConnections.containsKey(address);
     }
     @Override public Set<SocketAddress> getEstablishedConnections() {
-        return establishedConnections;
+        return establishedConnections.keySet();
     }
     @Override public Set<SocketAddress> getPreviouslyEstablishedConnections() {
         return historicConnections.keySet();
@@ -212,24 +208,49 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         return connectionLimit - establishedConnections.size();
     }
     @Override public void graduateToEstablishedConnection(SocketAddress address) {
-        establishedConnections.add(address);
+        establishedConnections.put(address, System.currentTimeMillis());
         historicConnections.remove(address);
         notifyConnectionEstablished(address);
     }
     @Override public void markBrokenConnection(SocketAddress address, boolean retry) {
-        boolean wasRemoved = establishedConnections.remove(address);
-        if(!wasRemoved) {
+        Long wasRemoved = establishedConnections.remove(address);
+        if(wasRemoved==null) {
             System.err.println(address+" is not an established connection - could not mark as broken (already marked??)");
         } else {
-            historicConnections.put(address, retry ? System.currentTimeMillis() + 1000 * 60 * 2 : Long.MAX_VALUE);
+            historicConnections.put(address, retry ? new Pair<>(System.currentTimeMillis() + 1000 * 60 * 2, 0) : new Pair<>(Long.MAX_VALUE, -1));
             notifyConnectionDisconnected(address);
         }
     }
+    @Override public void notifyPacketReceivedFrom(SocketAddress from) {
+        boolean isEstablished = establishedConnections.computeIfPresent(from, (f,p)->System.currentTimeMillis()) != null;
+        Pair<Long, Integer> retryStateOfHistoricConnection = isEstablished||connectionLimitReached()?null:historicConnections.get(from);
+        if(retryStateOfHistoricConnection != null/* && retryStateOfHistoricConnection.r>0*/) //not actively retrying does not mean the connection should not be reestablished
+            graduateToEstablishedConnection(from);
+    }
+    private List<SocketAddress> getDormantEstablishedConnections(long now) {
+        ArrayList<SocketAddress> dormantConnections = new ArrayList<>(establishedConnections.size());
+        for(Map.Entry<SocketAddress, Long> e:establishedConnections.entrySet())
+            if((now - e.getValue()) > P2LHeuristics.ESTABLISHED_CONNECTION_IS_DORMANT_THRESHOLD_MS)
+                dormantConnections.add(e.getKey());
+        return dormantConnections;
+    }
+    private List<SocketAddress> getRetryableHistoricConnections() {
+        ArrayList<SocketAddress> retryableHistoricConnections = new ArrayList<>(Math.min(16, historicConnections.size()));
+        for(Map.Entry<SocketAddress, Pair<Long, Integer>> e:historicConnections.entrySet()) {
+            long nextRetry = e.getValue().l;
+            int totalNumberOfPreviousRetries = e.getValue().r;
+            if(nextRetry <= System.currentTimeMillis()) {
+                e.setValue(new Pair<>((long) (nextRetry + 60*1000 * Math.pow(2, totalNumberOfPreviousRetries)), totalNumberOfPreviousRetries+1));
+
+                retryableHistoricConnections.add(e.getKey());
+            }
+        }
+        return retryableHistoricConnections;
+    }
+
     @Override public P2LFuture<Integer> executeAllOnSendThreadPool(P2LThreadPool.Task... tasks) {
         return outgoingPool.execute(tasks);
     }
-
-
 
 
 
