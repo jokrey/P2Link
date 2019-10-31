@@ -15,13 +15,13 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.SL_WHO_AM_
  */
 public class WhoAmIProtocol {
     public static String asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
-        return parent.tryReceive(3, 500, () -> {
-            parent.sendInternalMessage(P2LMessage.Factory.createSendMessageFrom(SL_WHO_AM_I), to);
-            return parent.expectInternalMessage(to, R_WHO_AM_I_ANSWER);
-        }).asString();
+        return parent.tryReceive(3, 500, () ->
+                parent.expectInternalMessage(to, R_WHO_AM_I_ANSWER)
+                .nowOrCancel(() -> parent.sendInternalMessage(P2LMessage.Factory.createSendMessageFrom(SL_WHO_AM_I), to))
+        ).asString();
     }
     static void asAnswerer(P2LNodeInternal parent, DatagramPacket receivedPacket) throws IOException {
-        parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_WHO_AM_I_ANSWER, toString(receivedPacket.getSocketAddress())), receivedPacket.getSocketAddress());
+        parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_WHO_AM_I_ANSWER, P2LMessage.EXPIRE_INSTANTLY, toString(receivedPacket.getSocketAddress())), receivedPacket.getSocketAddress());
     }
 
 

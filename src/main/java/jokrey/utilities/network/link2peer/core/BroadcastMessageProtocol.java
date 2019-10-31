@@ -19,27 +19,27 @@ import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
  */
 class BroadcastMessageProtocol {
     private static void asInitiator(P2LNodeInternal parent, P2LMessage message, SocketAddress to) throws IOException {
-        parent.tryComplete(3, 500, () -> {
-            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SC_BROADCAST, message.getContentHash().raw()), to);
+        parent.tryComplete(3, 500, () ->
+                parent.expectInternalMessage(to, C_BROADCAST_MSG_KNOWLEDGE_RETURN)
+                .nowOrCancel(() -> parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SC_BROADCAST, message.getContentHash().raw()), to))
+                .combine(peerHashKnowledgeOfMessage_msg -> {
+                    boolean peerHashKnowledgeOfMessage = peerHashKnowledgeOfMessage_msg.nextBool();
 
-            return parent.expectInternalMessage(to, C_BROADCAST_MSG_KNOWLEDGE_RETURN).combine(peerHashKnowledgeOfMessage_msg -> {
-                boolean peerHashKnowledgeOfMessage = peerHashKnowledgeOfMessage_msg.nextBool();
-
-                if(!peerHashKnowledgeOfMessage) {
-                    byte[] senderBytes = message.sender.getBytes(StandardCharsets.UTF_8);
-                    try {
-                        parent.sendInternalMessage(
-                                P2LMessage.Factory.createSendMessageFrom(C_BROADCAST_MSG, message.type,
-                                        P2LMessage.makeVariableIndicatorFor(senderBytes.length), senderBytes,
-                                        P2LMessage.makeVariableIndicatorFor(message.payloadLength), message.asBytes()),
-                                to);
-                    } catch (IOException e) {
-                        return new P2LFuture<>(false);
+                    if(!peerHashKnowledgeOfMessage) {
+                        byte[] senderBytes = message.sender.getBytes(StandardCharsets.UTF_8);
+                        try {
+                            parent.sendInternalMessage(
+                                    P2LMessage.Factory.createSendMessageFromWithExpiration(C_BROADCAST_MSG, P2LMessage.EXPIRE_INSTANTLY, message.type,
+                                            P2LMessage.makeVariableIndicatorFor(senderBytes.length), senderBytes,
+                                            P2LMessage.makeVariableIndicatorFor(message.payloadLength), message.asBytes()),
+                                    to);
+                        } catch (IOException e) {
+                            return new P2LFuture<>(false);
+                        }
                     }
-                }
-                return new P2LFuture<>(true);
-            });
-        });
+                    return new P2LFuture<>(true);
+                })
+        );
     }
 
     static P2LMessage asAnswerer(P2LNodeInternal parent, BroadcastState state, SocketAddress from, P2LMessage initialMessage) throws IOException {
@@ -53,16 +53,17 @@ class BroadcastMessageProtocol {
         if(state.isKnown(brdMessageHash)) {
 //        if(wasKnown) {
 //            System.out.println("receiving message at " + parent.getSelfLink() + " - known - sending msg knowledge return");
-            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(C_BROADCAST_MSG_KNOWLEDGE_RETURN, true), from);
+            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(C_BROADCAST_MSG_KNOWLEDGE_RETURN, P2LMessage.EXPIRE_INSTANTLY, true), from);
 //            System.out.println("receiving message at " + parent.getSelfLink() + " - known - send msg knowledge return");
             return null; //do not tell application about broadcast again
         } else {
             try {
     //            System.out.println("receiving message at " + parent.getSelfLink() + " - NOT known - sending msg knowledge return - hash: "+ Arrays.toString(initialMessage.asBytes()));
-                parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(C_BROADCAST_MSG_KNOWLEDGE_RETURN, false), from);
     //            System.out.println("receiving message at " + parent.getSelfLink() + " - NOT known - send msg knowledge return");
 
-                P2LMessage message = parent.expectInternalMessage(from, C_BROADCAST_MSG).get(2500);
+                P2LMessage message = parent.expectInternalMessage(from, C_BROADCAST_MSG)
+                        .nowOrCancel(()-> parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(C_BROADCAST_MSG_KNOWLEDGE_RETURN, P2LMessage.EXPIRE_INSTANTLY, false), from))
+                        .get(2500);
                 int brdMsgType = message.nextInt();
                 String sender = message.nextVariableString();
                 byte[] data = message.nextVariable();
@@ -149,6 +150,10 @@ class BroadcastMessageProtocol {
                 //removes all hashes older than 2 minute - i.e. the same broadcast can be send every roughly 2 minutes
                 //also means that a broadcast has to pass through(and fade, i.e. no longer redistributed) the network within 2 minutes
             }
+        }
+
+        public void clear() {
+            knownMessageHashes.clear();
         }
     }
 }

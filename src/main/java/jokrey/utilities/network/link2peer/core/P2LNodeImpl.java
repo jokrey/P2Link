@@ -7,10 +7,7 @@ import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
 import java.net.SocketAddress;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -38,20 +35,41 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         incomingHandler = new IncomingHandler(this);
 
         new Thread(() -> {
+            long lastPing = System.currentTimeMillis();
             while(!incomingHandler.isClosed()) {
+                long startTime = System.currentTimeMillis();
                 try {
 
-                    //todo - ping protocol to clean up established connections
+                    //todo test ping protocol - reset last ping after
+                    SocketAddress[] origEstablished = null;
+                    ArrayList<P2LFuture<SocketAddress>> pingedList = null;
+                    if((System.currentTimeMillis()-lastPing)/1e3 > 2*60) {
+                        origEstablished = getEstablishedConnections().toArray(new SocketAddress[0]);
+                        pingedList = new ArrayList<>(origEstablished.length);
+                        for(SocketAddress established:origEstablished)
+                            pingedList.add(PingProtocol.asInitiator(this, established));
+                    }
 
                     //maybe retry historic connections (based on their timeout value)
 
+                    //todo test clean up (verify it does what it is supposed to...)
                     incomingHandler.internalMessageQueue.cleanExpiredMessages();
                     incomingHandler.receiptsQueue.cleanExpiredMessages();
                     incomingHandler.userBrdMessageQueue.cleanExpiredMessages();
                     incomingHandler.userMessageQueue.cleanExpiredMessages();
                     incomingHandler.broadcastState.clean();
 
-                    Thread.sleep(5000);
+                    if(pingedList != null) {
+                        Collection<SocketAddress> stillEstablishedConnections = P2LFuture.waitForEm(pingedList, 10000);
+
+                        for(SocketAddress established:origEstablished)
+                            if(!stillEstablishedConnections.contains(established))
+                                markBrokenConnection(established, true);
+
+                        lastPing = System.currentTimeMillis();
+                    }
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    Thread.sleep(Math.max(10, 10000 - elapsed));
                 } catch (Throwable t) {
                     t.printStackTrace();
                 }
@@ -64,6 +82,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     @Override public void close() {
         disconnectFromAll();
         incomingHandler.close();
+        outgoingPool.shutdown();
     }
 
     @Override public P2LFuture<Boolean> establishConnection(SocketAddress to) {
@@ -134,9 +153,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
     @Override public void sendInternalMessageBlocking(P2LMessage message, SocketAddress to, int retries, int initialTimeout) throws IOException {
         try {
-            tryComplete(retries, initialTimeout, () -> {
-                return sendInternalMessageWithReceipt(message, to);
-            });
+            tryComplete(retries, initialTimeout, () -> sendInternalMessageWithReceipt(message, to));
         } catch(IOException e) {
             markBrokenConnection(to, true);
             throw e;
@@ -197,14 +214,16 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     @Override public void graduateToEstablishedConnection(SocketAddress address) {
         establishedConnections.add(address);
         historicConnections.remove(address);
-        notifyNewConnection(address);
+        notifyConnectionEstablished(address);
     }
-    @Override public void markBrokenConnection(SocketAddress address, boolean makeHistory) {
+    @Override public void markBrokenConnection(SocketAddress address, boolean retry) {
         boolean wasRemoved = establishedConnections.remove(address);
         if(!wasRemoved) {
             System.err.println(address+" is not an established connection - could not mark as broken (already marked??)");
-        } else if(makeHistory)
-            historicConnections.put(address, System.currentTimeMillis());
+        } else {
+            historicConnections.put(address, retry ? System.currentTimeMillis() + 1000 * 60 * 2 : Long.MAX_VALUE);
+            notifyConnectionDisconnected(address);
+        }
     }
     @Override public P2LFuture<Integer> executeAllOnSendThreadPool(P2LThreadPool.Task... tasks) {
         return outgoingPool.execute(tasks);
@@ -220,12 +239,15 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     private final ArrayList<P2LMessageListener> individualMessageListeners = new ArrayList<>();
     private final ArrayList<P2LMessageListener> broadcastMessageListeners = new ArrayList<>();
     private final ArrayList<Consumer<SocketAddress>> newConnectionEstablishedListeners = new ArrayList<>();
+    private final ArrayList<Consumer<SocketAddress>> connectionDisconnectedListeners = new ArrayList<>();
     @Override public void addMessageListener(P2LMessageListener listener) { individualMessageListeners.add(listener); }
     @Override public void addBroadcastListener(P2LMessageListener listener) { broadcastMessageListeners.add(listener); }
-    @Override public void addNewConnectionListener(Consumer<SocketAddress> listener) { newConnectionEstablishedListeners.add(listener); }
+    @Override public void addConnectionEstablishedListener(Consumer<SocketAddress> listener) { newConnectionEstablishedListeners.add(listener); }
+    @Override public void addConnectionDisconnectedListener(Consumer<SocketAddress> listener) { connectionDisconnectedListeners.add(listener); }
     @Override public void removeMessageListener(P2LMessageListener listener) { individualMessageListeners.remove(listener); }
     @Override public void removeBroadcastListener(P2LMessageListener listener) { broadcastMessageListeners.remove(listener); }
-    @Override public void removeNewConnectionListener(Consumer<SocketAddress> listener) { newConnectionEstablishedListeners.add(listener); }
+    @Override public void removeConnectionEstablishedListener(Consumer<SocketAddress> listener) { newConnectionEstablishedListeners.remove(listener); }
+    @Override public void removeConnectionDisconnectedListener(Consumer<SocketAddress> listener) { connectionDisconnectedListeners.remove(listener); }
     @Override public void notifyBroadcastMessageReceived(P2LMessage message) {
         for (P2LMessageListener l : broadcastMessageListeners) { l.received(message); }
     }
@@ -233,8 +255,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         for (P2LMessageListener l : individualMessageListeners) { l.received(message); }
     }
 
-    private void notifyNewConnection(SocketAddress newAddress) {
+    private void notifyConnectionEstablished(SocketAddress newAddress) {
         for (Consumer<SocketAddress> l : newConnectionEstablishedListeners) { l.accept(newAddress); }
+    }
+    private void notifyConnectionDisconnected(SocketAddress newAddress) {
+        for (Consumer<SocketAddress> l : connectionDisconnectedListeners) { l.accept(newAddress); }
     }
 
 

@@ -38,7 +38,7 @@ public class IncomingHandler {
     private final P2LThreadPool handleReceivedMessagesPool = new P2LThreadPool(4, 64);
 
 
-    private void handleReceivedMessage(DatagramPacket receivedPacket) throws IOException {
+    private void handleReceivedMessage(DatagramPacket receivedPacket) throws Throwable {
         SocketAddress from = receivedPacket.getSocketAddress();
         P2LMessage message = P2LMessage.fromPacket(receivedPacket);
         if(INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE>0) {
@@ -70,9 +70,11 @@ public class IncomingHandler {
             RequestPeerLinksProtocol.asAnswerer(parent, from);
         } else if (message.type == SL_WHO_AM_I) {
             WhoAmIProtocol.asAnswerer(parent, receivedPacket);
+        } else if (message.type == SL_PING) {
+            PingProtocol.asAnswerer(parent, from, message);
         } else if (message.type == SL_PEER_CONNECTION_REQUEST) {
             if (!parent.connectionLimitReached()) {
-                EstablishSingleConnectionProtocol.asReceiver(parent, new InetSocketAddress(receivedPacket.getAddress(), receivedPacket.getPort()), message);
+                EstablishSingleConnectionProtocol.asAnswerer(parent, new InetSocketAddress(receivedPacket.getAddress(), receivedPacket.getPort()), message);
             }
         } else if (message.type == SC_BROADCAST) {
             P2LMessage received = BroadcastMessageProtocol.asAnswerer(parent, broadcastState, from, message);
@@ -81,7 +83,7 @@ public class IncomingHandler {
                 parent.notifyBroadcastMessageReceived(received);
             }
         } else if (message.type == SC_DISCONNECT) {
-            DisconnectSingleConnectionProtocol.asReceiver(parent, from);
+            DisconnectSingleConnectionProtocol.asAnswerer(parent, from);
         } else {
             if (message.isInternalMessage()) {
                 internalMessageQueue.handleNewMessage(message);
@@ -126,6 +128,12 @@ public class IncomingHandler {
 
     void close() {
         serverSocket.close();
+        handleReceivedMessagesPool.shutdown();
+        internalMessageQueue.clear();
+        userMessageQueue.clear();
+        userBrdMessageQueue.clear();
+        receiptsQueue.clear();
+        broadcastState.clear();
     }
     boolean isClosed() {
         return serverSocket.isClosed();

@@ -15,7 +15,7 @@ class DisconnectSingleConnectionProtocol {
         } catch (IOException ignored) { }
     }
 
-    static void asReceiver(P2LNodeInternal parent, SocketAddress from) {
+    static void asAnswerer(P2LNodeInternal parent, SocketAddress from) {
         parent.markBrokenConnection(from, false);
     }
 }

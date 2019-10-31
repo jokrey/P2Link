@@ -9,7 +9,7 @@ import java.net.SocketAddress;
 
 interface P2LNodeInternal extends P2LNode {
     void graduateToEstablishedConnection(SocketAddress address);
-    void markBrokenConnection(SocketAddress address, boolean makeHistory);
+    void markBrokenConnection(SocketAddress address, boolean retry);
     int remainingNumberOfAllowedPeerConnections();
 
     void sendInternalMessage(P2LMessage message, SocketAddress to) throws IOException;

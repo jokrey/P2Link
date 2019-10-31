@@ -1,3 +1,4 @@
+import jdk.nashorn.internal.ir.annotations.Ignore;
 import jokrey.utilities.debug_analysis_helper.AverageCallTimeMarker;
 import jokrey.utilities.debug_analysis_helper.TimeDiffMarker;
 import jokrey.utilities.network.link2peer.P2LMessage;
@@ -197,8 +198,11 @@ class IntermediateTests {
                     sleep(100);
                     counter.getAndIncrement();
                 }));
+            System.out.println("x1");
             assertTrue(P2LFuture.reduce(allFs, P2LFuture.AND).get());
+            System.out.println("x2");
             assertEquals(counter.get(), 100);
+            pool.shutdown();
         }
         TimeDiffMarker.println(5331, "custom 1 took: ");
 
@@ -214,22 +218,23 @@ class IntermediateTests {
                 });
             while (counter.get() < 100) sleep(10);
             assertEquals(counter.get(), 100);
+            pool.shutdown();
         }
         TimeDiffMarker.println(5331, "custom 2 took: ");
 
-        TimeDiffMarker.setMark(5331);
-        {
-            ThreadPoolExecutor pool = new ThreadPoolExecutor(2, 32, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(100));
-            AtomicInteger counter = new AtomicInteger(0);
-            for (int i = 0; i < 100; i++)
-                pool.execute(() -> {
-                    sleep(100);
-                    counter.getAndIncrement();
-                });
-            while (counter.get() < 100) sleep(10);
-            assertEquals(counter.get(), 100);
-        }
-        TimeDiffMarker.println(5331, "custom took: ");
+//        TimeDiffMarker.setMark(5331);
+//        {
+//            ThreadPoolExecutor pool = new ThreadPoolExecutor(2, 32, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(100));
+//            AtomicInteger counter = new AtomicInteger(0);
+//            for (int i = 0; i < 100; i++)
+//                pool.execute(() -> {
+//                    sleep(100);
+//                    counter.getAndIncrement();
+//                });
+//            while (counter.get() < 100) sleep(10);
+//            assertEquals(counter.get(), 100);
+//        }
+//        TimeDiffMarker.println(5331, "custom took: ");
     }
     @Test void p2lThreadPoolTest_capacity() {
         P2LThreadPool pool = new P2LThreadPool(1, 1, 1);
@@ -412,6 +417,8 @@ class IntermediateTests {
         boolean connected = node1.establishConnection(local(node2)).get(1000);
         assertTrue(connected);
 
+        System.out.println("t2");
+
         printPeers(node1, node2);
 
         P2LFuture<Boolean> sendResult;
@@ -419,31 +426,43 @@ class IntermediateTests {
         assertTrue(sendResult.get(200));
         sendResult = node1.sendMessageWithReceipt(local(node2), P2LMessage.Factory.createSendMessage(1, "welt"));
         assertTrue(sendResult.get(200));
+        System.out.println("t3");
 
         String node2Received = node2.expectMessage(1).get(200).asString();
         assertEquals("welt", node2Received);
         String node1Received = node1.expectMessage(1).get(200).asString();
         assertEquals("hallo", node1Received);
+        System.out.println("t4");
 
         sendResult = node2.sendMessageWithReceipt(local(node1), P2LMessage.Factory.createSendMessage(25, "hallo welt!"));
         assertTrue(sendResult.get(200));
+        System.out.println("t5");
 
         assertThrows(TimeoutException.class, () -> {
             node1.expectMessage(1).get(100); //will timeout, because message was consumed
         });
+        System.out.println("t6-0");
 
         sendResult = node2.sendMessageWithReceipt(local(node1), P2LMessage.Factory.createSendMessage(1, "hallo welt"));
+        System.out.println("t6-1");
         assertTrue(sendResult.get(200));
+        System.out.println("t6-2");
         String node1Received2 = node1.expectMessage(1).get(100).asString(); //no longer times out, because node 2 has send another message now
+        System.out.println("t6-3");
         assertEquals("hallo welt", node1Received2);
 
+        System.out.println("t6-4");
         assertThrows(TimeoutException.class, () -> {
             node1.expectMessage(local(node1), 25).get(100); //will timeout, because the message is not from node1...
         });
+        System.out.println("t6-5");
         String node1Received3 = node1.expectMessage(local(node2), 25).get(100).asString();
+        System.out.println("t6-6");
         assertEquals("hallo welt!", node1Received3);
+        System.out.println("t7");
 
         close(node1, node2);
+        System.out.println("t8");
     }
 
 
@@ -681,7 +700,7 @@ class IntermediateTests {
         close(nodes);
     }
     @Test void messagePassingWithCallMeBackFutureWorks() throws IOException {
-        P2LNode[] nodes = generateNodes(2, 64000);
+        P2LNode[] nodes = generateNodes(2, 60040);
         nodes[1].expectMessage(1).callMeBack(m -> {
             System.out.println("CALLED!!!!!");
             assertEquals(142, m.nextInt());
@@ -720,7 +739,7 @@ class IntermediateTests {
         assertEquals("sup", nodes[2].expectMessage(1).get(1).asString());
         assertThrows(TimeoutException.class, () -> nodes[3].expectMessage(1).get(1));
 
-        nodes[6].sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(WhoAmIProtocol.toString(local(nodes[6])), 1, "sup")).waitForIt();
+        nodes[6].sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(WhoAmIProtocol.toString(local(nodes[6])), 1, "sup")).waitForIt(20000);
 
         for(P2LNode node:nodes)
             if(node != nodes[6])

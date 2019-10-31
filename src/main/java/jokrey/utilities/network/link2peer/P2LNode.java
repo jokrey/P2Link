@@ -35,7 +35,6 @@ import java.util.function.Function;
  *    with conversation id, a counter and an intelligent retry function pretty much exactly like tcp
  *
  *
- *
  * LATER:
  * TODO: fixed size networks (with much improved broadcast efficiency and maybe send to type(instead of send to link))
  * TODO:     improving upon fixed size: limit size networks..
@@ -256,7 +255,7 @@ public interface P2LNode {
             try {
                 T gotten = conversationWithResult.request().getOrNull(timeout);
                 if (gotten != null) return gotten;
-            } catch (IOException ignore) {}
+            } catch (Throwable ignore) {}
             timeout *= 2;
         }
         throw new IOException(getPort()+" could not get result after "+retries+" retries");
@@ -275,13 +274,13 @@ public interface P2LNode {
             try {
                 Boolean success = conversation.request().getOrNull(timeout);
                 if(success!=null && success) return;
-            } catch (IOException ignore) {}
+            } catch (Throwable ignore) {}
             timeout *= 2;
         }
         throw new IOException(getPort()+" could not get result after "+retries+" retries");
     }
     /** Function producing something in the future */
-    interface Request<T> { P2LFuture<T> request() throws IOException;}
+    interface Request<T> { P2LFuture<T> request() throws Throwable;}
 
 
 
@@ -303,7 +302,13 @@ public interface P2LNode {
      * The given listener will receive all newly established connections.
      * @param listener listener to add
      */
-    void addNewConnectionListener(Consumer<SocketAddress> listener);
+    void addConnectionEstablishedListener(Consumer<SocketAddress> listener);
+    /**
+     * The given listener will receive all disconnected connections.
+     * @param listener listener to add
+     */
+    void addConnectionDisconnectedListener(Consumer<SocketAddress> listener);
+
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
     void removeMessageListener(P2LMessageListener listener);
@@ -312,7 +317,10 @@ public interface P2LNode {
     void removeBroadcastListener(P2LMessageListener listener);
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
-    void removeNewConnectionListener(Consumer<SocketAddress> listener);
+    void removeConnectionEstablishedListener(Consumer<SocketAddress> listener);
+    /** Removes a previously assigned listener, by raw reference (i.e. ==)
+     * @param listener listener to remove */
+    void removeConnectionDisconnectedListener(Consumer<SocketAddress> listener);
     /** Trivial message listener - dual use for direct messages and broadcasts */
     interface P2LMessageListener { void received(P2LMessage message);}
 }

@@ -76,11 +76,11 @@ public final class P2LMessage {
     public final boolean isReceipt;
 
     /**
-     * Constant for an instant message timeout.
-     * An example for message that instantly timeout are receipts.
+     * Constant for an instant message expiration.
+     * An example for message that instantly expire are receipts.
      * All messages that are directly waited upon(for example in a conversation), should instantly timeout.
      */
-    public static final short INSTANT_TIMEOUT = 0;
+    public static final short EXPIRE_INSTANTLY = 0;
     /**
      * Node max timeout for messages - also used for incoming messages, so no message will ever remain longer in the message queues - even if the sender expects that.
      * default is at 180 seconds = 3 minutes
@@ -157,9 +157,9 @@ public final class P2LMessage {
     public static P2LMessage createReceiptFor(P2LMessage message) {
         Hash receiptHash = HeaderUtil.contentHashFrom(null, message.raw, message.payloadLength);
         byte[] raw = new byte[HeaderUtil.HEADER_SIZE + receiptHash.length()];
-        HeaderUtil.writeHeader(raw, message.type, message.conversationId, false, true, INSTANT_TIMEOUT); //receipts instantly time out - because they are always automatically waited on by the system..
+        HeaderUtil.writeHeader(raw, message.type, message.conversationId, false, true, EXPIRE_INSTANTLY); //receipts instantly time out - because they are always automatically waited on by the system..
         System.arraycopy(receiptHash.raw(), 0, raw, HeaderUtil.HEADER_SIZE, receiptHash.length());
-        return new P2LMessage(null, message.type, message.conversationId, false,true, INSTANT_TIMEOUT, null, raw, receiptHash.length(), receiptHash.raw());
+        return new P2LMessage(null, message.type, message.conversationId, false,true, EXPIRE_INSTANTLY, null, raw, receiptHash.length(), receiptHash.raw());
     }
     public boolean validateIsReceiptFor(P2LMessage message) {
         if(!isReceipt) throw new IllegalStateException("cannot validate receipt, since this is not a receipt");
@@ -314,16 +314,31 @@ public final class P2LMessage {
         public static <T>P2LMessage createSendMessage(int type, T payload) {
             return createSendMessage(type, trans.transform(payload));
         }
+        public static <T>P2LMessage createSendMessage(int type, short expirationTimeoutInSeconds, T payload) {
+            return createSendMessage(type, expirationTimeoutInSeconds, trans.transform(payload));
+        }
         public static P2LMessage createSendMessageFrom(int type, Object... payloads) {
+            return createSendMessageFrom(type, P2LNode.NO_CONVERSATION_ID, payloads);
+        }
+        public static P2LMessage createSendMessageFrom(int type, int conversationId, Object... payloads) {
+            return createSendMessageFrom(type, conversationId, MAX_TIMEOUT, payloads);
+        }
+        public static P2LMessage createSendMessageFromWithExpiration(int type, short expirationTimeoutInSeconds, Object... payloads) {
+            return createSendMessageFrom(type, P2LNode.NO_CONVERSATION_ID, expirationTimeoutInSeconds, payloads);
+        }
+        public static P2LMessage createSendMessageFrom(int type, int conversationId, short expirationTimeoutInSeconds, Object... payloads) {
             byte[][] total = new byte[payloads.length][];
             int sizeCounter = 0;
             for(int i=0;i<payloads.length;i++) {
                 total[i] = trans.transform(payloads[i]);
                 sizeCounter+=total[i].length;
             }
-            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, MAX_TIMEOUT, sizeCounter, total);
+            return createSendMessageWith(type, conversationId, expirationTimeoutInSeconds, sizeCounter, total);
         }
         public static P2LMessage createSendMessageFromVariables(int type, Object... payloads) {
+            return createSendMessageFromVariablesWithExpiration(type, MAX_TIMEOUT, payloads);
+        }
+        public static P2LMessage createSendMessageFromVariablesWithExpiration(int type, short expirationTimeoutInSeconds, Object... payloads) {
             byte[][] total = new byte[payloads.length*2][];
             int sizeCounter = 0;
             for(int i=0;i<total.length;i+=2) {
@@ -331,9 +346,12 @@ public final class P2LMessage {
                 total[i] = makeVariableIndicatorFor(total[i+1].length);
                 sizeCounter+=total[i].length + total[i+1].length;
             }
-            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, MAX_TIMEOUT, sizeCounter, total);
+            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expirationTimeoutInSeconds, sizeCounter, total);
         }
         public static P2LMessage createSendMessageFromVariables(int type, Collection payloads) {
+            return createSendMessageFromVariables(type, MAX_TIMEOUT, payloads);
+        }
+        public static P2LMessage createSendMessageFromVariables(int type, short expirationTimeoutInSeconds, Collection payloads) {
             Iterator payloadsIterator = payloads.iterator();
             byte[][] total = new byte[payloads.size()*2][];
             int sizeCounter = 0;
@@ -342,7 +360,7 @@ public final class P2LMessage {
                 total[i] = makeVariableIndicatorFor(total[i + 1].length);
                 sizeCounter += total[i].length + total[i + 1].length;
             }
-            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, MAX_TIMEOUT, sizeCounter, total);
+            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expirationTimeoutInSeconds, sizeCounter, total);
         }
 
         public static P2LMessage createBroadcast(String sender, int brdMsgType, Object payload) {

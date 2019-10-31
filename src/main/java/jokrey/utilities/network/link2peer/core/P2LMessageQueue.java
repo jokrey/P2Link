@@ -20,6 +20,12 @@ class P2LMessageQueue {
     private final Map<MessageRequest, Stack<P2LFuture<P2LMessage>>> waitingReceivers = new HashMap<>();
     private final Map<MessageRequest, List<P2LMessage>> unconsumedMessages_byExactRequest = new HashMap<>();
     private final Map<Integer, List<P2LMessage>> unconsumedMessages_byId = new HashMap<>();
+    synchronized void clear() {
+        waitingReceivers.clear();
+        unconsumedMessages_byExactRequest.clear();
+        unconsumedMessages_byId.clear();
+    }
+
     synchronized P2LFuture<P2LMessage> futureFor(int messageType) {
         P2LFuture<P2LMessage> future = new P2LFuture<>();
         List<P2LMessage> unconsumedMessagesForId = unconsumedMessages_byId.get(messageType);
