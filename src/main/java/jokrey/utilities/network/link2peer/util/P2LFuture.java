@@ -1,6 +1,10 @@
 package jokrey.utilities.network.link2peer.util;
 
+import jokrey.utilities.network.link2peer.util.P2LThreadPool.Task;
 import jokrey.utilities.simple.data_structure.stack.LFStack;
+import jokrey.utilities.simple.data_structure.stack.Stack;
+import jokrey.utilities.simple.data_structure.stack.LinkedStack;
+
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -59,14 +63,14 @@ public class P2LFuture<T> {
      */
     public P2LFuture(T result) {
         this(DEFAULT_TIMEOUT);
-        this.result.set(result);
+        this.result = result;
     }
 
     private volatile boolean isGetWaiting = false;
     private volatile boolean isCanceled = false;
     private volatile boolean hasTimedOut = false;
-    private final LFStack<Consumer<T>> resultCallbacks = new LFStack<>();
-    private final AtomicReference<T> result = new AtomicReference<>(null);
+    private final Stack<Consumer<T>> resultCallbacks = new LinkedStack<>();
+    private T result = null;
 
     /**
      * @return whether anyone is waiting for the future in a blocking fashion
@@ -79,7 +83,7 @@ public class P2LFuture<T> {
      * @return whether anyone is waiting for the future in an unblocking fashion
      */
     private boolean isUnblockingWaiting() {
-        return resultCallbacks.size() > 0;
+        return resultCallbacks.size() > 0; //thread safe, even without blocking, due to copy on write (though result may not be perfectly current)
     } //outsider should not make a difference between blocking and unblocking waiting (type conversion and combine kinda rely on that)
 
     /**
@@ -114,7 +118,7 @@ public class P2LFuture<T> {
      * @return the result or null if it is not yet available
      */
     public T getResult() {
-        return result.get();
+        return result;
     }
 
     /**
@@ -126,11 +130,13 @@ public class P2LFuture<T> {
      *
      * @param callback callback receiving the result
      */
-    public void callMeBack(Consumer<T> callback) {
+    public synchronized void callMeBack(Consumer<T> callback) {
+        //has to be synchronized, otherwise between pushing the callback and the isCompleted - it could be completed and never called....
         if (isCompleted())
             callback.accept(getResult());
-        else
+        else {
             resultCallbacks.push(callback);
+        }
     }
 
     /**
@@ -160,11 +166,7 @@ public class P2LFuture<T> {
     public T get(long timeout_ms) {
         T result = getOrNull(timeout_ms);
         if (isCanceled()) throw new CanceledException();
-        if (result == null) {
-            System.out.println("timeout_ms = " + timeout_ms);
-            System.out.println("result = " + result);
-            throw new TimeoutException();
-        }
+        if (result == null) throw new TimeoutException();
         return result;
     }
 
@@ -200,6 +202,7 @@ public class P2LFuture<T> {
      */
     public T getOrNull(long timeout_ms) {
         if (isCanceled()) return null;
+        if (isCompleted()) return getResult();
         if (timeout_ms < 0) timeout_ms = ENDLESS_WAIT;
         try {
             isGetWaiting = true;
@@ -207,15 +210,15 @@ public class P2LFuture<T> {
             synchronized (this) {
                 while (!isCompleted() && !isCanceled()) {
                     long elapsed_ms = System.currentTimeMillis() - waitingSince;
-                    long remaining_ms = timeout_ms <= 0 ? ENDLESS_WAIT : timeout_ms - elapsed_ms;
-                    if (remaining_ms < 0) { //waiting for timeout without rechecking whether it has actually timed out is not possible - wait(timeout) is not guaranteed to sleep until timeout
+                    long remaining_ms = timeout_ms - elapsed_ms;
+                    if (timeout_ms != ENDLESS_WAIT && remaining_ms <= 0) { //waiting for timeout without rechecking whether it has actually timed out is not possible - wait(timeout) is not guaranteed to sleep until timeout
                         timeout();
                         return null;
                     }
-                    wait(remaining_ms);
+                    wait(timeout_ms == ENDLESS_WAIT ? ENDLESS_WAIT : remaining_ms);
                 }
             }
-            if (isCanceled())
+            if(isCanceled())
                 return null;
             return getResult();
         } catch (InterruptedException e) {
@@ -236,45 +239,121 @@ public class P2LFuture<T> {
      */
     public void setCompleted(T result) {
         if (result == null) throw new NullPointerException("result cannot be null");
-        if (isCanceled()) throw new CanceledException();
-        if (this.result.compareAndSet(null, result)) { //only if result previously not set
-            if (isBlockingWaiting()) {
-                synchronized (this) {
-                    notifyAll();
-                }
-            }
-            Consumer<T> unblockingWaiter;
-            while ((unblockingWaiter = resultCallbacks.pop()) != null) //at this point no more waiters are added, since the result is already set - however it would work anyways
-                unblockingWaiter.accept(result);
-        } else {
-            throw new AlreadyCompletedException();
+        synchronized (this) {
+            if (isCanceled()) throw new CanceledException();
+            if (isCompleted()) throw new AlreadyCompletedException();
+            this.result = result;
+            done();
         }
     }
 
     /**
      * Cancels the future, making is impossible to set it to complete ever again.
-     * Notifies all still blocking waiting threads to wake up. They will throw {@link CanceledException}.
+     * Notifies all still blocking waiting threads to wake up. They will throw a {@link CanceledException}.
      * Calls all unblocking waiters with a null reference. Note that the callbacks are executed from this thread, i.e. if they hang this method will hang as well.
+     *
+     * If the future was previously canceled, this method will do nothing.
      *
      * @throws AlreadyCompletedException if the future was completed before this method ends
      */
     public void cancel() {
-        if (isCompleted()) throw new AlreadyCompletedException();
-        isCanceled = true;
-        if (isBlockingWaiting()) {
-            synchronized (this) {
-                notifyAll();
-            }
+//        System.out.println("P2LFuture.cancel");
+        synchronized (this) {
+            if (isCompleted()) throw new AlreadyCompletedException();
+            if(isCanceled()) return;
+            isCanceled = true;
+            done();
         }
+    }
+
+    /**
+     * Like {@link #cancel()} except it won't even throw an exception
+     * @return !isCompleted() && !isCanceled()
+     */
+    public boolean cancelIfNotCompleted() {
+        synchronized (this) {
+            if(isCompleted()) return false;
+            if(isCanceled()) return false;
+            isCanceled = true;
+            done();
+            return true;
+        }
+    }
+
+    private synchronized void done() {
+        if (isBlockingWaiting())
+            notifyAll();
+
         Consumer<T> unblockingWaiter;
         while ((unblockingWaiter = resultCallbacks.pop()) != null) //at this point no more waiters are added, since the result is already set - however it would work anyways
             unblockingWaiter.accept(getResult()); //if the result was set in the meantime - this will respect that
-        if (isCompleted()) throw new AlreadyCompletedException();
     }
-
     private void timeout() {
         hasTimedOut = true;
     }
+
+
+    /**
+     * Executes the given task instantly.
+     * Useful when this future has to exist for the task to be safely executed(for example because it cause the future to be conceptually complete),
+     *     but it has to returned from a method.
+     * @param task a given task to execute immediately (before or after the future is complete, but after it exists and can be completed)
+     * @throws Throwable any given exception the task throws is rethrown and causes this future to be canceled
+     * @return this future
+     */
+    public P2LFuture<T> nowOrCancel(Task task) throws Throwable {
+        try {
+            task.run();
+        } catch (Throwable t) {
+            cancel();
+            throw t;
+        }
+        return this;
+    }
+    /**
+     * Like {@link #nowOrCancel(Task)}, except the task cannot throw an exception and will not cause this future to be canceled.
+     * RuntimeExceptions are simply rethrown and do not cause this future to be canceled.
+     * @see #nowOrCancel(Task)
+     */
+    public P2LFuture<T> now(Runnable task) {
+        task.run();
+        return this;
+    }
+    /**
+     * The given task will be executed after the future completes OR is canceled.
+     * Essentially a wrapper for {@link #callMeBack(Consumer)} that does not consider the result of this future and returns this.
+     * @param task a given task to be executed after the future completes OR is canceled
+     * @return this future
+     */
+    public P2LFuture<T> then(Runnable task) {
+        callMeBack(t -> task.run());
+        return this;
+    }
+    /**
+     * The given task will be executed after the future completes, but ONLY if it completes successfully (i.e. if the future is canceled the task will not be called)
+     * @param task a given task to be executed after the future completes
+     * @return this future
+     */
+    public P2LFuture<T> whenCompleted(Runnable task) {
+        callMeBack(t -> { if(t != null) task.run(); });
+        return this;
+    }
+    /**
+     * The given task will be executed after the future is canceled (i.e. if the future is completed successfully the task will not be called)
+     * @param task a given task to be executed after the future is canceled
+     * @return this future
+     */
+    public P2LFuture<T> whenCanceled(Runnable task) {
+        callMeBack(t -> { if(t == null) task.run(); });
+        return this;
+    }
+
+
+
+
+
+
+
 
     /**
      * Converts the given future to a boolean future using the given converter function
@@ -424,6 +503,37 @@ public class P2LFuture<T> {
         if(futures.isEmpty())
             allResults.setCompleted(collector);
         return allResults;
+    }
+
+    /**
+     * Waits for the given collection of futures for the given total time until a timeout.
+     * Within this timeout the method will collect as many results as it can.
+     * If a future in the given collection is canceled, this method will ignore it.
+     * All futures in the given collection that do not complete by the timeout are marked to have timed out.
+     * @param futures collection of futures of the same type
+     * @param timeoutMs maximum time until this method returns
+     * @return a list of obtained results, min size is 0, max size is == futures.size
+     */
+    public static <T> Collection<T> waitForEm(Collection<P2LFuture<T>> futures, int timeoutMs) {
+        LinkedList<T> list = new LinkedList<>();
+        long startTime = System.currentTimeMillis();
+        for(P2LFuture<T> future:futures) {
+            long elapsed = System.currentTimeMillis() - startTime;
+            long remaining = timeoutMs-elapsed;
+            if(remaining > 0) {
+                T result = future.getOrNull(remaining);
+                if(result != null)
+                    list.add(result);
+                //do not break if null, could just be this single future was canceled
+            } else {
+                T result = future.getResult();//do not wait anymore
+                if(result != null)
+                    list.add(result);
+                else
+                    future.hasTimedOut();
+            }
+        }
+        return list;
     }
 
     /**

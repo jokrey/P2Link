@@ -17,11 +17,18 @@ public abstract class P2LTask<R> extends P2LFuture<R> {
     protected void start() {
         started = true;
         try {
-            setCompletedOrCanceledBasedOn(run());
+            R resultOrNull = run();
+            if (resultOrNull == null) cancel();
+            else super.setCompleted(resultOrNull);
         } catch (Throwable t) {
             t.printStackTrace();
-            cancel();
+            cancel(); //cannot be completed at this point
         }
+    }
+
+    /** UNSUPPORTED FOR TASK FROM OUTSIDER - canceling a task on the other hand is fine, that can be alternatively handled by the run method of the task */
+    @Override public void setCompleted(R result) {
+        throw new UnsupportedOperationException("cannot set a task to complete from outside the task itself");
     }
 
     /**

@@ -85,7 +85,7 @@ public class P2LThreadPool {
             P2LThread thread = poolIterator.next();
             if (!isCommitted && thread.runTask(task)) {
                 isCommitted = true;
-            } else if (size > coreThreads && thread.shutdown()) {
+            } else if (size > coreThreads && thread.shutdownIfIdle()) {
                 poolIterator.remove();
                 size--;
             }
@@ -112,10 +112,16 @@ public class P2LThreadPool {
             runTask(task);
         }
 
-        synchronized boolean shutdown() {
-            if(task!=null) return false;
+        synchronized void shutdown() {
+            if(task!=null)
+                task.cancelIfNotCompleted();
+            task = null;
             shutdown = true;
             notify();
+        }
+        synchronized boolean shutdownIfIdle() {
+            if(task != null) return false;
+            shutdown();
             return true;
         }
 
