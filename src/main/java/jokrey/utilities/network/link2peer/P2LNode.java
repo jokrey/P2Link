@@ -1,6 +1,7 @@
 package jokrey.utilities.network.link2peer;
 
 import jokrey.utilities.network.link2peer.core.NodeCreator;
+import jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
@@ -199,21 +200,21 @@ public interface P2LNode {
 
     /**
      * Creates a future for an expected message with the given messageType.
-     * @param messageType a message type of user privileges (i.e. that {@link jokrey.utilities.network.link2peer.core.P2L_Message_IDS#isInternalMessageId(int)} does not hold)
+     * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
      * @return the created future
      */
     P2LFuture<P2LMessage> expectMessage(int messageType);
     /**
      * Creates a future for an expected message with the given sender and messageType.
      * @param from the sender of the broadcast message (decoded from the raw ip packet)
-     * @param messageType a message type of user privileges (i.e. that {@link jokrey.utilities.network.link2peer.core.P2L_Message_IDS#isInternalMessageId(int)} does not hold)
+     * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
      * @return the created future
      */
     P2LFuture<P2LMessage> expectMessage(SocketAddress from, int messageType);
     /**
      * Creates a future for an expected message with the given sender, messageType and conversationId (see {@link #createUniqueConversationId()}).
      * @param from the sender of the broadcast message (decoded from the raw ip packet)
-     * @param messageType a message type of user privileges (i.e. that {@link jokrey.utilities.network.link2peer.core.P2L_Message_IDS#isInternalMessageId(int)} does not hold)
+     * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
      * @param conversationId the conversation id of the message
      * @return the created future
      */
@@ -228,14 +229,14 @@ public interface P2LNode {
     P2LFuture<Integer> sendBroadcastWithReceipts(P2LMessage message);
     /**
      * Creates a future for an expected broadcast message with the given messageType.
-     * @param messageType a message type of user privileges (i.e. that {@link jokrey.utilities.network.link2peer.core.P2L_Message_IDS#isInternalMessageId(int)} does not hold)
+     * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
      * @return the created future
      */
     P2LFuture<P2LMessage> expectBroadcastMessage(int messageType);
     /**
      * Creates a future for an expected broadcast message with the given sender and messageType.
      * @param from the self named sender of the broadcast message (never validated to be anything)
-     * @param messageType a message type of user privileges (i.e. that {@link jokrey.utilities.network.link2peer.core.P2L_Message_IDS#isInternalMessageId(int)} does not hold)
+     * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
      * @return the created future
      */
     P2LFuture<P2LMessage> expectBroadcastMessage(String from, int messageType);

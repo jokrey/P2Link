@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
+import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.*;
 
 /**
  * @author jokrey

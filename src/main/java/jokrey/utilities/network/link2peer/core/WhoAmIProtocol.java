@@ -7,8 +7,8 @@ import java.net.DatagramPacket;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
-import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.R_WHO_AM_I_ANSWER;
-import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.SL_WHO_AM_I;
+import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.R_WHO_AM_I_ANSWER;
+import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.SL_WHO_AM_I;
 
 /**
  * @author jokrey

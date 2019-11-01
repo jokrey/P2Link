@@ -5,7 +5,7 @@ import jokrey.utilities.network.link2peer.P2LMessage;
 import java.io.IOException;
 import java.net.SocketAddress;
 
-import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.SC_DISCONNECT;
+import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.SC_DISCONNECT;
 
 class DisconnectSingleConnectionProtocol {
     static void asInitiator(P2LNodeInternal parent, SocketAddress to) {

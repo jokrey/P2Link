@@ -50,6 +50,7 @@ public class P2LMessageHeader {
      */
     public final int conversationId;
 
+    //cannot be merged, index 0 is not necessarily the first packet received
     public final int partIndex;
     public final int partNumberOfParts;
     

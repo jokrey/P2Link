@@ -6,8 +6,8 @@ import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.ArrayList;
 
-import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.C_PEER_LINKS;
-import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS;
+import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.C_PEER_LINKS;
+import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS;
 
 class RequestPeerLinksProtocol {
     static String[] asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {

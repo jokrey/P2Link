@@ -13,7 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
-import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.isInternalMessageId;
+import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.isInternalMessageId;
 
 /**
  * A message always has a sender and data. What actual data is transported is naturally arbitrary.

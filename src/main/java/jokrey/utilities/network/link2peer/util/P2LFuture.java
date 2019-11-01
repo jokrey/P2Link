@@ -376,14 +376,16 @@ public class P2LFuture<T> {
     }
 
     /**
-     * todo if f is canceled, cancel this
      * Converts the this future to a future of type R using the given converter function
+     * If the returned future is canceled, the underlying (i.e. this) future is also canceled.
+     * If the returned future is completed directly(not automatically through completing the underlying future), then behaviour is undefined.
      * @param converter T to R converter function
      * @return the newly created future of type R
      */
     public <R> P2LFuture<R> toType(Function<T, R> converter) {
         P2LFuture<R> f = new P2LFuture<>();
         callMeBack(t -> f.setCompletedOrCanceledBasedOn(t == null ? null : converter.apply(t)));
+        f.callMeBack(t -> { if(t == null) cancel(); }); //if f is canceled, the underlying needs to be canceled as well - might be a short loop(i.e. the other callback canceled f, but that is not a problem)
         return f;
     }
 

@@ -10,7 +10,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
+import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.*;
 
 /**
  * Protocol:

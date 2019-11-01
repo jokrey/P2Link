@@ -1,6 +1,6 @@
 package jokrey.utilities.network.link2peer.core;
 
-public class P2L_Message_IDS {
+public class P2LInternalMessageTypes {
     //STATE LESS - i.e. connection and therefore verified p2link does not need to be known by incoming handler to handle these:
     static final int SL_PEER_CONNECTION_REQUEST = -1;
     static final int SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS = -2;

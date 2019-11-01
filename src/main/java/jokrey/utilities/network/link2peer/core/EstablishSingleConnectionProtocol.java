@@ -9,7 +9,7 @@ import java.net.SocketAddress;
 import java.security.SecureRandom;
 import java.util.Arrays;
 
-import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.*;
+import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.*;
 
 class EstablishSingleConnectionProtocol {
     private static final SecureRandom secureRandom = new SecureRandom();

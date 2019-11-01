@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-import static jokrey.utilities.network.link2peer.core.P2L_Message_IDS.validateMsgIdNotInternal;
+import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.validateMsgIdNotInternal;
 
 /**
  *
