@@ -258,7 +258,7 @@ public interface P2LNode {
             try {
                 T gotten = conversationWithResult.request().getOrNull(timeout);
                 if (gotten != null) return gotten;
-            } catch (Throwable ignore) {}
+            } catch (Throwable ignore) {ignore.printStackTrace();}
             timeout *= 2;
         }
         throw new IOException(getPort()+" could not get result after "+attempts+" attempts");

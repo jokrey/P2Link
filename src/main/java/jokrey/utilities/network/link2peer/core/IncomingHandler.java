@@ -51,12 +51,12 @@ public class IncomingHandler {
 
         parent.notifyPacketReceivedFrom(from);
 
-        if(message.isLongPart) {
-            message = longMessageHandler.received(message.toLongMessagePart());
+        if(message.header.isLongPart) {
+            message = longMessageHandler.received(message);
             if(message == null) return; //not yet entire message received
         }
 
-        if (message.requestReceipt) {
+        if (message.header.requestReceipt) {
             //TODO - problem: double send receipt - i.e.
 //            if(message.isRetry) {
 //                boolean hasBeenHandled = retryHandler.hasBeenHandled(message);
@@ -69,27 +69,27 @@ public class IncomingHandler {
             //todo - what if this packet is lost? then the client will resend, and potentially redo this operation
             //todo - solve: send retryCounter (or rather conversation id)
         }
-        if (message.isReceipt)
+        if (message.header.isReceipt)
             receiptsQueue.handleNewMessage(message);
-        else if (message.type == SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS) { //requires connection to asAnswerer data on the other side.....
+        else if (message.header.type == SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS) { //requires connection to asAnswerer data on the other side.....
             RequestPeerLinksProtocol.asAnswerer(parent, from);
-        } else if (message.type == SL_WHO_AM_I) {
+        } else if (message.header.type == SL_WHO_AM_I) {
             WhoAmIProtocol.asAnswerer(parent, receivedPacket);
-        } else if (message.type == SL_PING) {
+        } else if (message.header.type == SL_PING) {
             PingProtocol.asAnswerer(parent, from);
-        } else if (message.type == SL_PONG) {
+        } else if (message.header.type == SL_PONG) {
             //already notify packet received from called, i.e. it is no longer marked as dormant
-        } else if (message.type == SL_PEER_CONNECTION_REQUEST) {
+        } else if (message.header.type == SL_PEER_CONNECTION_REQUEST) {
             if (!parent.connectionLimitReached()) {
                 EstablishSingleConnectionProtocol.asAnswerer(parent, new InetSocketAddress(receivedPacket.getAddress(), receivedPacket.getPort()), message);
             }
-        } else if (message.type == SC_BROADCAST) {
+        } else if (message.header.type == SC_BROADCAST) {
             P2LMessage received = BroadcastMessageProtocol.asAnswerer(parent, broadcastState, from, message);
             if (received != null) {
                 userBrdMessageQueue.handleNewMessage(received);
                 parent.notifyBroadcastMessageReceived(received);
             }
-        } else if (message.type == SC_DISCONNECT) {
+        } else if (message.header.type == SC_DISCONNECT) {
             DisconnectSingleConnectionProtocol.asAnswerer(parent, from);
         } else {
             if (message.isInternalMessage()) {

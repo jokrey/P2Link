@@ -353,7 +353,7 @@ class IntermediateTests {
         SocketAddress l2 = new InetSocketAddress("localhost", p2);
         P2LNode node1 = P2LNode.create(p1); //creates server thread
         node1.addMessageListener(message -> {
-            assertEquals(WhoAmIProtocol.toString(l2), message.sender);
+            assertEquals(WhoAmIProtocol.toString(l2), message.header.sender);
             assertArrayEquals(idvMsgToSend, message.asBytes());
             nodesAndNumberOfReceivedMessages.compute(l1, (link, counter) -> counter == null? 1 : counter+1);
         });
@@ -362,7 +362,7 @@ class IntermediateTests {
         });
         P2LNode node2 = P2LNode.create(p2); //creates server thread
         node2.addMessageListener(message -> {
-            assertEquals(WhoAmIProtocol.toString(l1), message.sender);
+            assertEquals(WhoAmIProtocol.toString(l1), message.header.sender);
             assertArrayEquals(idvMsgToSend, message.asBytes());
             nodesAndNumberOfReceivedMessages.compute(l2, (link, counter) -> counter == null? 1 : counter+1);
         });
@@ -411,8 +411,8 @@ class IntermediateTests {
 
         sleep(100); //let nodes start
 
-        boolean connected = node1.establishConnection(local(node2)).get(1000);
-        assertTrue(connected);
+//        boolean connected = node1.establishConnection(local(node2)).get(1000);
+//        assertTrue(connected);
 
         printPeers(node1, node2);
 
@@ -454,14 +454,11 @@ class IntermediateTests {
         P2LNode node1 = P2LNode.create(p1); //creates server thread
         P2LNode node2 = P2LNode.create(p2); //creates server thread
 
-        byte[] toSend_1To2 = new byte[(P2LMessage.CUSTOM_RAW_SIZE_LIMIT - P2LMessage.HeaderUtil.HEADER_SIZE_LONG_MESSAGE) * 2];
+        byte[] toSend_1To2 = new byte[(P2LMessage.CUSTOM_RAW_SIZE_LIMIT - 13) * 2];
         byte[] toSend_2To1 = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT * 20];
         ThreadLocalRandom.current().nextBytes(toSend_1To2);
         ThreadLocalRandom.current().nextBytes(toSend_2To1);
         int randomType = ThreadLocalRandom.current().nextInt(1, 400000);
-
-        boolean connected = node1.establishConnection(local(node2)).get(1000);
-        assertTrue(connected);
 
         printPeers(node1, node2);
 
@@ -495,7 +492,7 @@ class IntermediateTests {
             throw new IllegalStateException("this should not be called here");
         }, p2Link -> message -> {
             System.out.println(p2Link + " - IntermediateTests.receivedBroadcastMessage: " + message);
-            assertEquals(WhoAmIProtocol.toString(senderLink), message.sender);
+            assertEquals(WhoAmIProtocol.toString(senderLink), message.header.sender);
             assertArrayEquals(brdMsgToSend.get(), message.asBytes());
             nodesAndNumberOfReceivedMessages.compute(p2Link, (link, counter) -> counter == null? 1 : counter+1);
         });

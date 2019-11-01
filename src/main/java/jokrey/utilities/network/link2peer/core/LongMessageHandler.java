@@ -1,24 +1,24 @@
 package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.P2LongMessagePart;
+import jokrey.utilities.network.link2peer.P2LMessageHeader;
 
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author jokrey
  */
 public class LongMessageHandler {
-    //todo requires some sort of timeout - if the entire message is never received...
-    private final HashMap<MessageIdentifier, MessagePartReceiver> map = new HashMap<>();
+    //todo requires some sort of short timeout - if the entire message is never received...
+    private final ConcurrentHashMap<MessageIdentifier, MessagePartReceiver> map = new ConcurrentHashMap<>();
 
-    public synchronized P2LMessage received(P2LongMessagePart part) {
+    public P2LMessage received(P2LMessage part) {
         MessageIdentifier identifier = new MessageIdentifier(part);
-        MessagePartReceiver messages = map.computeIfAbsent(identifier, k -> new MessagePartReceiver(part.size));
+        MessagePartReceiver messages = map.computeIfAbsent(identifier, k -> new MessagePartReceiver(part.header.partNumberOfParts));
         messages.received(part);
         if(messages.isFullyReceived()) {
             map.remove(identifier);
@@ -29,19 +29,24 @@ public class LongMessageHandler {
 
     public void send(P2LNodeInternal parent, P2LMessage overLongMessage, SocketAddress to) throws IOException {
         if(overLongMessage.canBeSentInSinglePacket()) throw new IllegalArgumentException("message could be send in a single packet...");
-        int maxPayloadSize = P2LMessage.CUSTOM_RAW_SIZE_LIMIT- P2LMessage.HeaderUtil.HEADER_SIZE_LONG_MESSAGE;
-        int numberOfRequiredParts = overLongMessage.payloadLength/maxPayloadSize + 1;
-        int lastPartSize = overLongMessage.payloadLength%maxPayloadSize;
+        int maxPayloadSize = P2LMessage.CUSTOM_RAW_SIZE_LIMIT -
+                P2LMessageHeader.getSize(overLongMessage.header.isConversationIdPresent(), overLongMessage.header.isExpirationPresent(), true);
+        //todo - this is a little dumb: the custom raw size limit is only to avoid involuntary fragmentation in layer 1+2 and keep a small buffer size when receiving
+        //todo     - but now we are doing the fragmentation.. (only in java so it is much slower than in HW)
+        //todo     - however if the receive buffer should generally remain small, I do not see an option
+        int numberOfRequiredParts = overLongMessage.payloadLength / maxPayloadSize + 1;
+        int lastPartSize = overLongMessage.payloadLength % maxPayloadSize;
         if(lastPartSize == 0) {
             numberOfRequiredParts--;
             lastPartSize = maxPayloadSize;
         }
 
+        int from_raw_i = overLongMessage.header.getSize();
         for(int i=0;i<numberOfRequiredParts;i++) {
-            int from_raw_i = P2LMessage.HeaderUtil.HEADER_SIZE_NORMAL_MESSAGE + i*maxPayloadSize;
             int to_raw_i = from_raw_i + ((i+1==numberOfRequiredParts)? lastPartSize :maxPayloadSize);
-            P2LongMessagePart part = P2LongMessagePart.from(overLongMessage, i, numberOfRequiredParts, from_raw_i, to_raw_i);
+            P2LMessage part = P2LMessage.Factory.messagePartFrom(overLongMessage, i, numberOfRequiredParts, from_raw_i, to_raw_i);
             parent.sendInternalMessage(part, to);
+            from_raw_i = to_raw_i;
         }
 
 
@@ -58,17 +63,17 @@ public class LongMessageHandler {
     }
 
 
-    //todo- write receiver that writes to disk
+    //todo- receiver that writes to disk
     private static class MessagePartReceiver {
         private int numberOfPartsReceived = 0;
         private long totalByteSize = 0;
-        private final P2LongMessagePart[] parts;
+        private final P2LMessage[] parts;
         private MessagePartReceiver(int size) {
-            parts = new P2LongMessagePart[size];
+            parts = new P2LMessage[size];
         }
-        synchronized void received(P2LongMessagePart part) {
-            if(parts[part.index]==null) {
-                parts[part.index] = part;
+        synchronized void received(P2LMessage part) {
+            if(parts[part.header.partIndex]==null) {
+                parts[part.header.partIndex] = part;
                 totalByteSize += part.payloadLength;
                 numberOfPartsReceived++;
             }
@@ -85,7 +90,7 @@ public class LongMessageHandler {
 
         public P2LMessage assemble() {
             if(!isFullyReceived()) throw new IllegalStateException();
-            return P2LongMessagePart.reassemble(parts, (int) totalByteSize);
+            return P2LMessage.Factory.reassembleFromParts(parts, (int) totalByteSize);
         }
     }
 
@@ -99,7 +104,7 @@ public class LongMessageHandler {
             this.conversationId = conversationId;
         }
         private MessageIdentifier(P2LMessage msg) {
-            this(msg.sender, msg.type, msg.conversationId);
+            this(msg.header.sender, msg.header.type, msg.header.conversationId);
         }
 
         @Override public boolean equals(Object o) {

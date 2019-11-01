@@ -33,8 +33,8 @@ public class CommandLineP2LChat {
 
         P2LNode node = P2LNode.create(port);
 
-        node.addMessageListener(message -> System.out.println(port+" received message(from "+message.sender+"):\n"+message.asString()));
-        node.addBroadcastListener(message -> System.out.println(port+" received broadcast(from "+message.sender+"):\n"+message.asString()));
+        node.addMessageListener(message -> System.out.println(port+" received message(from "+message.header.sender+"):\n"+message.asString()));
+        node.addBroadcastListener(message -> System.out.println(port+" received broadcast(from "+message.header.sender+"):\n"+message.asString()));
         node.addConnectionEstablishedListener(newAddress -> System.out.println(port+" established a new connection to "+newAddress));
         node.addConnectionDisconnectedListener(disconnected -> System.out.println(port+" connection to "+disconnected +" disconnected"));
 
