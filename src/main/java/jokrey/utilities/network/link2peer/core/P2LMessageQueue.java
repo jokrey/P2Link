@@ -59,7 +59,7 @@ class P2LMessageQueue {
             waitingReceivers.computeIfAbsent(request, (k) -> new LinkedStack<>()).push(future);
         } else {
             P2LMessage consumedMessage = unconsumedMessagesForRequest.remove(0);
-            unconsumedMessages_byId.get(consumedMessage.header.type).remove(consumedMessage);
+            unconsumedMessages_byId.get(consumedMessage.header.getType()).remove(consumedMessage);
             future.setCompleted(consumedMessage);
         }
         return future;
@@ -77,7 +77,7 @@ class P2LMessageQueue {
     }
     synchronized void handleNewMessage(P2LMessage received) {
         MessageRequest answersRequest = new MessageRequest(received);
-        MessageRequest answersTypeRequest = new MessageRequest(received.header.type);
+        MessageRequest answersTypeRequest = new MessageRequest(received.header.getType());
 
         Stack<P2LFuture<P2LMessage>> waitingForMessage = waitingReceivers.get(answersRequest); //higher priority
         Stack<P2LFuture<P2LMessage>> waitingForMessageId = waitingReceivers.get(answersTypeRequest);
@@ -143,7 +143,7 @@ class P2LMessageQueue {
             this.msgIsReceipt = msgIsReceipt;
         }
         private MessageRequest(P2LMessage msg) {
-            this(msg.header.sender, msg.header.type, msg.header.conversationId, msg.header.isReceipt);
+            this(msg.header.getSender(), msg.header.getType(), msg.header.getConversationId(), msg.header.isReceipt());
         }
 
         @Override public boolean equals(Object o) {

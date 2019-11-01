@@ -18,7 +18,7 @@ public class LongMessageHandler {
 
     public P2LMessage received(P2LMessage part) {
         MessageIdentifier identifier = new MessageIdentifier(part);
-        MessagePartReceiver messages = map.computeIfAbsent(identifier, k -> new MessagePartReceiver(part.header.partNumberOfParts));
+        MessagePartReceiver messages = map.computeIfAbsent(identifier, k -> new MessagePartReceiver(part.header.getNumberOfParts()));
         messages.received(part);
         if(messages.isFullyReceived()) {
             map.remove(identifier);
@@ -72,8 +72,8 @@ public class LongMessageHandler {
             parts = new P2LMessage[size];
         }
         synchronized void received(P2LMessage part) {
-            if(parts[part.header.partIndex]==null) {
-                parts[part.header.partIndex] = part;
+            if(parts[part.header.getPartIndex()]==null) {
+                parts[part.header.getPartIndex()] = part;
                 totalByteSize += part.payloadLength;
                 numberOfPartsReceived++;
             }
@@ -104,7 +104,7 @@ public class LongMessageHandler {
             this.conversationId = conversationId;
         }
         private MessageIdentifier(P2LMessage msg) {
-            this(msg.header.sender, msg.header.type, msg.header.conversationId);
+            this(msg.header.getSender(), msg.header.getType(), msg.header.getConversationId());
         }
 
         @Override public boolean equals(Object o) {

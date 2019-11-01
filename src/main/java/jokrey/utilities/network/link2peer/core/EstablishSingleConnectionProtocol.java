@@ -60,7 +60,7 @@ class EstablishSingleConnectionProtocol {
 //            parent.attachIpToSelfLink(ip);
 //        }
 
-        int conversationId = initialRequestMessage.header.conversationId;
+        int conversationId = initialRequestMessage.header.getConversationId();
         if (parent.connectionLimitReached()) {
             parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId, P2LMessage.EXPIRE_INSTANTLY), from); //do not retry refusal
             return;

@@ -141,20 +141,22 @@ public class P2LMessage {
      * @return a receipt for the given message, in p2l message form
      */
     public static P2LMessage createReceiptFor(P2LMessage message) {
-        if(message.header.isLongPart) throw new UnsupportedOperationException("receipt cannot be created for parts");
+        if(message.header.isLongPart()) throw new UnsupportedOperationException("receipt cannot be created for parts - that would be like tcp ACK, but we wants receipts for many parts and this requires a difference functionality");
+        //todo - use less cryptographic function - the checksum of udp is already pretty safe - so even without the hash at all it is pretty safe
+        //todo     - interesting would be a hash id that allows getting two receipts for the same sender-type-conv simultaneously  (though we are quickly approaching overkill territory here)
         Hash receiptHash = message.header.contentHashFromIgnoreSender(message.raw, message.payloadLength);
-        P2LMessageHeader receiptHeader = new P2LMessageHeader(null, message.header.type, message.header.conversationId, EXPIRE_INSTANTLY,
-                0, 0, false, true,  false);
+        P2LMessageHeader receiptHeader = P2LMessageHeader.from(null, message.header.getType(), message.header.getConversationId(), EXPIRE_INSTANTLY,
+                0, 0, false, true,  false, false);
         byte[] raw = new byte[receiptHeader.getSize() + receiptHash.length()];
         receiptHeader.writeTo(raw);
         System.arraycopy(receiptHash.raw(), 0, raw, receiptHeader.getSize(), receiptHash.length());
         return new P2LMessage(receiptHeader, null, raw, receiptHash.length(), receiptHash.raw());
     }
     public boolean validateIsReceiptFor(P2LMessage message) {
-        if(!header.isReceipt) throw new IllegalStateException("cannot validate receipt, since this is not a receipt");
+        if(!header.isReceipt()) throw new IllegalStateException("cannot validate receipt, since this is not a receipt");
         Hash receiptHash = message.header.contentHashFromIgnoreSender(message.raw, message.payloadLength);
-        P2LMessageHeader receiptHeader = new P2LMessageHeader(null, message.header.type, message.header.conversationId, EXPIRE_INSTANTLY,
-                0, 0, false, true, false);
+        P2LMessageHeader receiptHeader = P2LMessageHeader.from(null, message.header.getType(), message.header.getConversationId(), EXPIRE_INSTANTLY,
+                0, 0, false, true, false, false);
         return header.equalsIgnoreVolatile(receiptHeader) && payloadEquals(receiptHash.raw());
     }
 
@@ -200,7 +202,7 @@ public class P2LMessage {
      * @return whether this message is internal or used by the application running on the p2l network
      */
     public boolean isInternalMessage() {
-        return isInternalMessageId(header.type);
+        return isInternalMessageId(header.getType());
     }
 
     /**
@@ -267,7 +269,7 @@ public class P2LMessage {
         }
 
         public static P2LMessage createSendMessageWith(int type, int conversationId, short expirationTimeoutInSeconds, int totalPayloadSize, byte[]... payloads) {
-            P2LMessageHeader header = new P2LMessageHeader(null, type, conversationId, expirationTimeoutInSeconds, 0,0, false, false, false);
+            P2LMessageHeader header = P2LMessageHeader.from(null, type, conversationId, expirationTimeoutInSeconds, 0,0, false, false, false, false);
             byte[] raw = new byte[header.getSize() + totalPayloadSize];
             header.writeTo(raw);
             int index = header.getSize();
@@ -336,7 +338,7 @@ public class P2LMessage {
             return createBroadcast(sender, brdMsgType, trans.transform(payload));
         }
         public static P2LMessage createBroadcast(String sender, int brdMsgType, byte[] payload) {
-            P2LMessageHeader header = new P2LMessageHeader(sender, brdMsgType, 0, MAX_EXPIRATION_TIMEOUT, 0, 0, false, false, false);
+            P2LMessageHeader header = P2LMessageHeader.from(sender, brdMsgType, 0, MAX_EXPIRATION_TIMEOUT, 0, 0, false, false, false, false);
             byte[] raw = new byte[header.getSize() + payload.length];
             header.writeTo(raw);
             System.arraycopy(payload, 0, raw, header.getSize(), payload.length);
@@ -347,8 +349,8 @@ public class P2LMessage {
 
         public static P2LMessage messagePartFrom(P2LMessage message, int index, int size, int from, int to) {
             int subPayloadLength = to-from;
-            P2LMessageHeader partHeader = new P2LMessageHeader(message.header.sender, message.header.type, message.header.conversationId, message.header.expirationTimeoutInSeconds,
-                    index, size, message.header.requestReceipt, false, true);
+            P2LMessageHeader partHeader = P2LMessageHeader.from(message.header.getSender(), message.header.getType(), message.header.getConversationId(), message.header.getExpirationTimeoutInSeconds(),
+                    index, size, message.header.requestReceipt(), false, true, false);
 
             byte[] raw = new byte[partHeader.getSize() + subPayloadLength];
             partHeader.writeTo(raw);
@@ -357,10 +359,10 @@ public class P2LMessage {
         }
 
         public static P2LMessage reassembleFromParts(P2LMessage[] parts, int totalByteSize) {
-            P2LMessageHeader reassembledHeader = new P2LMessageHeader(
-                    parts[0].header.sender, parts[0].header.type, parts[0].header.conversationId, parts[0].header.expirationTimeoutInSeconds,
+            P2LMessageHeader reassembledHeader = P2LMessageHeader.from(
+                    parts[0].header.getSender(), parts[0].header.getType(), parts[0].header.getConversationId(), parts[0].header.getExpirationTimeoutInSeconds(),
                     0, 0,
-                    parts[0].header.requestReceipt, false, false);
+                    parts[0].header.requestReceipt(), false, false, false);
 
             byte[] raw = new byte[(reassembledHeader.getSize() + totalByteSize)];
             int raw_i = reassembledHeader.getSize();

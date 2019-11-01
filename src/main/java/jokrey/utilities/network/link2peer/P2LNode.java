@@ -29,9 +29,6 @@ import java.util.function.Function;
  * TODO: allow light clients to connect with each other (tcp hole punching or something like that)
  *    - does this work out of the box??
  *
- * TODO: streamed messages (i.e. longer messages broken up into pieces)
- *    with conversation id, a counter and an intelligent retry function pretty much exactly like tcp
- *
  *
  * LATER:
  * TODO? support for multicast - usage instead of broadcast when multiple peers in same local network?
@@ -53,6 +50,8 @@ import java.util.function.Function;
  *    allows asking socket addresses for their established connections (temp/potential connection)
  *    allows sending individual messages to socket addresses (temp/potential connection - with optional received receipt)
  *        for receipt messages it allows a retry functionality after which an exception is thrown and (if the connection was an established one) the connection is marked as broken
+ *        allow breaking up messages and sending them in parts
+ * todo       allow streaming very long messages (i.e. break up messages, but requery lost part-packets - udt like protocol)
  *      both internal and user messages can use this functionality.
  *    allows maintaining broken/previously-established connections
  *

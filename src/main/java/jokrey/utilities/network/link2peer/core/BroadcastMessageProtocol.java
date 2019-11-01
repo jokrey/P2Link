@@ -26,10 +26,10 @@ class BroadcastMessageProtocol {
                     boolean peerHashKnowledgeOfMessage = peerHashKnowledgeOfMessage_msg.nextBool();
 
                     if(!peerHashKnowledgeOfMessage) {
-                        byte[] senderBytes = message.header.sender.getBytes(StandardCharsets.UTF_8);
+                        byte[] senderBytes = message.header.getSender().getBytes(StandardCharsets.UTF_8);
                         try {
                             parent.sendInternalMessage(
-                                    P2LMessage.Factory.createSendMessageFromWithExpiration(C_BROADCAST_MSG, P2LMessage.EXPIRE_INSTANTLY, message.header.type,
+                                    P2LMessage.Factory.createSendMessageFromWithExpiration(C_BROADCAST_MSG, P2LMessage.EXPIRE_INSTANTLY, message.header.getType(),
                                             P2LMessage.makeVariableIndicatorFor(senderBytes.length), senderBytes,
                                             P2LMessage.makeVariableIndicatorFor(message.payloadLength), message.asBytes()),
                                     to);
@@ -98,7 +98,7 @@ class BroadcastMessageProtocol {
 
         ArrayList<SocketAddress> establishedConnectionsExcept = new ArrayList<>(originallyEstablishedConnections.length);
         for(SocketAddress established:originallyEstablishedConnections)
-            if(!WhoAmIProtocol.toString(established).equals(message.header.sender) && !Objects.equals(established, directlyReceivedFrom))
+            if(!WhoAmIProtocol.toString(established).equals(message.header.getSender()) && !Objects.equals(established, directlyReceivedFrom))
                 establishedConnectionsExcept.add(established);
 
         if(establishedConnectionsExcept.isEmpty())
