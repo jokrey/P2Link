@@ -1,6 +1,8 @@
-package jokrey.utilities.network.link2peer;
+package jokrey.utilities.network.link2peer.core.message_headers;
 
 import jokrey.utilities.bitsandbytes.BitHelper;
+import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
 import jokrey.utilities.network.link2peer.util.Hash;
 
@@ -9,6 +11,7 @@ import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Objects;
 
 import static jokrey.utilities.network.link2peer.P2LMessage.EXPIRE_INSTANTLY;
 
@@ -53,7 +56,7 @@ public interface P2LMessageHeader {
      * The time in seconds until this message is removed from the message queues
      * For value <= 0 the message will never be added to the message queue, it is only considered if a consumer is waiting when it arrives.
      */
-    short getExpirationTimeoutInSeconds();
+    short getExpiresAfter();
     /**
      * Only relevant to received messages
      * @return whether this message has expired, based on the time at which this object has been created
@@ -79,13 +82,13 @@ public interface P2LMessageHeader {
 
 
 
-    P2LMessageHeader mutateToRequestReceipt(byte[] raw);
+    void mutateToRequestReceipt(byte[] raw);
 
     default boolean equalsIgnoreVolatile(P2LMessageHeader that) {
         return  getType() == that.getType() && getConversationId() == that.getConversationId() &&
                 getPartIndex() == that.getPartIndex() && getNumberOfParts() == that.getNumberOfParts() &&
                 requestReceipt() == that.requestReceipt() && isReceipt() == that.isReceipt() && isLongPart() == that.isLongPart() &&
-                getExpirationTimeoutInSeconds() == that.getExpirationTimeoutInSeconds();
+                getExpiresAfter() == that.getExpiresAfter();
     }
     default Hash contentHashFrom(byte[] raw, int payloadLength) {
         return contentHashFrom(getSender(), raw, payloadLength);
@@ -142,7 +145,7 @@ public interface P2LMessageHeader {
         }
         if(expirationFieldOffset != -1) {
             flagByte = BitHelper.setBit(flagByte, HEADER_FLAG_BIT_OFFSET_IS_EXPIRATION_PRESENT);
-            BitHelper.writeInt16(raw, expirationFieldOffset, getExpirationTimeoutInSeconds());
+            BitHelper.writeInt16(raw, expirationFieldOffset, getExpiresAfter());
         }
         if(partIndexAndSizeFieldOffset != -1) {
             flagByte = BitHelper.setBit(flagByte, HEADER_FLAG_BIT_OFFSET_IS_LONG_PART);
@@ -166,20 +169,61 @@ public interface P2LMessageHeader {
         boolean isStreamPart = readIsStreamPartFromHeader(flagByte);
 
         int conversationId = readConversationIdFromHeader(raw, conversationIdFieldPresent);
-        short expirationTimeoutInSeconds = readExpirationFromHeader(raw, conversationIdFieldPresent, expirationFieldPresent);
+        short expiresAfter = readExpirationFromHeader(raw, conversationIdFieldPresent, expirationFieldPresent);
         int partIndex = readPartIndexFromHeader(raw, conversationIdFieldPresent, expirationFieldPresent, isLongPart);
         int partNumberOfParts = readPartSizeFromHeader(raw, conversationIdFieldPresent, expirationFieldPresent, isLongPart);
 
         String sender = WhoAmIProtocol.toString(from);
 
-        return new P2LMessageHeaderFull(sender, type, conversationId, expirationTimeoutInSeconds, partIndex, partNumberOfParts, requestReceipt, isReceipt, isLongPart, isStreamPart);
+        return from(sender, type, conversationId, expiresAfter, partIndex, partNumberOfParts, requestReceipt, isReceipt, isLongPart, isStreamPart);
     }
     static P2LMessageHeader from(String sender,
-                                 int type, int conversationId, short expirationTimeoutInSeconds,
+                                 int type, int conversationId, short expiresAfter) {
+        return from(sender, type, conversationId, expiresAfter, false);
+    }
+    static P2LMessageHeader from(String sender,
+                                 int type, int conversationId, short expiresAfter, boolean requestReceipt) {
+        boolean conversationIdFieldPresent = conversationId != P2LNode.NO_CONVERSATION_ID;
+        boolean expirationFieldPresent = expiresAfter != EXPIRE_INSTANTLY;
+
+        if(conversationIdFieldPresent && expirationFieldPresent)
+            return new FullShortMessageHeader(sender, type, conversationId, expiresAfter, requestReceipt);
+        if(conversationIdFieldPresent)
+            return new ConversationHeader(sender, type, conversationId, requestReceipt);
+        if(expirationFieldPresent)
+            return new CustomExpirationHeader(sender, type, expiresAfter, requestReceipt);
+        return new MinimalHeader(sender, type, requestReceipt);
+    }
+    static P2LMessageHeader from(String sender,
+                                 int type, int conversationId, short expiresAfter,
                                  int partIndex, int partNumberOfParts,
                                  boolean requestReceipt, boolean isReceipt, boolean isLongPart, boolean isStreamPart) {
-        return new P2LMessageHeaderFull(sender, type, conversationId, expirationTimeoutInSeconds, partIndex, partNumberOfParts, requestReceipt, isReceipt, isLongPart, isStreamPart);
+        boolean conversationIdFieldPresent = conversationId != P2LNode.NO_CONVERSATION_ID;
+        boolean expirationFieldPresent = expiresAfter != EXPIRE_INSTANTLY;
+
+        if(isReceipt)
+            return new ReceiptHeader(sender, type, conversationId, requestReceipt);
+
+        if(isLongPart)
+            return new LongMessagePartHeader(sender, type, conversationId, expiresAfter, partIndex, partNumberOfParts, requestReceipt);
+
+        if(conversationIdFieldPresent && expirationFieldPresent)
+            return new FullShortMessageHeader(sender, type, conversationId, expiresAfter, requestReceipt);
+        if(conversationIdFieldPresent)
+            return new ConversationHeader(sender, type, conversationId, requestReceipt);
+        if(expirationFieldPresent)
+            return new CustomExpirationHeader(sender, type, expiresAfter, requestReceipt);
+        
+        return new P2LMessageHeaderFull(sender, type, conversationId, expiresAfter, partIndex, partNumberOfParts, isReceipt, isLongPart, isStreamPart);
     }
+    default P2LMessageHeader toShortMessageHeader() {
+        return P2LMessageHeader.from(getSender(), getType(), getConversationId(), getExpiresAfter(), requestReceipt());
+    }
+    default P2LMessageHeader toMessagePartHeader(int index, int size) {
+        return new LongMessagePartHeader(getSender(), getType(), getConversationId(), getExpiresAfter(), index, size, requestReceipt());
+    }
+
+
 
     default int getSize() {
         return getSize(isConversationIdPresent(), isExpirationPresent(), isLongPart());
@@ -202,7 +246,7 @@ public interface P2LMessageHeader {
         return 5;//from 5 to 9
     }
     default boolean isExpirationPresent() {
-        return getExpirationTimeoutInSeconds() != EXPIRE_INSTANTLY;
+        return getExpiresAfter() != EXPIRE_INSTANTLY;
     }
     default int getExpirationFieldOffset() {
         return getExpirationFieldOffset(isConversationIdPresent(), isExpirationPresent());
@@ -274,4 +318,74 @@ public interface P2LMessageHeader {
     int HEADER_FLAG_BIT_OFFSET_IS_STREAM_PART  = 5;
     int HEADER_FLAG_BIT_OFFSET_Y = 6;
     int HEADER_FLAG_BIT_OFFSET_Z = 7;
+
+
+
+
+    abstract class HeaderIdentifier {
+        public abstract boolean equals(Object o);
+        public abstract int hashCode();
+    }
+    class TypeIdentifier extends HeaderIdentifier {
+        public final int messageType;
+        public TypeIdentifier(int messageType) {
+            this.messageType = messageType;
+        }
+        public TypeIdentifier(P2LMessage msg) {
+            this(msg.header.getType());
+        }
+
+        @Override public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            TypeIdentifier that = (TypeIdentifier) o;
+            return messageType == that.messageType;
+        }
+        @Override public int hashCode() { return Objects.hash(messageType); }
+        @Override public String toString() {
+            return "TypeIdentifier{messageType=" + messageType + '}';
+        }
+    }
+    class SenderTypeConversationIdentifier extends TypeIdentifier {
+        private final String from;
+        private final int conversationId;
+        public SenderTypeConversationIdentifier(String from, int messageType, int conversationId) {
+            super(messageType);
+            this.from = from;
+            this.conversationId = conversationId;
+        }
+        public SenderTypeConversationIdentifier(P2LMessage msg) {
+            this(msg.header.getSender(), msg.header.getType(), msg.header.getConversationId());
+        }
+
+        @Override public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            if (!super.equals(o)) return false;
+            SenderTypeConversationIdentifier that = (SenderTypeConversationIdentifier) o;
+            return conversationId == that.conversationId && Objects.equals(from, that.from);
+        }
+        @Override public int hashCode() { return Objects.hash(super.hashCode(), from, conversationId); }
+        @Override public String toString() {
+            return "SenderTypeConversationIdentifier{from=" + from + ", messageType=" + super.messageType + ", conversationId=" + conversationId + '}';
+        }
+    }
+    class ReceiptIdentifier extends SenderTypeConversationIdentifier {
+        public ReceiptIdentifier(String from, int messageType, int conversationId) {
+            super(from, messageType, conversationId);
+        }
+        public ReceiptIdentifier(P2LMessage msg) {
+            super(msg);
+            if(!msg.header.isReceipt()) throw new IllegalArgumentException("receipt identifier can only be created for a receipt");
+        }
+        @Override public boolean equals(Object o) {
+            return o instanceof ReceiptIdentifier && super.equals(o);
+        }
+        @Override public int hashCode() {
+            return super.hashCode()*13 + 1;
+        }
+        @Override public String toString() {
+            return "ReceiptIdentifier{from=" + super.from + ", messageType=" + super.messageType + ", conversationId=" + super.conversationId + '}';
+        }
+    }
 }

@@ -48,9 +48,11 @@ public class IncomingHandler {
                 return;
             }
         }
+        System.out.println(parent.getPort() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
 
         parent.notifyPacketReceivedFrom(from);
 
+        //todo:?: allow streams and long messages only from established connections? - why tho?
         if(message.header.isStreamPart()) {
             System.out.println("received stream part message: from = [" + from + "], message = [" + message + "]");
             return;
@@ -68,7 +70,7 @@ public class IncomingHandler {
 //                    return;
 //            } else {
 //                retryHandler.markHandled(message);
-            parent.sendInternalMessage(P2LMessage.createReceiptFor(message), from);
+            parent.sendInternalMessage(message.createReceipt(), from);
 //            }
         }
         if (message.header.isReceipt())

@@ -51,6 +51,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
                     incomingHandler.userBrdMessageQueue.cleanExpiredMessages();
                     incomingHandler.userMessageQueue.cleanExpiredMessages();
                     incomingHandler.broadcastState.clean(true);
+                    incomingHandler.longMessageHandler.clean();
 
                     Thread.sleep(P2LHeuristics.MAIN_NODE_SLEEP_TIMEOUT_MS);
 
@@ -138,12 +139,14 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         validateMsgIdNotInternal(message.header.getType());
         sendInternalMessageBlocking(message, to, attempts, initialTimeout);
     }
-    @Override public P2LFuture<Boolean> sendInternalMessageWithReceipt(P2LMessage origMessage, SocketAddress to) throws IOException {
-        P2LMessage message = origMessage.mutateToRequestReceipt();
+    @Override public P2LFuture<Boolean> sendInternalMessageWithReceipt(P2LMessage message, SocketAddress to) throws IOException {
+        message.mutateToRequestReceipt();
         try {
             return incomingHandler.receiptsQueue.receiptFutureFor(to, message.header.getType(), message.header.getConversationId())
                     .nowOrCancel(() -> sendInternalMessage(message, to)) //weird syntax, but we have to make sure we already wait for the receipt when we send the message (receipt expire instantly
-                    .toBooleanFuture(receipt -> receipt.validateIsReceiptFor(message));
+                    .toBooleanFuture(receipt -> {
+                        return receipt.validateIsReceiptFor(message);
+                    });
         } catch (IOException t) {
             throw t;
         } catch (Throwable t) {
@@ -320,6 +323,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         System.out.println("incomingHandler.receiptsQueue.debugString() = " + incomingHandler.receiptsQueue.debugString());
         System.out.println("incomingHandler.userMessageQueue.debugString() = " + incomingHandler.userMessageQueue.debugString());
         System.out.println("incomingHandler.userBrdMessageQueue.debugString() = " + incomingHandler.userBrdMessageQueue.debugString());
+        System.out.println("incomingHandler.longMessageHandler.debugString() = " + incomingHandler.longMessageHandler.debugString());
         System.out.println("incomingHandler.handleReceivedMessagesPool = " + incomingHandler.handleReceivedMessagesPool.debugString());
         System.out.println("outgoingPool = " + outgoingPool.debugString());
         System.out.println("individualMessageListeners = " + individualMessageListeners);

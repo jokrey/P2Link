@@ -1,30 +1,50 @@
 package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.P2LMessageHeader;
+import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader;
+import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader.HeaderIdentifier;
 
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.Arrays;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * @author jokrey
  */
 public class LongMessageHandler {
     //todo requires some sort of short timeout - if the entire message is never received...
-    private final ConcurrentHashMap<MessageIdentifier, MessagePartReceiver> map = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<HeaderIdentifier, MessagePartReceiver> receivedPartsMap = new ConcurrentHashMap<>();
+    private ReentrantReadWriteLock cleanUpLock = new ReentrantReadWriteLock();
 
     public P2LMessage received(P2LMessage part) {
-        MessageIdentifier identifier = new MessageIdentifier(part);
-        MessagePartReceiver messages = map.computeIfAbsent(identifier, k -> new MessagePartReceiver(part.header.getNumberOfParts()));
-        messages.received(part);
-        if(messages.isFullyReceived()) {
-            map.remove(identifier);
-            return messages.assemble();
+        cleanUpLock.readLock().lock();
+        try {
+            HeaderIdentifier identifier = new P2LMessageHeader.SenderTypeConversationIdentifier(part);
+            if(part.header.getNumberOfParts() > P2LHeuristics.LONG_MESSAGE_MAX_NUMBER_OF_PARTS) {
+                System.err.println("received long message part with size("+part.header.getNumberOfParts()+") > max("+P2LHeuristics.LONG_MESSAGE_MAX_NUMBER_OF_PARTS+"). " +
+                        "Consider using a stream instead.");
+                return null;
+            }
+            MessagePartReceiver messages = receivedPartsMap.computeIfAbsent(identifier, k -> new MessagePartReceiver(part.header.getNumberOfParts()));
+            messages.received(part);
+            if (messages.isFullyReceived()) {
+                receivedPartsMap.remove(identifier);
+                return messages.assemble();
+            }
+            return null;
+        } finally {
+            cleanUpLock.readLock().unlock();
         }
-        return null;
+    }
+    public void clean() {
+        cleanUpLock.writeLock().lock();
+        try {
+            receivedPartsMap.values().removeIf(MessagePartReceiver::isExpired);
+        } finally {
+            cleanUpLock.writeLock().unlock();
+        }
     }
 
     public void send(P2LNodeInternal parent, P2LMessage overLongMessage, SocketAddress to) throws IOException {
@@ -65,6 +85,7 @@ public class LongMessageHandler {
 
     //todo- receiver that writes to disk
     private static class MessagePartReceiver {
+        private long lastMessageReceivedAtCtm = System.currentTimeMillis();
         private int numberOfPartsReceived = 0;
         private long totalByteSize = 0;
         private final P2LMessage[] parts;
@@ -76,11 +97,16 @@ public class LongMessageHandler {
                 parts[part.header.getPartIndex()] = part;
                 totalByteSize += part.payloadLength;
                 numberOfPartsReceived++;
+                lastMessageReceivedAtCtm = System.currentTimeMillis();
             }
             //else it is a resend message - ignore that it can happen, it is not that bad.. todo should not happen here... (unless conversation id is reused)
         }
         public boolean isFullyReceived() {
             return numberOfPartsReceived == parts.length;
+        }
+        public boolean isExpired() {
+            return (System.currentTimeMillis() - numberOfPartsReceived) > P2LHeuristics.LONG_MESSAGE_RECEIVE_NO_PART_TIMEOUT_MS;
+            //even if the timeout is only 10 seconds, a slow loris attack is still feasible - send a very fragmented message of only a few bytes each and send them slowly (the timeout would be reset..)
         }
 
         //equals and hash code by pointer address
@@ -94,28 +120,7 @@ public class LongMessageHandler {
         }
     }
 
-    private static class MessageIdentifier {
-        private final String from;
-        private final int messageType;
-        private final int conversationId;
-        private MessageIdentifier(String from, int messageType, int conversationId) {
-            this.from = from;
-            this.messageType = messageType;
-            this.conversationId = conversationId;
-        }
-        private MessageIdentifier(P2LMessage msg) {
-            this(msg.header.getSender(), msg.header.getType(), msg.header.getConversationId());
-        }
-
-        @Override public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            MessageIdentifier that = (MessageIdentifier) o;
-            return messageType == that.messageType && Objects.equals(from, that.from) && conversationId == that.conversationId;
-        }
-        @Override public int hashCode() { return Objects.hash(from, messageType, conversationId); }
-        @Override public String toString() {
-            return "MessageRequest{from=" + from + ", messageType=" + messageType + ", conversationId=" + conversationId + '}';
-        }
+    String debugString() {
+        return "LongMessageHandler{receivedPartsMap=" + receivedPartsMap + '}';
     }
 }

@@ -5,6 +5,9 @@ import jokrey.utilities.encoder.as_union.li.LIPosition;
 import jokrey.utilities.encoder.as_union.li.bytes.LIbae;
 import jokrey.utilities.encoder.tag_based.implementation.paired.length_indicator.type.transformer.LITypeToBytesTransformer;
 import jokrey.utilities.encoder.type_transformer.bytes.TypeToBytesTransformer;
+import jokrey.utilities.network.link2peer.core.message_headers.CustomExpirationHeader;
+import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader;
+import jokrey.utilities.network.link2peer.core.message_headers.ReceiptHeader;
 import jokrey.utilities.network.link2peer.util.Hash;
 
 import java.net.DatagramPacket;
@@ -13,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
+
 import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.isInternalMessageId;
 
 /**
@@ -137,16 +141,15 @@ public class P2LMessage {
      * Creates a receipt for the given message, to be send back to the sender of the given message.
      * Contains the content hash(without the sender, since that was automatically attached on this side) of the given message.
      * The content hash can be validated using {@link #validateIsReceiptFor(P2LMessage)}.
-     * @param message a received message
      * @return a receipt for the given message, in p2l message form
      */
-    public static P2LMessage createReceiptFor(P2LMessage message) {
-        if(message.header.isLongPart()) throw new UnsupportedOperationException("receipt cannot be created for parts - that would be like tcp ACK, but we wants receipts for many parts and this requires a difference functionality");
+    public P2LMessage createReceipt() {
+        if(header.isLongPart() || header.isStreamPart()) throw new UnsupportedOperationException("receipt cannot be created for parts - that would be like tcp ACK, but we wants receipts for many parts and this requires a difference functionality");
         //todo - use less cryptographic function - the checksum of udp is already pretty safe - so even without the hash at all it is pretty safe
         //todo     - interesting would be a hash id that allows getting two receipts for the same sender-type-conv simultaneously  (though we are quickly approaching overkill territory here)
-        Hash receiptHash = message.header.contentHashFromIgnoreSender(message.raw, message.payloadLength);
-        P2LMessageHeader receiptHeader = P2LMessageHeader.from(null, message.header.getType(), message.header.getConversationId(), EXPIRE_INSTANTLY,
-                0, 0, false, true,  false, false);
+        Hash receiptHash = header.contentHashFromIgnoreSender(raw, payloadLength);
+        System.out.println("createReceipt receiptHash = " + receiptHash);
+        P2LMessageHeader receiptHeader = new ReceiptHeader(null, header.getType(), header.getConversationId());
         byte[] raw = new byte[receiptHeader.getSize() + receiptHash.length()];
         receiptHeader.writeTo(raw);
         System.arraycopy(receiptHash.raw(), 0, raw, receiptHeader.getSize(), receiptHash.length());
@@ -155,9 +158,9 @@ public class P2LMessage {
     public boolean validateIsReceiptFor(P2LMessage message) {
         if(!header.isReceipt()) throw new IllegalStateException("cannot validate receipt, since this is not a receipt");
         Hash receiptHash = message.header.contentHashFromIgnoreSender(message.raw, message.payloadLength);
-        P2LMessageHeader receiptHeader = P2LMessageHeader.from(null, message.header.getType(), message.header.getConversationId(), EXPIRE_INSTANTLY,
-                0, 0, false, true, false, false);
-        return header.equalsIgnoreVolatile(receiptHeader) && payloadEquals(receiptHash.raw());
+        System.out.println("validateIsReceiptFor receiptHash = " + receiptHash);
+        return header.getType() == message.header.getType() && header.getConversationId() == message.header.getConversationId() &&
+                payloadEquals(receiptHash.raw());
     }
 
     /**
@@ -211,8 +214,8 @@ public class P2LMessage {
      * SHOULD ONLY BE USED INTERNALLY
      * @return the message that has {@link P2LMessageHeader#requestReceipt} set to true
      */
-    public P2LMessage mutateToRequestReceipt() {
-        return new P2LMessage(header.mutateToRequestReceipt(raw), contentHash, raw, payloadLength, payload);
+    public void mutateToRequestReceipt() {
+        header.mutateToRequestReceipt(raw);
     }
     public boolean isExpired() {
         return header.isExpired();
@@ -242,11 +245,11 @@ public class P2LMessage {
         public static P2LMessage createSendMessage(int type, int conversationId) {
             return createSendMessageWith(type, conversationId, MAX_EXPIRATION_TIMEOUT, 0);
         }
-        public static P2LMessage createSendMessage(int type, short expirationTimeoutInSeconds) {
-            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expirationTimeoutInSeconds, 0);
+        public static P2LMessage createSendMessage(int type, short expiresAfter) {
+            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, 0);
         }
-        public static P2LMessage createSendMessage(int type, int conversationId, short expirationTimeoutInSeconds) {
-            return createSendMessageWith(type, conversationId, expirationTimeoutInSeconds, 0);
+        public static P2LMessage createSendMessage(int type, int conversationId, short expiresAfter) {
+            return createSendMessageWith(type, conversationId, expiresAfter, 0);
         }
 
         /**
@@ -261,15 +264,15 @@ public class P2LMessage {
         public static P2LMessage createSendMessage(int type, int conversationId, byte[] payload) {
             return createSendMessageWith(type, conversationId, MAX_EXPIRATION_TIMEOUT, payload.length, payload);
         }
-        public static P2LMessage createSendMessage(int type, short expirationTimeoutInSeconds, byte[] payload) {
-            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expirationTimeoutInSeconds, payload.length, payload);
+        public static P2LMessage createSendMessage(int type, short expiresAfter, byte[] payload) {
+            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, payload.length, payload);
         }
-        public static P2LMessage createSendMessage(int type, int conversationId, short expirationTimeoutInSeconds, byte[] payload) {
-            return createSendMessageWith(type, conversationId, expirationTimeoutInSeconds, payload.length, payload);
+        public static P2LMessage createSendMessage(int type, int conversationId, short expiresAfter, byte[] payload) {
+            return createSendMessageWith(type, conversationId, expiresAfter, payload.length, payload);
         }
 
-        public static P2LMessage createSendMessageWith(int type, int conversationId, short expirationTimeoutInSeconds, int totalPayloadSize, byte[]... payloads) {
-            P2LMessageHeader header = P2LMessageHeader.from(null, type, conversationId, expirationTimeoutInSeconds, 0,0, false, false, false, false);
+        public static P2LMessage createSendMessageWith(int type, int conversationId, short expiresAfter, int totalPayloadSize, byte[]... payloads) {
+            P2LMessageHeader header = P2LMessageHeader.from(null, type, conversationId, expiresAfter);
             byte[] raw = new byte[header.getSize() + totalPayloadSize];
             header.writeTo(raw);
             int index = header.getSize();
@@ -285,8 +288,8 @@ public class P2LMessage {
         public static <T>P2LMessage createSendMessage(int type, T payload) {
             return createSendMessage(type, trans.transform(payload));
         }
-        public static <T>P2LMessage createSendMessage(int type, short expirationTimeoutInSeconds, T payload) {
-            return createSendMessage(type, expirationTimeoutInSeconds, trans.transform(payload));
+        public static <T>P2LMessage createSendMessage(int type, short expiresAfter, T payload) {
+            return createSendMessage(type, expiresAfter, trans.transform(payload));
         }
         public static P2LMessage createSendMessageFrom(int type, Object... payloads) {
             return createSendMessageFrom(type, P2LNode.NO_CONVERSATION_ID, payloads);
@@ -294,22 +297,22 @@ public class P2LMessage {
         public static P2LMessage createSendMessageFrom(int type, int conversationId, Object... payloads) {
             return createSendMessageFrom(type, conversationId, MAX_EXPIRATION_TIMEOUT, payloads);
         }
-        public static P2LMessage createSendMessageFromWithExpiration(int type, short expirationTimeoutInSeconds, Object... payloads) {
-            return createSendMessageFrom(type, P2LNode.NO_CONVERSATION_ID, expirationTimeoutInSeconds, payloads);
+        public static P2LMessage createSendMessageFromWithExpiration(int type, short expiresAfter, Object... payloads) {
+            return createSendMessageFrom(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, payloads);
         }
-        public static P2LMessage createSendMessageFrom(int type, int conversationId, short expirationTimeoutInSeconds, Object... payloads) {
+        public static P2LMessage createSendMessageFrom(int type, int conversationId, short expiresAfter, Object... payloads) {
             byte[][] total = new byte[payloads.length][];
             int sizeCounter = 0;
             for(int i=0;i<payloads.length;i++) {
                 total[i] = trans.transform(payloads[i]);
                 sizeCounter+=total[i].length;
             }
-            return createSendMessageWith(type, conversationId, expirationTimeoutInSeconds, sizeCounter, total);
+            return createSendMessageWith(type, conversationId, expiresAfter, sizeCounter, total);
         }
         public static P2LMessage createSendMessageFromVariables(int type, Object... payloads) {
             return createSendMessageFromVariablesWithExpiration(type, MAX_EXPIRATION_TIMEOUT, payloads);
         }
-        public static P2LMessage createSendMessageFromVariablesWithExpiration(int type, short expirationTimeoutInSeconds, Object... payloads) {
+        public static P2LMessage createSendMessageFromVariablesWithExpiration(int type, short expiresAfter, Object... payloads) {
             byte[][] total = new byte[payloads.length*2][];
             int sizeCounter = 0;
             for(int i=0;i<total.length;i+=2) {
@@ -317,12 +320,12 @@ public class P2LMessage {
                 total[i] = makeVariableIndicatorFor(total[i+1].length);
                 sizeCounter+=total[i].length + total[i+1].length;
             }
-            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expirationTimeoutInSeconds, sizeCounter, total);
+            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, sizeCounter, total);
         }
         public static P2LMessage createSendMessageFromVariables(int type, Collection payloads) {
             return createSendMessageFromVariables(type, MAX_EXPIRATION_TIMEOUT, payloads);
         }
-        public static P2LMessage createSendMessageFromVariables(int type, short expirationTimeoutInSeconds, Collection payloads) {
+        public static P2LMessage createSendMessageFromVariables(int type, short expiresAfter, Collection payloads) {
             Iterator payloadsIterator = payloads.iterator();
             byte[][] total = new byte[payloads.size()*2][];
             int sizeCounter = 0;
@@ -331,14 +334,14 @@ public class P2LMessage {
                 total[i] = makeVariableIndicatorFor(total[i + 1].length);
                 sizeCounter += total[i].length + total[i + 1].length;
             }
-            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expirationTimeoutInSeconds, sizeCounter, total);
+            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, sizeCounter, total);
         }
 
         public static P2LMessage createBroadcast(String sender, int brdMsgType, Object payload) {
             return createBroadcast(sender, brdMsgType, trans.transform(payload));
         }
         public static P2LMessage createBroadcast(String sender, int brdMsgType, byte[] payload) {
-            P2LMessageHeader header = P2LMessageHeader.from(sender, brdMsgType, 0, MAX_EXPIRATION_TIMEOUT, 0, 0, false, false, false, false);
+            P2LMessageHeader header = new CustomExpirationHeader(sender, brdMsgType, MAX_EXPIRATION_TIMEOUT, false);
             byte[] raw = new byte[header.getSize() + payload.length];
             header.writeTo(raw);
             System.arraycopy(payload, 0, raw, header.getSize(), payload.length);
@@ -349,8 +352,7 @@ public class P2LMessage {
 
         public static P2LMessage messagePartFrom(P2LMessage message, int index, int size, int from, int to) {
             int subPayloadLength = to-from;
-            P2LMessageHeader partHeader = P2LMessageHeader.from(message.header.getSender(), message.header.getType(), message.header.getConversationId(), message.header.getExpirationTimeoutInSeconds(),
-                    index, size, message.header.requestReceipt(), false, true, false);
+            P2LMessageHeader partHeader = message.header.toMessagePartHeader(index, size);
 
             byte[] raw = new byte[partHeader.getSize() + subPayloadLength];
             partHeader.writeTo(raw);
@@ -359,10 +361,7 @@ public class P2LMessage {
         }
 
         public static P2LMessage reassembleFromParts(P2LMessage[] parts, int totalByteSize) {
-            P2LMessageHeader reassembledHeader = P2LMessageHeader.from(
-                    parts[0].header.getSender(), parts[0].header.getType(), parts[0].header.getConversationId(), parts[0].header.getExpirationTimeoutInSeconds(),
-                    0, 0,
-                    parts[0].header.requestReceipt(), false, false, false);
+            P2LMessageHeader reassembledHeader = parts[0].header.toShortMessageHeader();
 
             byte[] raw = new byte[(reassembledHeader.getSize() + totalByteSize)];
             int raw_i = reassembledHeader.getSize();

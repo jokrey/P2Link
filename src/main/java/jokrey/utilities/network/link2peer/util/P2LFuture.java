@@ -385,7 +385,7 @@ public class P2LFuture<T> {
     public <R> P2LFuture<R> toType(Function<T, R> converter) {
         P2LFuture<R> f = new P2LFuture<>();
         callMeBack(t -> f.setCompletedOrCanceledBasedOn(t == null ? null : converter.apply(t)));
-        f.callMeBack(t -> { if(t == null) cancel(); }); //if f is canceled, the underlying needs to be canceled as well - might be a short loop(i.e. the other callback canceled f, but that is not a problem)
+        f.callMeBack(t -> { if(t == null) cancelIfNotCompleted(); }); //if f is canceled, the underlying needs to be canceled as well - might be a short loop(i.e. the other callback canceled f, but that is not a problem)
         return f;
     }
 

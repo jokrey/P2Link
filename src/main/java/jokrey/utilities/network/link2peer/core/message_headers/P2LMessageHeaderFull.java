@@ -1,17 +1,8 @@
-package jokrey.utilities.network.link2peer;
+package jokrey.utilities.network.link2peer.core.message_headers;
 
 import jokrey.utilities.bitsandbytes.BitHelper;
-import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
-import jokrey.utilities.network.link2peer.util.Hash;
 
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
-
-import static jokrey.utilities.network.link2peer.P2LMessage.EXPIRE_INSTANTLY;
 
 /**
  * Consider for protocol comparison with udp(8 bytes header) and tcp(20 bytes header min):
@@ -25,31 +16,31 @@ import static jokrey.utilities.network.link2peer.P2LMessage.EXPIRE_INSTANTLY;
  * @author jokrey
  */
 public class P2LMessageHeaderFull implements P2LMessageHeader {
-    public final String sender;
+    private final String sender;
     @Override public String getSender() { return sender; }
 
-    public final int type;
+    private final int type;
     @Override public int getType() { return type; }
-    public final int conversationId;
+    private final int conversationId;
     @Override public int getConversationId() { return conversationId; }
 
     //cannot be merged, index 0 is not necessarily the first packet received
-    public final int partIndex;
+    private final int partIndex;
     @Override public int getPartIndex() { return partIndex; }
-    public final int partNumberOfParts;
+    private final int partNumberOfParts;
     @Override public int getNumberOfParts() { return partNumberOfParts; }
 
-    public final boolean requestReceipt;
+    private boolean requestReceipt = false;
     @Override public boolean requestReceipt() {
         return requestReceipt;
     }
-    public final boolean isReceipt;
+    private final boolean isReceipt;
     @Override public boolean isReceipt() {
         return isReceipt;
     }
-    public final boolean isLongPart;
+    private final boolean isLongPart;
     @Override public boolean isLongPart() { return isLongPart; }
-    public final boolean isStreamPart;
+    private final boolean isStreamPart;
     @Override public boolean isStreamPart() { return isStreamPart; }
     @Override public boolean isFinalStreamPart() { throw new UnsupportedOperationException(); }
 
@@ -57,29 +48,28 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
      * The time in seconds until this message is removed from the message queues
      * For value <= 0 the message will never be added to the message queue, it is only considered if a consumer is waiting when it arrives.
      */
-    public final short expirationTimeoutInSeconds;
-    @Override public short getExpirationTimeoutInSeconds() {
-        return expirationTimeoutInSeconds;
+    public final short expiresAfter;
+    @Override public short getExpiresAfter() {
+        return expiresAfter;
     }
 
     private final long createdAtCtm;//automatically set in the constructor
     @Override public boolean isExpired() {
-        return createdAtCtm>0 && (expirationTimeoutInSeconds <= 0 || (System.currentTimeMillis() - createdAtCtm)/1e3 > expirationTimeoutInSeconds);
+        return createdAtCtm>0 && (expiresAfter <= 0 || (System.currentTimeMillis() - createdAtCtm)/1e3 > expiresAfter);
     }
 
 
 
     public P2LMessageHeaderFull(String sender,
-                                int type, int conversationId, short expirationTimeoutInSeconds,
+                                int type, int conversationId, short expiresAfter,
                                 int partIndex, int partNumberOfParts,
-                                boolean requestReceipt, boolean isReceipt, boolean isLongPart, boolean isStreamPart) {
+                                boolean isReceipt, boolean isLongPart, boolean isStreamPart) {
         this.sender = sender;
         this.type = type;
         this.conversationId = conversationId;
-        this.expirationTimeoutInSeconds = expirationTimeoutInSeconds;
+        this.expiresAfter = expiresAfter;
         this.partIndex = partIndex;
         this.partNumberOfParts = partNumberOfParts;
-        this.requestReceipt = requestReceipt;
         this.isReceipt = isReceipt;
         this.isLongPart = isLongPart;
         this.isStreamPart = isStreamPart;
@@ -88,9 +78,9 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
 
 
 
-    @Override public P2LMessageHeaderFull mutateToRequestReceipt(byte[] raw) {
+    @Override public void mutateToRequestReceipt(byte[] raw) {
         raw[HEADER_OFFSET_FLAG_BYTE] = BitHelper.setBit(raw[HEADER_OFFSET_FLAG_BYTE], HEADER_FLAG_BIT_OFFSET_REQUEST_RECEIPT);
-        return new P2LMessageHeaderFull(sender, type, conversationId, expirationTimeoutInSeconds, partIndex, partNumberOfParts, true, isReceipt, isLongPart, isStreamPart);
+        requestReceipt = true;
     }
 
 
@@ -100,7 +90,7 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
         return "P2LMessageHeader{sender='" + sender + '\'' +
                 ", type=" + type + ", conversationId=" + conversationId + ", partIndex=" + partIndex + ", partNumberOfParts=" + partNumberOfParts +
                 ", requestReceipt=" + requestReceipt + ", isReceipt=" + isReceipt + ", isLongPart=" + isLongPart +
-                ", expirationTimeoutInSeconds=" + expirationTimeoutInSeconds + ", createdAtCtm=" + createdAtCtm + '}';
+                ", expiresAfter=" + expiresAfter + ", createdAtCtm=" + createdAtCtm + '}';
     }
     @Override public boolean equals(Object o) {
         if (this == o) return true;
@@ -109,6 +99,6 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
         return Objects.equals(sender, that.sender) && createdAtCtm == that.createdAtCtm && equalsIgnoreVolatile(that);
     }
     @Override public int hashCode() {
-        return Objects.hash(sender, type, conversationId, partIndex,  partNumberOfParts, requestReceipt, isReceipt, isLongPart, expirationTimeoutInSeconds, createdAtCtm);
+        return Objects.hash(sender, type, conversationId, partIndex,  partNumberOfParts, requestReceipt, isReceipt, isLongPart, expiresAfter, createdAtCtm);
     }
 }

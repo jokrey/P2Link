@@ -708,7 +708,7 @@ class IntermediateTests {
         future.get().cancel();
 //        sleep(500);
         nodes[0].sendMessage(local(nodes[1]), P2LMessage.Factory.createSendMessage(1, new Integer(142)));
-        sleep(500);//ensure other future could receive it, before the next line takes precedence
+        sleep(500);//ensure other, canceled future could theoretically receive it, before the next line takes precedence
         assertEquals(142, nodes[1].expectMessage(1).get(100).nextInt());
         assertEquals(1, successCounter.get());
         close(nodes);
