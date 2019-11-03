@@ -32,6 +32,7 @@ public class IncomingHandler {
     final P2LMessageQueue receiptsQueue = new P2LMessageQueue();
     final BroadcastMessageProtocol.BroadcastState broadcastState = new BroadcastMessageProtocol.BroadcastState();
     final LongMessageHandler longMessageHandler = new LongMessageHandler();
+    final StreamMessageHandler streamMessageHandler = new StreamMessageHandler();
 //    final RetryHandler retryHandler = new RetryHandler();
 
     final P2LThreadPool handleReceivedMessagesPool = new P2LThreadPool(4, 64);
@@ -54,7 +55,7 @@ public class IncomingHandler {
 
         //todo:?: allow streams and long messages only from established connections? - why tho?
         if(message.header.isStreamPart()) {
-            System.out.println("received stream part message: from = [" + from + "], message = [" + message + "]");
+            streamMessageHandler.received(message);
             return;
         } else if(message.header.isLongPart()) {
             message = longMessageHandler.received(message);
@@ -90,8 +91,12 @@ public class IncomingHandler {
         } else if (message.header.getType() == SC_BROADCAST) {
             P2LMessage received = BroadcastMessageProtocol.asAnswerer(parent, broadcastState, from, message);
             if (received != null) {
-                userBrdMessageQueue.handleNewMessage(received);
-                parent.notifyBroadcastMessageReceived(received);
+                if(received.isInternalMessage()) {
+                    System.err.println("someone managed to send an internal broadcast message...? How? And more importantly why?");
+                } else {
+                    userBrdMessageQueue.handleNewMessage(received);
+                    parent.notifyUserBroadcastMessageReceived(received);
+                }
             }
         } else if (message.header.getType() == SC_DISCONNECT) {
             DisconnectSingleConnectionProtocol.asAnswerer(parent, from);
@@ -100,7 +105,7 @@ public class IncomingHandler {
                 internalMessageQueue.handleNewMessage(message);
             } else {
                 userMessageQueue.handleNewMessage(message);
-                parent.notifyMessageReceived(message);
+                parent.notifyUserMessageReceived(message);
             }
         }
 

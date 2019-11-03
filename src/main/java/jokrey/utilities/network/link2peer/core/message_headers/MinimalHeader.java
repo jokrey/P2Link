@@ -43,7 +43,7 @@ public class MinimalHeader implements P2LMessageHeader {
         return Objects.equals(sender, that.sender) && equalsIgnoreVolatile(that);
     }
     @Override public int hashCode() {
-        return Objects.hash(sender, type, requestReceipt, isReceipt(), isFinalStreamPart(), isLongPart(), isStreamPart(), getConversationId(), getExpiresAfter(), getPartIndex(), getNumberOfParts());
+        return Objects.hash(sender, type, requestReceipt, isReceipt(), isStreamEof(), isLongPart(), isStreamPart(), getConversationId(), getExpiresAfter(), getPartIndex(), getNumberOfParts());
     }
     @Override public String toString() {
         return getClass().getName()+"{" + "sender='" + sender + '\'' + ", type=" + type + (isConversationIdPresent()?", conversationId=" + getConversationId():"") +
@@ -57,7 +57,7 @@ public class MinimalHeader implements P2LMessageHeader {
     @Override public short getExpiresAfter() { return P2LMessage.EXPIRE_INSTANTLY; }
     @Override public boolean isLongPart() { return false; }
     @Override public boolean isStreamPart() { return false; }
-    @Override public boolean isFinalStreamPart() { return false; }
+    @Override public boolean isStreamEof() { return false; }
     @Override public int getPartIndex() { return 0; }
     @Override public int getNumberOfParts() { return 0; }
 }

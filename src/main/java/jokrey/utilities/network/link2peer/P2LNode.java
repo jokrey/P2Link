@@ -5,6 +5,7 @@ import jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.SocketAddress;
 import java.util.List;
 import java.util.Set;
@@ -12,7 +13,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * This Interface is the Alpha and the Omega of the P2L Network.
+ * This Interface is the Alpha and the Omega of the P2L Network. The P2L Network is middleware designed to provide a useful abstraction and advanced features to the bare udp protocol.
  * It represents the local peer and maintains connections to remote peers.
  *
  * A Node has to provide access via a link that allows other nodes to connect to it.
@@ -219,6 +220,14 @@ public interface P2LNode {
      */
     P2LFuture<P2LMessage> expectMessage(SocketAddress from, int messageType, int conversationId);
 
+    /**
+     * Returns the stream for the given identifier. It is possible to have up to (2^31-1) * (2^31-1) streams from a single source (todo this is absolutely idiotic -
+     * @param from the sender of the broadcast message (decoded from the raw ip packet)
+     * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
+     * @param conversationId the conversation id of the message
+     * @return
+     */
+    InputStream getInputStream(SocketAddress from, int messageType, int conversationId);
 
     /**
      * @param message message to be send, sender field can be null in that case it will be filled automatically

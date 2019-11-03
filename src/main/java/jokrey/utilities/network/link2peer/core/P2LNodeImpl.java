@@ -7,6 +7,7 @@ import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 import jokrey.utilities.simple.data_structure.pairs.Pair;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.SocketAddress;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -189,7 +190,10 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         validateMsgIdNotInternal(messageType);
         return incomingHandler.userBrdMessageQueue.futureFor(from, messageType);
     }
-
+    @Override public InputStream getInputStream(SocketAddress from, int messageType, int conversationId) {
+        validateMsgIdNotInternal(messageType);
+        return incomingHandler.streamMessageHandler.getInputStream(from, messageType, conversationId);
+    }
 
 
 
@@ -285,10 +289,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     @Override public void removeBroadcastListener(P2LMessageListener listener) { broadcastMessageListeners.remove(listener); }
     @Override public void removeConnectionEstablishedListener(Consumer<SocketAddress> listener) { newConnectionEstablishedListeners.remove(listener); }
     @Override public void removeConnectionDisconnectedListener(Consumer<SocketAddress> listener) { connectionDisconnectedListeners.remove(listener); }
-    @Override public void notifyBroadcastMessageReceived(P2LMessage message) {
+
+    @Override public void notifyUserBroadcastMessageReceived(P2LMessage message) {
         for (P2LMessageListener l : broadcastMessageListeners) { l.received(message); }
     }
-    @Override public void notifyMessageReceived(P2LMessage message) {
+    @Override public void notifyUserMessageReceived(P2LMessage message) {
         for (P2LMessageListener l : individualMessageListeners) { l.received(message); }
     }
 
@@ -333,4 +338,6 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         System.out.println("runningConversationId = " + runningConversationId.get());
         System.out.println("-END- DEBUG INFORMATION -END-");
     }
+
+
 }

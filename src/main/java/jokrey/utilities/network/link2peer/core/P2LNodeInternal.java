@@ -23,6 +23,6 @@ interface P2LNodeInternal extends P2LNode {
     P2LFuture<Integer> executeAllOnSendThreadPool(P2LThreadPool.Task... tasks);
     void notifyPacketReceivedFrom(SocketAddress from);
 
-    void notifyBroadcastMessageReceived(P2LMessage message);
-    void notifyMessageReceived(P2LMessage message);
+    void notifyUserBroadcastMessageReceived(P2LMessage message);
+    void notifyUserMessageReceived(P2LMessage message);
 }

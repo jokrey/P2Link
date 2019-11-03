@@ -42,7 +42,8 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
     @Override public boolean isLongPart() { return isLongPart; }
     private final boolean isStreamPart;
     @Override public boolean isStreamPart() { return isStreamPart; }
-    @Override public boolean isFinalStreamPart() { throw new UnsupportedOperationException(); }
+    private final boolean isStreamEof;
+    @Override public boolean isStreamEof() { return isStreamEof; }
 
     /**
      * The time in seconds until this message is removed from the message queues
@@ -63,7 +64,7 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
     public P2LMessageHeaderFull(String sender,
                                 int type, int conversationId, short expiresAfter,
                                 int partIndex, int partNumberOfParts,
-                                boolean isReceipt, boolean isLongPart, boolean isStreamPart) {
+                                boolean isReceipt, boolean isLongPart, boolean isStreamPart, boolean isStreamEof) {
         this.sender = sender;
         this.type = type;
         this.conversationId = conversationId;
@@ -73,6 +74,7 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
         this.isReceipt = isReceipt;
         this.isLongPart = isLongPart;
         this.isStreamPart = isStreamPart;
+        this.isStreamEof = isStreamEof;
         createdAtCtm = System.currentTimeMillis();
     }
 
