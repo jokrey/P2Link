@@ -44,8 +44,8 @@ public class StreamMessageHandler {
     }
 
     private static class P2LInputStream extends InputStream {
-        private int earliestIndexMissing = 0;
-        private int latestIndexReceived = 0;
+        private int earliestIndexMissing = 0;//todo wrap around feature (i.e. infinite stream)
+        private int latestIndexReceived = 0;//todo can be replaced with boolean(for the context in which it is currently used
         private boolean eofReceived =false;
         private int available = 0;
         private LinkedList<DataChunk> unconsumedChunksQueue = new LinkedList<>();
@@ -56,16 +56,12 @@ public class StreamMessageHandler {
 
         private synchronized void received(P2LMessage message) {
             if(isClosed()) return;
-//            //in this first step we assume everything arrives and in the correct order::
-//            if((latestIndexQueued!=0 || message.header.getPartIndex()!=0) && message.header.getPartIndex() <= latestIndexQueued) {
-//                throw new IllegalStateException("in this first step we assume everything arrives and in the correct order - latestIndexQueued("+latestIndexQueued+"), m.index("+message.header.getPartIndex()+")");
-//            }
             DataChunk unreadDataChunk = new DataChunk(message);
 
             if(message.header.isStreamEof())
                 eofReceived =true;
 
-            System.out.println("unconsumedChunksQueue before = " + unconsumedChunksQueue);
+//            System.out.println("unconsumedChunksQueue before = " + unconsumedChunksQueue);
             int m_index_received = message.header.getPartIndex();
             latestIndexReceived = Math.max(latestIndexReceived, m_index_received);
             if(m_index_received == earliestIndexMissing) {
@@ -101,12 +97,27 @@ public class StreamMessageHandler {
 //                System.out.println("x - m_index_received = " + m_index_received);
                 int unqueuedIndex = (m_index_received - earliestIndexMissing)-1; //min should be 1
 //                System.out.println("x - unqueuedIndex = " + unqueuedIndex);
-                if(unqueuedIndex >= unqueuedChunks.length)
-                    throw new IllegalStateException("what to do if unqueued message bounds are hit");
                 if(unqueuedIndex<0) {
-                    System.err.println("unqueuedIndex("+unqueuedIndex+") < 0 - this cannot happen (except maybe for resend packages)");
+                    System.err.println("unqueuedIndex("+unqueuedIndex+") < 0 - this cannot happen (except maybe for resend packages, in which case this can be easily ignored)");
                     return;
                 }
+                if(unqueuedIndex >= unqueuedChunks.length) {
+                    //todo - at this point the package has to be dropped intentionally..
+                    //todo - send a receipt with a delay request and a list of missing indices
+
+                    //todo - basic logic:
+                    //  sender sends a self chosen number n of packages(but keeps them in memory for now) - HAS TO BE BLOCKING, except when the user provides additionally buffer memory
+                    //  receiver receives as many packages as possible with the algorithm above
+                    //     when the buffer is full, - i.e. the earliest not received package has been a while ago(either lost or congestion[IS THAT REALLY WHAT CONGESTION MEANS])
+                    //       then send a receipt of currently missing package indices back to sender [[OR MARK 'FULL' AND WAIT A WHILE LONGER;WHILE CONTINUING TO DROP PACKAGES FOR A SECOND?? try, maybe]]
+                    //           note: no hashes required - udp checksum reasonably guarantees that every received package was valid
+                    //       MAYBE: flag bit of whether the response means missing or received package indices - depending on what is more..
+                    //  sender receives receipt with list of currently missing package indices
+                    //     sender will clear buffer of packages the receipt indicates as received
+                    //     all other packages will be resend - in addition to new packages made available by the user
+                    throw new IllegalStateException("what to do if unqueued message bounds are hit");
+                }
+
                 unqueuedChunks[unqueuedIndex] = unreadDataChunk;
             }
 

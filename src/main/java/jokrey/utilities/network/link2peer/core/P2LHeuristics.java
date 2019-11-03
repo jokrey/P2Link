@@ -1,11 +1,17 @@
 package jokrey.utilities.network.link2peer.core;
 
+import jokrey.utilities.network.link2peer.P2LMessage;
+
 /**
  * Can be changed by node operator - but always with care and knowledge(please)
  *
  * todo add explanations on why the values where chosen and what their theoretical bounds are
  */
 public class P2LHeuristics {
+    /**
+     * Has to be smaller 4*({@link P2LMessage#CUSTOM_RAW_SIZE_LIMIT} - ~20). This is so that the indices list in the receipt definitely fits
+     * For the default value of raw limit this means that the max is: (1024-20)/4 = 251
+     */
     public static int STREAM_CHUNK_BUFFER_ARRAY_SIZE = 128;
     public static int ORIGINAL_RETRY_HISTORIC_TIMEOUT_MS = 60*1000;
     public static int DEFAULT_PROTOCOL_ATTEMPT_COUNT = 3;
