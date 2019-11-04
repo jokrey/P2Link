@@ -6,6 +6,7 @@ import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.SocketAddress;
 import java.util.List;
 import java.util.Set;
@@ -55,6 +56,9 @@ import java.util.function.Function;
  * todo       allow streaming very long messages (i.e. break up messages, but requery lost part-packets - udt like protocol)
  *      both internal and user messages can use this functionality.
  *    allows maintaining broken/previously-established connections
+ *
+ *
+ * todo eliminate string type sender of sender in P2LMessage and the constant calls to WhoAmIProtocol.toString()
  *
  * @author jokrey
  */
@@ -221,15 +225,6 @@ public interface P2LNode {
     P2LFuture<P2LMessage> expectMessage(SocketAddress from, int messageType, int conversationId);
 
     /**
-     * Returns the stream for the given identifier. It is possible to have up to (2^31-1) * (2^31-1) streams from a single source (todo this is absolutely idiotic -
-     * @param from the sender of the broadcast message (decoded from the raw ip packet)
-     * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
-     * @param conversationId the conversation id of the message
-     * @return
-     */
-    InputStream getInputStream(SocketAddress from, int messageType, int conversationId);
-
-    /**
      * @param message message to be send, sender field can be null in that case it will be filled automatically
      * @return a future that is set to complete when attempts were made to send to all
      * @throws IllegalArgumentException if the message has an invalid sender(!= null and not equal to getSelfLink())
@@ -248,6 +243,24 @@ public interface P2LNode {
      * @return the created future
      */
     P2LFuture<P2LMessage> expectBroadcastMessage(String from, int messageType);
+
+    /**
+     * Returns the stream for the given identifier. It is possible to have up to (2^31-1) * (2^31-1) streams from a single source (todo this is absolutely idiotic -
+     * @param from the sender of the broadcast message (decoded from the raw ip packet)
+     * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
+     * @param conversationId the conversation id of the message
+     * @return
+     */
+    InputStream getInputStream(SocketAddress from, int messageType, int conversationId);
+
+    /**
+     * todo
+     * @param to
+     * @param messageType
+     * @param conversationId
+     * @return
+     */
+    OutputStream getOutputStream(SocketAddress to, int messageType, int conversationId);
 
 
     /**

@@ -8,7 +8,7 @@ import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 import java.io.IOException;
 import java.net.SocketAddress;
 
-interface P2LNodeInternal extends P2LNode {
+public interface P2LNodeInternal extends P2LNode {
     void graduateToEstablishedConnection(SocketAddress address);
     void markBrokenConnection(SocketAddress address, boolean retry);
     int remainingNumberOfAllowedPeerConnections();
@@ -25,4 +25,8 @@ interface P2LNodeInternal extends P2LNode {
 
     void notifyUserBroadcastMessageReceived(P2LMessage message);
     void notifyUserMessageReceived(P2LMessage message);
+
+    void setStreamReceiptListener(SocketAddress to, int type, int conversationId, P2LMessageListener listener);
+    void removeStreamReceiptListener(SocketAddress to, int type, int conversationId, P2LMessageListener listener);
+    void notifyStreamReceiptReceived(P2LMessage message);
 }

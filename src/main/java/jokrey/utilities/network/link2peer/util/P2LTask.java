@@ -19,7 +19,7 @@ public abstract class P2LTask<R> extends P2LFuture<R> {
         try {
             R resultOrNull = run();
             if (resultOrNull == null) cancel();
-            else super.setCompleted(resultOrNull);
+            else if(!isCanceled()) super.setCompleted(resultOrNull);
         } catch (Throwable t) {
             t.printStackTrace();
             cancel(); //cannot be completed at this point

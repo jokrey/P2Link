@@ -89,9 +89,10 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
 
 
     @Override public String toString() {
-        return "P2LMessageHeader{sender='" + sender + '\'' +
+        return "P2LMessageHeaderFull{sender='" + sender + '\'' +
                 ", type=" + type + ", conversationId=" + conversationId + ", partIndex=" + partIndex + ", partNumberOfParts=" + partNumberOfParts +
-                ", requestReceipt=" + requestReceipt + ", isReceipt=" + isReceipt + ", isLongPart=" + isLongPart +
+                ", requestReceipt=" + requestReceipt + ", isReceipt=" + isReceipt + ", isLongPart=" + isLongPart + ", isStreamPart=" + isStreamPart +
+                ", isStreamEof=" + isStreamEof +
                 ", expiresAfter=" + expiresAfter + ", createdAtCtm=" + createdAtCtm + '}';
     }
     @Override public boolean equals(Object o) {

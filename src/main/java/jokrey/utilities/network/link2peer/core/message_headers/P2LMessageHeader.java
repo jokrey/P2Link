@@ -170,7 +170,7 @@ public interface P2LMessageHeader {
             BitHelper.writeInt16(raw, expirationFieldOffset, getExpiresAfter());
         }
         if(indexFieldOffset != -1)
-            BitHelper.writeInt32(raw, indexFieldOffset, getPartIndex());
+            BitHelper.writeInt32(raw, indexFieldOffset, getPartIndex()); //todo do not encode if is receipt, stream receipt does not need to have an index field
         if(numPartsFieldOffset != -1)
             BitHelper.writeInt32(raw, numPartsFieldOffset, getNumberOfParts());
 
@@ -226,11 +226,15 @@ public interface P2LMessageHeader {
         boolean conversationIdFieldPresent = conversationId != P2LNode.NO_CONVERSATION_ID;
         boolean expirationFieldPresent = expiresAfter != EXPIRE_INSTANTLY;
 
+        if(isStreamPart) {
+            if(isReceipt)
+                return new StreamReceiptHeader(sender, type, conversationId, isStreamEof);
+            else
+                return new StreamPartHeader(sender, type, conversationId, partIndex, requestReceipt, isStreamEof);
+        }
+
         if(isReceipt)
             return new ReceiptHeader(sender, type, conversationId, requestReceipt);
-
-        if(isStreamPart)
-            return new StreamPartHeader(sender, type, conversationId, partIndex, isStreamEof);
 
         if(isLongPart)
             return new LongMessagePartHeader(sender, type, conversationId, expiresAfter, partIndex, partNumberOfParts, requestReceipt);

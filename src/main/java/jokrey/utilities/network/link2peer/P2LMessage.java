@@ -99,11 +99,13 @@ public class P2LMessage {
     /** @return a udp datagram packet from the internal data - it can be decoded on the receiver side using {@link #fromPacket(DatagramPacket)}
      * @param to receiver of the created datagram packet*/
     public DatagramPacket toPacket(SocketAddress to) {
+        int actualLength = header.getSize() + payloadLength;
+
         int maxSize = getMaxPacketSize();
         byte[] actual = raw;
         if(raw.length > maxSize) {
-            if(header.getSize() + payloadLength < maxSize) { //never gonna trigger, when message created with factory methods
-                byte[] shrunk = new byte[header.getSize() + payloadLength];
+            if(actualLength < maxSize) { //never gonna trigger, when message created with factory methods
+                byte[] shrunk = new byte[actualLength];
                 System.arraycopy(raw, 0, shrunk, 0, shrunk.length);
                 actual = shrunk;
             }
@@ -112,10 +114,10 @@ public class P2LMessage {
         if (actual.length > MAX_UDP_PACKET_SIZE) throw new IllegalArgumentException("total size of a udp packet cannot exceed " + MAX_UDP_PACKET_SIZE + " - size here is: " + raw.length);
         if(raw.length > 512)
             System.err.println("message greater than 512 bytes - this can be considered inefficient because intermediate low level protocols might break it up - size here is: "+raw.length);
-        return new DatagramPacket(actual, actual.length, to);
+        return new DatagramPacket(actual, actualLength, to);
     }
 
-    private int getMaxPacketSize() {
+    private static int getMaxPacketSize() {
         return Math.min(CUSTOM_RAW_SIZE_LIMIT, MAX_UDP_PACKET_SIZE);
     }
 
@@ -185,7 +187,7 @@ public class P2LMessage {
         return header.hashCode() + 13*Arrays.hashCode(raw);
     }
     @Override public String toString() {
-        return "P2LMessage{header=" + header + ", contentHash=" + contentHash + ", raw=" + Arrays.toString(raw) + '}';
+        return "P2LMessage{header=" + header + ", contentHash=" + contentHash + ", raw(pay=["+header.getSize()+", "+(header.getSize()+payloadLength)+"])=" + Arrays.toString(raw) + '}';
     }
 
 

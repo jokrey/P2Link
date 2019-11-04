@@ -1,14 +1,13 @@
 package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.core.stream.StreamMessageHandler;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
+import java.net.*;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.*;
 
@@ -22,6 +21,8 @@ import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.*;
  */
 public class IncomingHandler {
     public static int INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
+    public static AtomicInteger NUMBER_OF_STREAM_RECEIPTS_RECEIVED = new AtomicInteger(0);
+    public static AtomicInteger NUMBER_OF_STREAM_PARTS_RECEIVED = new AtomicInteger(0);
 
     DatagramSocket serverSocket;
     private P2LNodeInternal parent;
@@ -55,7 +56,13 @@ public class IncomingHandler {
 
         //todo:?: allow streams and long messages only from established connections? - why tho?
         if(message.header.isStreamPart()) {
-            streamMessageHandler.received(message);
+            if(message.header.isReceipt()) {
+                parent.notifyStreamReceiptReceived(message);
+                NUMBER_OF_STREAM_RECEIPTS_RECEIVED.getAndIncrement();
+            } else {
+                streamMessageHandler.received(message);
+                NUMBER_OF_STREAM_PARTS_RECEIVED.getAndIncrement();
+            }
             return;
         } else if(message.header.isLongPart()) {
             message = longMessageHandler.received(message);
@@ -133,6 +140,9 @@ public class IncomingHandler {
                             e.printStackTrace();
                         }
                     });
+                } catch (SocketException e) {
+                    if(e.getMessage().equals("socket closed"))
+                        return;
                 } catch (IOException e) {
                     e.printStackTrace();
                 }

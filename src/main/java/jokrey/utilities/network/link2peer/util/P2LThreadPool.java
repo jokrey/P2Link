@@ -26,6 +26,7 @@ public class P2LThreadPool {
     }
 
     private boolean shutdown = false;
+
     public synchronized void shutdown() {
         shutdown = true;
         for(P2LThread t:pool) t.shutdown();
@@ -100,6 +101,23 @@ public class P2LThreadPool {
             }
         }
 
+        return task;
+    }
+
+    public static P2LTask<Boolean> executeSingle(Task t) {
+        P2LTask<Boolean> task = new P2LTask<Boolean>() {
+            @Override protected Boolean run() {
+                try {
+                    t.run();
+                    return true;
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                    return false;//sets task to canceled
+                }
+            }
+        };
+
+        new Thread(task::start).start();
         return task;
     }
 

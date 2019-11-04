@@ -2,12 +2,15 @@ package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
+import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader.HeaderIdentifier;
+import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader.ReceiptIdentifier;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 import jokrey.utilities.simple.data_structure.pairs.Pair;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.SocketAddress;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -119,7 +122,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     //DIRECT MESSAGING:
     @Override public void sendInternalMessage(P2LMessage message, SocketAddress to) throws IOException {
         if(message.header.getSender() != null) throw new IllegalArgumentException("sender of message has to be this null and will be automatically set by the sender");
-//        System.out.println(getPort()+" - P2LNodeImpl_sendInternalMessage - to = [" + to + "], message = [" + message + "]");
+        System.out.println(getPort()+" - P2LNodeImpl_sendInternalMessage - to = [" + to + "], message = [" + message + "]");
 
         //todo - is it really desirable to have packages be broken up THIS automatically???
         //todo    - like it is cool that breaking up packages does not make a difference, but... like it is so transparent it could lead to inefficiencies
@@ -192,11 +195,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
     @Override public InputStream getInputStream(SocketAddress from, int messageType, int conversationId) {
         validateMsgIdNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.getInputStream(from, messageType, conversationId);
+        return incomingHandler.streamMessageHandler.getInputStream(this, from, messageType, conversationId);
     }
-
-
-
+    @Override public OutputStream getOutputStream(SocketAddress to, int messageType, int conversationId) {
+        return incomingHandler.streamMessageHandler.getOutputStream(this, to, messageType, conversationId);
+    }
 
 
     //CONNECTION KEEPER::
@@ -295,6 +298,19 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
     @Override public void notifyUserMessageReceived(P2LMessage message) {
         for (P2LMessageListener l : individualMessageListeners) { l.received(message); }
+    }
+
+    private final HashMap<HeaderIdentifier, P2LMessageListener> streamReceiptListeners = new HashMap<>();
+    @Override public void setStreamReceiptListener(SocketAddress to, int type, int conversationId, P2LMessageListener listener) {
+        streamReceiptListeners.putIfAbsent(new ReceiptIdentifier(WhoAmIProtocol.toString(to), type, conversationId), listener);
+    }
+    @Override public void removeStreamReceiptListener(SocketAddress to, int type, int conversationId, P2LMessageListener listener) {
+        streamReceiptListeners.remove(new ReceiptIdentifier(WhoAmIProtocol.toString(to), type, conversationId), listener);
+    }
+    @Override public void notifyStreamReceiptReceived(P2LMessage message) {
+        P2LMessageListener l = streamReceiptListeners.get(new ReceiptIdentifier(message));
+        if(l != null)
+            l.received(message);
     }
 
     private void notifyConnectionEstablished(SocketAddress newAddress) {
