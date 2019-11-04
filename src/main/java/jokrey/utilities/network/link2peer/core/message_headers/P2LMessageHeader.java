@@ -195,7 +195,7 @@ public interface P2LMessageHeader {
 
         int conversationId = readConversationIdFromHeader(raw, conversationIdFieldPresent);
         short expiresAfter = readExpirationFromHeader(raw, conversationIdFieldPresent, expirationFieldPresent);
-        int partIndex = readPartIndexFromHeader(raw, conversationIdFieldPresent, expirationFieldPresent, isLongPart, isStreamPart);
+        int partIndex = readPartIndexFromHeader(raw, conversationIdFieldPresent, expirationFieldPresent, isLongPart, isStreamPart, isReceipt);
         int partNumberOfParts = readPartSizeFromHeader(raw, conversationIdFieldPresent, expirationFieldPresent, isLongPart);
 
         String sender = WhoAmIProtocol.toString(from);
@@ -245,8 +245,10 @@ public interface P2LMessageHeader {
             return new ConversationHeader(sender, type, conversationId, requestReceipt);
         if(expirationFieldPresent)
             return new CustomExpirationHeader(sender, type, expiresAfter, requestReceipt);
+//        if(!conversationIdFieldPresent && !expirationFieldPresent)
+        return new MinimalHeader(sender, type, requestReceipt);
         
-        return new P2LMessageHeaderFull(sender, type, conversationId, expiresAfter, partIndex, partNumberOfParts, isReceipt, isLongPart, isStreamPart, isStreamEof);
+//        return new P2LMessageHeaderFull(sender, type, conversationId, expiresAfter, partIndex, partNumberOfParts, isReceipt, isLongPart, isStreamPart, isStreamEof);
     }
     default P2LMessageHeader toShortMessageHeader() {
         return P2LMessageHeader.from(getSender(), getType(), getConversationId(), getExpiresAfter(), requestReceipt());
@@ -258,14 +260,14 @@ public interface P2LMessageHeader {
 
 
     default int getSize() {
-        return getSize(isConversationIdPresent(), isExpirationPresent(), isLongPart(), isStreamPart());
+        return getSize(isConversationIdPresent(), isExpirationPresent(), isLongPart(), isStreamPart(), isReceipt());
     }
-    static int getSize(boolean isConversationIdPresent, boolean isExpirationPresent, boolean isLongPart, boolean isStreamPart) {
+    static int getSize(boolean isConversationIdPresent, boolean isExpirationPresent, boolean isLongPart, boolean isStreamPart, boolean isReceipt) {
         int size = 5;//flag byte + type bytes
         if(isConversationIdPresent) size += 4;
         if(isExpirationPresent) size += 2;
         //the following 2 are mutually exclusive
-        if(isStreamPart) size += 4;
+        if(isStreamPart && !isReceipt) size += 4;
         if(isLongPart) size += 8;
         return size;
     }
@@ -291,10 +293,10 @@ public interface P2LMessageHeader {
         return 5;//from 5 to 7
     }
     default int getPartIndexFieldOffset() {
-        return getPartIndexFieldOffset(isConversationIdPresent(), isExpirationPresent(), isLongPart(), isStreamPart());
+        return getPartIndexFieldOffset(isConversationIdPresent(), isExpirationPresent(), isLongPart(), isStreamPart(), isReceipt());
     }
-    static int getPartIndexFieldOffset(boolean conversationIdFieldPresent, boolean expirationFieldPresent, boolean isLongPart, boolean isStreamPart) {
-        if(!isLongPart&&!isStreamPart) return -1;
+    static int getPartIndexFieldOffset(boolean conversationIdFieldPresent, boolean expirationFieldPresent, boolean isLongPart, boolean isStreamPart, boolean isReceipt) {
+        if(!isLongPart&&(!isStreamPart||isReceipt)) return -1;
         if(conversationIdFieldPresent && expirationFieldPresent) return 11; //5+4+2=11, from 11 to 15
         if(conversationIdFieldPresent) return 9; //from 9 to 13
         if(expirationFieldPresent) return 7; //from 7 to 11
@@ -322,9 +324,9 @@ public interface P2LMessageHeader {
         if(!expirationFieldPresent) return EXPIRE_INSTANTLY;
         return BitHelper.getInt16From(raw, getExpirationFieldOffset(conversationIdFieldPresent, expirationFieldPresent));
     }
-    static int readPartIndexFromHeader(byte[] raw, boolean conversationIdFieldPresent, boolean expirationFieldPresent, boolean isLongPart, boolean isStreamPart) {
-        if(!isLongPart && !isStreamPart) return 0;
-        return BitHelper.getInt32From(raw, getPartIndexFieldOffset(conversationIdFieldPresent, expirationFieldPresent, isLongPart, isStreamPart));
+    static int readPartIndexFromHeader(byte[] raw, boolean conversationIdFieldPresent, boolean expirationFieldPresent, boolean isLongPart, boolean isStreamPart, boolean isReceipt) {
+        if(!isLongPart && (!isStreamPart||isReceipt)) return 0;
+        return BitHelper.getInt32From(raw, getPartIndexFieldOffset(conversationIdFieldPresent, expirationFieldPresent, isLongPart, isStreamPart, isReceipt));
     }
     static int readPartSizeFromHeader(byte[] raw, boolean conversationIdFieldPresent, boolean expirationFieldPresent, boolean isLongPart) {
         if(!isLongPart) return 0;

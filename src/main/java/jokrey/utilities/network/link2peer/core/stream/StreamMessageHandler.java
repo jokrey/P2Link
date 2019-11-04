@@ -17,7 +17,6 @@ public class StreamMessageHandler {
     private final ConcurrentHashMap<HeaderIdentifier, P2LInputStream> inputStreams = new ConcurrentHashMap<>();
 
     public void received(P2LMessage message) {
-//        System.out.println("received stream part message = [" + message.asString() + "]");
         P2LInputStream stream = getInputStream(message);
         stream.received(message);
 

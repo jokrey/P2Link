@@ -9,15 +9,20 @@ import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.core.message_headers.StreamPartHeader;
 import jokrey.utilities.network.link2peer.util.*;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
+import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.SocketAddress;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
@@ -774,13 +779,11 @@ class IntermediateTests {
         IncomingHandler.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
     }
 
-    @Test void stressTest() {
+    @Test @Disabled void stressTest() {
 
         //todo do CRAZY STUFF
 
         //do a simple broadcast test to check whether that still works after all the commotion...
-
-        throw new NotImplementedException();
     }
 
 
@@ -992,17 +995,17 @@ class IntermediateTests {
 
 
     /*
-    STREAM_CHUNK_BUFFER_ARRAY_SIZE=4
-    =>
-        NUMBER_OF_STREAM_RECEIPTS_RECEIVED = 2611
-        NUMBER_OF_STREAM_PARTS_RECEIVED = 6515
-    STREAM_CHUNK_BUFFER_ARRAY_SIZE=128
-    =>
-        NUMBER_OF_STREAM_RECEIPTS_RECEIVED = 531
-        NUMBER_OF_STREAM_PARTS_RECEIVED = 4995
+    STREAM_CHUNK_BUFFER_ARRAY_SIZE=4 - 555runs
+    =>(11.3s)
+        NUMBER_OF_STREAM_RECEIPTS_RECEIVED = 1747
+        NUMBER_OF_STREAM_PARTS_RECEIVED = 5250
+    STREAM_CHUNK_BUFFER_ARRAY_SIZE=128 - 555runs
+    => (5.6s)
+        NUMBER_OF_STREAM_RECEIPTS_RECEIVED = 673
+        NUMBER_OF_STREAM_PARTS_RECEIVED = 5119
      */
     @Test void streamTest_inOut_twiceBufferSize() throws IOException {
-        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=128;
+        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=4;
         P2LNode[] nodes = generateNodes(2, 62880);
 
         InputStream in = nodes[0].getInputStream(local(nodes[1]), 1, P2LNode.NO_CONVERSATION_ID);
@@ -1020,11 +1023,10 @@ class IntermediateTests {
 //                out.flush();//  works also, but close does an internal, direct eof flush
             out.close();
         });
-        new P2LThreadPool(1,1, 0).execute();
 
         streamSplitAssertions(in, toSend, false);
 
-        sendTask.waitForIt();  //todo causes issue
+        sendTask.waitForIt();
 
         close(nodes);
         P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=128;
@@ -1032,6 +1034,65 @@ class IntermediateTests {
         System.out.println("NUMBER_OF_STREAM_RECEIPTS_RECEIVED = " + NUMBER_OF_STREAM_RECEIPTS_RECEIVED);
         System.out.println("NUMBER_OF_STREAM_PARTS_RECEIVED = " + NUMBER_OF_STREAM_PARTS_RECEIVED);
     }
+
+
+    @Test void streamTest_inOut_largeArray_usageAsIntended() throws IOException {
+        int oldLimit = P2LMessage.CUSTOM_RAW_SIZE_LIMIT;
+        P2LMessage.CUSTOM_RAW_SIZE_LIMIT = P2LMessage.MAX_UDP_PACKET_SIZE;
+        P2LNode[] nodes = generateNodes(2, 62880);
+
+        InputStream in = nodes[0].getInputStream(local(nodes[1]), 1, P2LNode.NO_CONVERSATION_ID);
+        OutputStream out = nodes[1].getOutputStream(local(nodes[0]), 1, P2LNode.NO_CONVERSATION_ID);
+
+        byte[] toSend = new byte[10_000_000];//10mb
+        ThreadLocalRandom.current().nextBytes(toSend);
+
+        P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
+            out.write(toSend);
+            out.close();
+        });
+
+        ByteArrayStorage store = new ByteArrayStorage();
+        store.set(0, in, toSend.length);
+
+        assertArrayEquals(toSend, store.getContent());
+
+        sendTask.waitForIt();
+
+        close(nodes);
+
+        P2LMessage.CUSTOM_RAW_SIZE_LIMIT = oldLimit;
+    }
+
+    @Test void streamTest_inOut_largeArray_usageAsIntended_tcp() throws IOException {
+        ServerSocket server = new ServerSocket(6003);
+        Socket client = new Socket("localhost", 6003);
+        Socket serversConnectionToClient = server.accept();
+
+        InputStream in = serversConnectionToClient.getInputStream();
+        OutputStream out = client.getOutputStream();
+
+        byte[] toSend = new byte[10_000_000];//10mb
+        ThreadLocalRandom.current().nextBytes(toSend);
+
+        P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
+            out.write(toSend);
+
+//            sleep(100);
+
+            out.close();
+        });
+
+        ByteArrayStorage store = new ByteArrayStorage();
+        store.set(0, in, toSend.length);
+
+        assertArrayEquals(toSend, store.getContent());
+
+        sendTask.waitForIt();
+
+
+    }
+
 
 
     private void streamSplitAssertions(InputStream stream, String toSend, boolean forceClose) {

@@ -262,7 +262,6 @@ public class P2LFuture<T> {
      * @throws AlreadyCompletedException if the future was completed before this method ends
      */
     public void cancel() {
-//        System.out.println("P2LFuture.cancel");
         synchronized (this) {
             if (isCompleted()) throw new AlreadyCompletedException();
             if(isCanceled()) return;

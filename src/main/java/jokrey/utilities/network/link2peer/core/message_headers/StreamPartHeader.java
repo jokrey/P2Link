@@ -1,7 +1,5 @@
 package jokrey.utilities.network.link2peer.core.message_headers;
 
-import jokrey.utilities.bitsandbytes.BitHelper;
-
 /**
  * @author jokrey
  */
@@ -13,10 +11,6 @@ public class StreamPartHeader extends ConversationHeader {
 
         this.index = index;
         this.eofIndicator = eofIndicator;
-    }
-
-    public void reWriteIndexTo(byte[] raw) {
-        BitHelper.writeInt32(raw, getPartIndexFieldOffset(), index);
     }
 
     @Override public int getPartIndex() { return index; }

@@ -50,7 +50,7 @@ public class LongMessageHandler {
     public void send(P2LNodeInternal parent, P2LMessage overLongMessage, SocketAddress to) throws IOException {
         if(overLongMessage.canBeSentInSinglePacket()) throw new IllegalArgumentException("message could be send in a single packet...");
         int maxPayloadSize = P2LMessage.CUSTOM_RAW_SIZE_LIMIT -
-                P2LMessageHeader.getSize(overLongMessage.header.isConversationIdPresent(), overLongMessage.header.isExpirationPresent(), true, false);
+                P2LMessageHeader.getSize(overLongMessage.header.isConversationIdPresent(), overLongMessage.header.isExpirationPresent(), true, false, false);
         //todo - this is a little dumb: the custom raw size limit is only to avoid involuntary fragmentation in layer 1+2 and keep a small buffer size when receiving
         //todo     - but now we are doing the fragmentation.. (only in java so it is much slower than in HW)
         //todo     - however if the receive buffer should generally remain small, I do not see an option

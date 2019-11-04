@@ -92,11 +92,23 @@ public class DataChunk {
         lastDataIndex++;
     }
     public void put(byte[] b, int off, int len) {
-        System.arraycopy(b, off, data, lastDataIndex, len);
+        try {
+            System.arraycopy(b, off, data, lastDataIndex, len);
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            System.err.println("off = " + off);
+            System.err.println("len = " + len);
+            System.err.println("lastDataIndex = " + lastDataIndex);
+            System.err.println("data.length = " + data.length);
+        }
         lastDataIndex+=len;
     }
 
     public boolean isFull() {
         return lastDataIndex == data.length;
+    }
+
+    public int remainingSpace() {
+        return data.length - lastDataIndex;
     }
 }

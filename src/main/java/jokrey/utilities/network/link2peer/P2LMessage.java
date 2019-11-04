@@ -112,8 +112,8 @@ public class P2LMessage {
         }
         if (actual.length > CUSTOM_RAW_SIZE_LIMIT) throw new IllegalArgumentException("total size of raw cannot exceed " + CUSTOM_RAW_SIZE_LIMIT + ", user set limit - size here is: " + raw.length + " - max payload size is: " + (CUSTOM_RAW_SIZE_LIMIT - header.getSize()));
         if (actual.length > MAX_UDP_PACKET_SIZE) throw new IllegalArgumentException("total size of a udp packet cannot exceed " + MAX_UDP_PACKET_SIZE + " - size here is: " + raw.length);
-        if(raw.length > 512)
-            System.err.println("message greater than 512 bytes - this can be considered inefficient because intermediate low level protocols might break it up - size here is: "+raw.length);
+//        if(raw.length > 512)
+//            System.err.println("message greater than 512 bytes - this can be considered inefficient because intermediate low level protocols might break it up - size here is: "+raw.length);
         return new DatagramPacket(actual, actualLength, to);
     }
 
@@ -187,7 +187,7 @@ public class P2LMessage {
         return header.hashCode() + 13*Arrays.hashCode(raw);
     }
     @Override public String toString() {
-        return "P2LMessage{header=" + header + ", contentHash=" + contentHash + ", raw(pay=["+header.getSize()+", "+(header.getSize()+payloadLength)+"])=" + Arrays.toString(raw) + '}';
+        return "P2LMessage{header=" + header + ", contentHash=" + contentHash + ", raw(pay=["+header.getSize()+", "+(header.getSize()+payloadLength)+"])=" + Arrays.toString(Arrays.copyOfRange(raw,0, header.getSize()+Math.min(payloadLength, 12))) + '}';
     }
 
 
