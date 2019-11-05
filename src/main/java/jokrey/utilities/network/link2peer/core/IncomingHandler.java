@@ -122,10 +122,13 @@ public class IncomingHandler {
         this.parent = parentG;
 
         serverSocket = new DatagramSocket(parent.getPort());
+        serverSocket.setTrafficClass(0x10 | 0x08); //emphasize IPTOS_THROUGHPUT & IPTOS_LOWDELAY  - this option will likely be ignored by the underlying implementation
+        serverSocket.setReceiveBufferSize(P2LMessage.CUSTOM_RAW_SIZE_LIMIT);
 
         new Thread(() -> {
             while(!serverSocket.isClosed()) {
                 byte[] receiveBuffer = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT]; //asAnswerer buffer needs to be new for each run, otherwise handlereceivedmessages might get weird results - maximum safe size allegedly 512
+
                 DatagramPacket receivedPacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
                 try {
                     serverSocket.receive(receivedPacket);

@@ -4,6 +4,8 @@ import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader.HeaderIdentifier;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader.ReceiptIdentifier;
+import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
+import jokrey.utilities.network.link2peer.core.stream.P2LOutputStreamV1;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 import jokrey.utilities.simple.data_structure.pairs.Pair;
@@ -191,11 +193,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         validateMsgIdNotInternal(messageType);
         return incomingHandler.userBrdMessageQueue.futureFor(from, messageType);
     }
-    @Override public InputStream getInputStream(SocketAddress from, int messageType, int conversationId) {
+    @Override public P2LInputStream getInputStream(SocketAddress from, int messageType, int conversationId) {
         validateMsgIdNotInternal(messageType);
         return incomingHandler.streamMessageHandler.getInputStream(this, from, messageType, conversationId);
     }
-    @Override public OutputStream getOutputStream(SocketAddress to, int messageType, int conversationId) {
+    @Override public P2LOutputStreamV1 getOutputStream(SocketAddress to, int messageType, int conversationId) {
         return incomingHandler.streamMessageHandler.getOutputStream(this, to, messageType, conversationId);
     }
 
@@ -299,11 +301,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
 
     private final HashMap<HeaderIdentifier, P2LMessageListener> streamReceiptListeners = new HashMap<>();
-    @Override public void setStreamReceiptListener(SocketAddress to, int type, int conversationId, P2LMessageListener listener) {
-        streamReceiptListeners.putIfAbsent(new ReceiptIdentifier(WhoAmIProtocol.toString(to), type, conversationId), listener);
+    @Override public boolean setStreamReceiptListener(SocketAddress to, int type, int conversationId, P2LMessageListener listener) {
+        return streamReceiptListeners.putIfAbsent(new ReceiptIdentifier(WhoAmIProtocol.toString(to), type, conversationId), listener) == null;
     }
-    @Override public void removeStreamReceiptListener(SocketAddress to, int type, int conversationId, P2LMessageListener listener) {
-        streamReceiptListeners.remove(new ReceiptIdentifier(WhoAmIProtocol.toString(to), type, conversationId), listener);
+    @Override public void removeStreamReceiptListener(SocketAddress to, int type, int conversationId) {
+        streamReceiptListeners.remove(new ReceiptIdentifier(WhoAmIProtocol.toString(to), type, conversationId));
     }
     @Override public void notifyStreamReceiptReceived(P2LMessage message) {
         P2LMessageListener l = streamReceiptListeners.get(new ReceiptIdentifier(message));

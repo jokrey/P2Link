@@ -1,12 +1,11 @@
 package jokrey.utilities.network.link2peer.core.stream;
 
+import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.core.message_headers.StreamPartHeader;
 import jokrey.utilities.network.link2peer.util.DataChunk;
-import jokrey.utilities.simple.data_structure.pairs.Pair;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.SocketAddress;
@@ -15,21 +14,25 @@ import java.util.Arrays;
 /**
  * TODO - missing more advanced congestion control algorithm - current 'algorithm' works soley based on buffer size
  *     TODO - this entire stream algorithm should not be considered 'ready' - it is highly experimental and is missing critical features and optimizations
+ *     TODO - it is little more than a demonstration of a
  *
- * TODO _ REUSE BUFFERS (currently they are just set to null, but they could easily be reused)
  * TODO reuse header object - currently recreated with each part, could easily be reused
- * TODO    just reuse package object
+ * TODO    just reuse p2lMessage object
+ *
+ * TODO the three largest missing features: path mtu(maximum transmission unit size) discovery, congestion control and warp around after 2^31-1 packages
+ *
+ *
+ * TODO TODO TODO  - investigate extreme drops in performance on package loss (requires timeout -> request receipt, which is insane)
  *
  * @author jokrey
  */
-public class P2LOutputStream extends OutputStream implements AutoCloseable {
+public class P2LOutputStreamV1 extends OutputStream implements AutoCloseable {
     private final P2LNodeInternal parent;
     private final SocketAddress to;
     private final int type;
     private final int conversationId;
 
     private final DataChunk[] unconfirmedSendPackages = new DataChunk[P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE]; //technically + 1, because the receiving input stream does not store the first unreceived package
-//    private int remainingUnconfirmedBufferCapacity = unconfirmedSendPackages.length-1;
     private synchronized boolean isConfirmed(int partIndex) {
         int bufferIndex = partIndex - earliestUnconfirmedPartIndex;
         return unconfirmedSendPackages[bufferIndex] == null || unconfirmedSendPackages[bufferIndex].offset==-1;
@@ -37,12 +40,10 @@ public class P2LOutputStream extends OutputStream implements AutoCloseable {
     private synchronized void markConfirmed(int partIndex) {
         int bufferIndex = partIndex - earliestUnconfirmedPartIndex;
         if(unconfirmedSendPackages[bufferIndex] != null)
-            //todo - marking confirmed via offset causes a weird error in handle receipt - things are considered confirmed which are definitely not confirmed
-//            unconfirmedSendPackages[bufferIndex].offset=-1;
-            unconfirmedSendPackages[bufferIndex]=null;
+            unconfirmedSendPackages[bufferIndex].offset=-1;
     }
 
-    private int eofAtIndex = -1;
+    private int eofAtIndex = Integer.MAX_VALUE;
     private final DataChunk unsendBuffer;
     private int headerSize;
     private int earliestUnconfirmedPartIndex = 0;
@@ -53,7 +54,7 @@ public class P2LOutputStream extends OutputStream implements AutoCloseable {
         return earliestUnconfirmedPartIndex != latestAttemptedIndex+1;//i.e. the earliest unconfirmed is the part we have not send yet
     }
 
-    public P2LOutputStream(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
+    public P2LOutputStreamV1(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
         this.parent = parent;
         this.to = to;
         this.type = type;
@@ -63,19 +64,23 @@ public class P2LOutputStream extends OutputStream implements AutoCloseable {
         headerSize = new StreamPartHeader(null, type, conversationId, 0, false, false).getSize();
         unsendBuffer = new DataChunk(rawBuffer, headerSize, 0);
 
-        parent.setStreamReceiptListener(to, type, conversationId, message -> {
-            Pair<Integer, int[]> missingParts = StreamReceipt.decode(message);
+        boolean registeringReceiptListenerSuccessful = parent.setStreamReceiptListener(to, type, conversationId, message -> {
+            StreamReceipt missingParts = StreamReceipt.decode(message);
             handleReceipt(missingParts);//blocking
         });
+        if(!registeringReceiptListenerSuccessful)
+            throw new IllegalStateException("Stream occupied - another stream is already listening for the specific type-conversationId combination");
     }
 
     @Override public synchronized void write(int b) throws IOException {
+        if(eofAtIndex < latestAttemptedIndex+1) throw new IOException("Stream closed");
         unsendBuffer.put((byte)(b & 0xFF));
         if(unsendBuffer.isFull())
             packAndSend(false);
     }
 
     @Override public synchronized void write(byte[] b, int off, int len) throws IOException {
+        if(eofAtIndex < latestAttemptedIndex+1) throw new IOException("Stream closed");
         int bytesSend = 0;
         while(bytesSend < len) {
             int remainingInB = len-bytesSend;
@@ -93,19 +98,23 @@ public class P2LOutputStream extends OutputStream implements AutoCloseable {
     }
 
     @Override public synchronized void close() throws IOException {
-        if(eofAtIndex==-1) {//for reasons of impotence
+        if(eofAtIndex==Integer.MAX_VALUE) {//for reasons of impotence
             eofAtIndex = latestAttemptedIndex + 1;//i.e. next part
             packAndSend(true);
             waitForConfirmationOnAll();
+            parent.removeStreamReceiptListener(to, type, conversationId);
         }
     }
 
+    public boolean isClosed() {
+        return eofAtIndex < earliestUnconfirmedPartIndex && !hasUnconfirmedParts();
+    }
 
     private synchronized void waitForConfirmationOnAll() throws IOException {
         try {
             while(hasUnconfirmedParts()) {
                 sendExtraProcessReceiptRequest();
-//                System.out.println("P2LOutputStream.waitForConfirmationOnAll - earliestUnconfirmedPartIndex("+earliestUnconfirmedPartIndex+"), latestAttemptedIndex("+latestAttemptedIndex+")");
+//                System.out.println("P2LOutputStreamV1.waitForConfirmationOnAll - earliestUnconfirmedPartIndex("+earliestUnconfirmedPartIndex+"), latestAttemptedIndex("+latestAttemptedIndex+")");
                 wait(P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS);
                 sendExtraProcessReceiptRequest();
             }
@@ -131,15 +140,15 @@ public class P2LOutputStream extends OutputStream implements AutoCloseable {
 
     private synchronized void packAndSend(boolean forceRequestReceipt) throws IOException {
         try {
-            if(eofAtIndex!=-1 && latestAttemptedIndex+1 > eofAtIndex)
-                throw new IOException("Stream closed");
+            if(eofAtIndex < latestAttemptedIndex+1) throw new IOException("Stream closed");
 //            long startCtm = System.currentTimeMillis();
             while(latestAttemptedIndex+1 >= earliestUnconfirmedPartIndex+unconfirmedSendPackages.length) {
-//                System.out.println("P2LOutputStream.packAndSend - WAIT - for: "+(System.currentTimeMillis()-startCtm)/1e3+" - nextIndexToSend("+(latestAttemptedIndex+1)+"), earliestUnconfirmedPartIndex("+earliestUnconfirmedPartIndex+")");
+//                System.out.println("P2LOutputStreamV1.packAndSend - WAIT - for: "+(System.currentTimeMillis()-startCtm)/1e3+" - nextIndexToSend("+(latestAttemptedIndex+1)+"), earliestUnconfirmedPartIndex("+earliestUnconfirmedPartIndex+")");
                 wait(1000); //exceeding buffer limitations - slow down!, do not send and block until packages confirmed as received
                 if(latestAttemptedIndex+1 >= earliestUnconfirmedPartIndex+unconfirmedSendPackages.length)
-                    sendExtraProcessReceiptRequest();
+                    sendExtraProcessReceiptRequest(); //todo instead of sending an extra processing request, it would be possible to just send the current package - with an attached request (it is likely to be discarded, but maybe not and there is little to be lost)
             }
+            unsendBuffer.offset = headerSize;
             int unconfirmedBufferIndex = virtuallySend();
             send(unconfirmedBufferIndex, forceRequestReceipt);
 
@@ -158,7 +167,7 @@ public class P2LOutputStream extends OutputStream implements AutoCloseable {
         else if(unconfirmedBufferIndex >= unconfirmedSendPackages.length)
             throw new IllegalStateException("unconfirmedBufferIndex("+unconfirmedBufferIndex+") >= unconfirmedSendPackages.length("+unconfirmedSendPackages.length+")");
 
-        if(unconfirmedSendPackages[unconfirmedBufferIndex] == null)
+        if(unconfirmedSendPackages[unconfirmedBufferIndex] == null || unsendBuffer.lastDataIndex > unconfirmedSendPackages[unconfirmedBufferIndex].capacity())
             unconfirmedSendPackages[unconfirmedBufferIndex] = new DataChunk(unsendBuffer.capacity());
         unsendBuffer.cloneInto(unconfirmedSendPackages[unconfirmedBufferIndex]);
         return latestAttemptedIndex;
@@ -180,18 +189,19 @@ public class P2LOutputStream extends OutputStream implements AutoCloseable {
     }
 
 
-    private synchronized void handleReceipt(Pair<Integer, int[]> receipt) {
-        boolean eof = receipt.l<0;
-        int latestIndexReceivedByPeer = Math.abs(receipt.l);
-        int[] missingParts = receipt.r;
-        if(eof)
+    private synchronized void handleReceipt(StreamReceipt receipt) {
+        int latestIndexReceivedByPeer = receipt.latestReceived;
+        int[] missingParts = receipt.missingParts;
+        if(receipt.eof) {
             eofAtIndex = latestIndexReceivedByPeer;//i.e. now
-//        System.out.println("handleReceipt("+latestIndexReceivedByPeer+") - missingParts = " + Arrays.toString(missingParts));
-//        System.out.println("handleReceipt("+latestIndexReceivedByPeer+") - earliestUnconfirmedPartIndex = " + earliestUnconfirmedPartIndex);
-
-        if(latestIndexReceivedByPeer+1 < earliestUnconfirmedPartIndex) {
-            return;//received old receipt
+//            parent.removeStreamReceiptListener(to, type, conversationId);
+//            return;
         }
+
+        System.out.println("handleReceipt - missingParts = " + Arrays.toString(missingParts));
+
+        if(latestIndexReceivedByPeer+1 < earliestUnconfirmedPartIndex)
+            return;//received old receipt
 
         int newEarliestUnconfirmedIndex;
         if(missingParts.length == 0) {
@@ -200,30 +210,23 @@ public class P2LOutputStream extends OutputStream implements AutoCloseable {
             Arrays.sort(missingParts);
             newEarliestUnconfirmedIndex = missingParts[0];
 
-//            System.out.println("1 newEarliestUnconfirmedIndex = " + newEarliestUnconfirmedIndex);
-
             if(newEarliestUnconfirmedIndex <= latestAttemptedIndex) {
-//                System.out.println("1 newEarliestUnconfirmedIndex <= latestAttemptedIndex");
                 try {
-                    if (newEarliestUnconfirmedIndex < earliestUnconfirmedPartIndex) {
-//                        System.out.println("RETURN newEarliestUnconfirmedIndex < earliestUnconfirmedPartIndex");
+                    if (newEarliestUnconfirmedIndex < earliestUnconfirmedPartIndex)
                         return; //then this receipt is not current anymore
-                    }
-//                    System.out.println("1 newEarliestUnconfirmedIndex >= earliestUnconfirmedPartIndex");
 
                     int lastMissingPart = newEarliestUnconfirmedIndex;
                     for (int missingPart : missingParts) {
                         if (newEarliestUnconfirmedIndex == -1)
                             newEarliestUnconfirmedIndex = missingPart;
-                        for (int bufI = lastMissingPart + 1; bufI < missingPart; bufI++)//does not trigger the first round
-                            markConfirmed(bufI);
 
-//                        System.out.println("in for - missingPart = " + missingPart+" - isConfirmed(missingPart): "+isConfirmed(missingPart));
+                        markConfirmed(lastMissingPart+1, missingPart-1);
+
                         if (isConfirmed(missingPart)) {
                             if (missingPart == newEarliestUnconfirmedIndex)
                                 newEarliestUnconfirmedIndex = -1;
                         } else {
-                            System.out.println("resend missingPart = " + missingPart);
+                            System.out.println("handleReceipt - resend missingPart = " + missingPart);
                             send(missingPart, !requestRecentlyMade() && eofAtIndex!=-1);
                         }
                         lastMissingPart = missingPart;
@@ -234,14 +237,24 @@ public class P2LOutputStream extends OutputStream implements AutoCloseable {
                     e.printStackTrace();
                     //todo mark broken, etc...
                 }
-            }//else {System.out.println("ELSE newEarliestUnconfirmedIndex > latestAttemptedIndex");}// else newEarliestUnconfirmedIndex > latestAttemptedIndex : the peer notifies us that it has been waiting on a part we have not send yet - it might do this in case of delayed receipt requests
+            }
+//            else newEarliestUnconfirmedIndex > latestAttemptedIndex : the peer notifies us that it has been waiting on a part we have not send yet - it might do this in case of delayed receipt requests
         }
         int shiftBy = newEarliestUnconfirmedIndex - earliestUnconfirmedPartIndex;
-        System.arraycopy(unconfirmedSendPackages, shiftBy, unconfirmedSendPackages, 0, unconfirmedSendPackages.length - shiftBy);
-        for (int i = unconfirmedSendPackages.length - shiftBy; i < unconfirmedSendPackages.length; i++)
-            markConfirmed(earliestUnconfirmedPartIndex+i);
+        markConfirmed(earliestUnconfirmedPartIndex,
+                earliestUnconfirmedPartIndex+ (shiftBy-1));
+        //ARRAY COPY DOES NOT SUFFICE - consider: [p1, p2, p3] -shift-> [p2, p3, p3] - when p3 at i=2 is marked as completed, p3 at position i=1 would be as well...
+//        System.arraycopy(unconfirmedSendPackages, shiftBy, unconfirmedSendPackages, 0, unconfirmedSendPackages.length - shiftBy);
+        BitHelper.rotateLeftBy(unconfirmedSendPackages, unconfirmedSendPackages.length, shiftCache, shiftBy);
         earliestUnconfirmedPartIndex = newEarliestUnconfirmedIndex;
 
         notify();
     }
+
+    private void markConfirmed(int firstPartIndex, int lastPartIndex) {
+        for (int partI = firstPartIndex; partI <= lastPartIndex; partI++)
+            markConfirmed(partI);
+    }
+
+    private final DataChunk[] shiftCache = new DataChunk[unconfirmedSendPackages.length/2];
 }

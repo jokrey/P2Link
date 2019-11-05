@@ -26,7 +26,7 @@ public interface P2LNodeInternal extends P2LNode {
     void notifyUserBroadcastMessageReceived(P2LMessage message);
     void notifyUserMessageReceived(P2LMessage message);
 
-    void setStreamReceiptListener(SocketAddress to, int type, int conversationId, P2LMessageListener listener);
-    void removeStreamReceiptListener(SocketAddress to, int type, int conversationId, P2LMessageListener listener);
+    boolean setStreamReceiptListener(SocketAddress to, int type, int conversationId, P2LMessageListener listener);
+    void removeStreamReceiptListener(SocketAddress to, int type, int conversationId);
     void notifyStreamReceiptReceived(P2LMessage message);
 }

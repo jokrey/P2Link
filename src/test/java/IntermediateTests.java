@@ -7,6 +7,8 @@ import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.core.message_headers.StreamPartHeader;
+import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
+import jokrey.utilities.network.link2peer.core.stream.P2LOutputStreamV1;
 import jokrey.utilities.network.link2peer.util.*;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
@@ -1037,6 +1039,7 @@ class IntermediateTests {
 
 
     @Test void streamTest_inOut_largeArray_usageAsIntended() throws IOException {
+//        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=4;
         int oldLimit = P2LMessage.CUSTOM_RAW_SIZE_LIMIT;
         P2LMessage.CUSTOM_RAW_SIZE_LIMIT = P2LMessage.MAX_UDP_PACKET_SIZE;
         P2LNode[] nodes = generateNodes(2, 62880);
@@ -1062,6 +1065,77 @@ class IntermediateTests {
         close(nodes);
 
         P2LMessage.CUSTOM_RAW_SIZE_LIMIT = oldLimit;
+//        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=128;
+    }
+
+    @Test void streamTest_closingOutFirst() throws IOException {
+        P2LNode[] nodes = generateNodes(2, 62880);
+
+        P2LInputStream in = nodes[0].getInputStream(local(nodes[1]), 1, P2LNode.NO_CONVERSATION_ID);
+        P2LOutputStreamV1 out = nodes[1].getOutputStream(local(nodes[0]), 1, P2LNode.NO_CONVERSATION_ID);
+
+        P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
+            out.write(new byte[] {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16});
+            out.close();
+        });
+
+        byte[] read = new byte[5];
+        int numRead = in.read(read);
+        sendTask.waitForIt(); //data still available to read after out closed...
+
+        assertEquals(5, numRead);
+        assertArrayEquals(new byte[] {1,2,3,4,5}, read);
+
+        read = new byte[11];
+        numRead = in.read(read);
+        assertEquals(11, numRead);
+        System.out.println("read = " + Arrays.toString(read));
+        assertArrayEquals(new byte[] {6,7,8,9,10,11,12,13,14,15,16}, read);
+
+        boolean inClosed = in.isClosed();
+        boolean outClosed = out.isClosed();
+        assertTrue(inClosed);
+        assertTrue(outClosed);
+
+        close(nodes);
+    }
+
+    @Test void streamTest_closingInFirst() throws IOException {
+        P2LNode[] nodes = generateNodes(2, 62880);
+
+        P2LInputStream in = nodes[0].getInputStream(local(nodes[1]), 1, P2LNode.NO_CONVERSATION_ID);
+        P2LOutputStreamV1 out = nodes[1].getOutputStream(local(nodes[0]), 1, P2LNode.NO_CONVERSATION_ID);
+
+        P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
+            out.write(new byte[] {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16});
+            out.flush();
+
+            sleep(500);
+//            out.close();
+        });
+
+        byte[] read = new byte[5];
+        int numRead = in.read(read);
+
+        assertEquals(5, numRead);
+        assertArrayEquals(new byte[] {1,2,3,4,5}, read);
+
+        assertFalse(sendTask.isCompleted());
+
+        in.close();
+
+        sendTask.waitForIt(); //data still available to read after out closed...
+
+        assertThrows(IOException.class, ()-> in.read(read));
+
+        boolean inClosed = in.isClosed();
+        boolean outClosed = out.isClosed(); //note that this is despite that fact that out was never closed actively by the sender thread or anyone else.. it received the notification from the in stream
+        assertTrue(inClosed);
+        assertTrue(outClosed);
+
+        assertThrows(IOException.class, () -> out.write(1));
+
+        close(nodes);
     }
 
     @Test void streamTest_inOut_largeArray_usageAsIntended_tcp() throws IOException {
@@ -1093,6 +1167,9 @@ class IntermediateTests {
 
     }
 
+    @Test @Disabled void streamWithDroppedPackagesTest() {
+        //todo
+    }
 
 
     private void streamSplitAssertions(InputStream stream, String toSend, boolean forceClose) {

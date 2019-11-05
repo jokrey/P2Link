@@ -2,6 +2,8 @@ package jokrey.utilities.network.link2peer;
 
 import jokrey.utilities.network.link2peer.core.NodeCreator;
 import jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes;
+import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
+import jokrey.utilities.network.link2peer.core.stream.P2LOutputStreamV1;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
@@ -53,11 +55,11 @@ import java.util.function.Function;
  *    allows sending individual messages to socket addresses (temp/potential connection - with optional received receipt)
  *        for receipt messages it allows a retry functionality after which an exception is thrown and (if the connection was an established one) the connection is marked as broken
  *        allow breaking up messages and sending them in parts
- * todo       allow streaming very long messages (i.e. break up messages, but requery lost part-packets - udt like protocol)
+ *        allow streaming very long messages (i.e. break up messages, but requery lost part-packets) todo improve upon the current(naive) streaming protocol
  *      both internal and user messages can use this functionality.
  *    allows maintaining broken/previously-established connections
  *
- *
+ * todo - allow automatically finding mtu using icmp
  * todo eliminate string type sender of sender in P2LMessage and the constant calls to WhoAmIProtocol.toString()
  *
  * @author jokrey
@@ -251,7 +253,7 @@ public interface P2LNode {
      * @param conversationId the conversation id of the message
      * @return
      */
-    InputStream getInputStream(SocketAddress from, int messageType, int conversationId);
+    P2LInputStream getInputStream(SocketAddress from, int messageType, int conversationId);
 
     /**
      * todo
@@ -260,7 +262,7 @@ public interface P2LNode {
      * @param conversationId
      * @return
      */
-    OutputStream getOutputStream(SocketAddress to, int messageType, int conversationId);
+    P2LOutputStreamV1 getOutputStream(SocketAddress to, int messageType, int conversationId);
 
 
     /**
