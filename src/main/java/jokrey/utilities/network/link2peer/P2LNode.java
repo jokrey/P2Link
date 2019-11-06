@@ -30,13 +30,13 @@ import java.util.function.Function;
  *
  * !!!!!
  * TODO: light clients (clients without a public link, i.e. url + free port)
- * TODO: allow light clients to connect with each other (tcp hole punching or something like that)
+ * TODO: allow light clients to connect with each other (using udp hole punching)
  *    - does this work out of the box??
  *
  *
  * LATER:
- * TODO? support for multicast - usage instead of broadcast when multiple peers in same local network?
- * TODO: fixed size networks (with much improved broadcast efficiency and maybe send to type(instead of send to link))
+ * TODO? support for multicast - usage instead of broadcast when multiple peers in same local network? - unlikely advantage in practical applications
+ * TODO: fixed size networks (with much improved broadcast efficiency and maybe send to id[mpi-style](instead of send to link), though that would require potentially complex routing)
  * TODO:     improving upon fixed size: limit size networks..
  *
  * NOT_TODO: allow sending messages to a not directly connected peer (i.e. send through the network via a random search - for example useful when it is a light peer or max connections are reached)
@@ -59,8 +59,8 @@ import java.util.function.Function;
  *      both internal and user messages can use this functionality.
  *    allows maintaining broken/previously-established connections
  *
- * todo - allow automatically finding mtu using icmp
- * todo eliminate string type sender of sender in P2LMessage and the constant calls to WhoAmIProtocol.toString()
+ * todo - allow automatically finding mtu using icmp for established connections (require streams to be to established connections and use mtu there, mtu can be different to every node, mtu max = CUSTOM_RAW_SIZE of a peer node)
+ * todo eliminate string type sender of sender in P2LMessage and the repeated calls to WhoAmIProtocol.toString() - replace with wrapper to a socket address and its string representation
  *
  * @author jokrey
  */
