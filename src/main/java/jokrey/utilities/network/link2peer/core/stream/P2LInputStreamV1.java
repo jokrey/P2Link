@@ -144,7 +144,7 @@ class P2LInputStreamV1 extends P2LInputStream {
             long elapsed = 0;
             while(available==0 && !eofReached()) {
                 wait(timeout_ms==0?0:timeout_ms-elapsed);
-                if(timeout_ms > 0 && elapsed > timeout_ms) throw new IOException("timeout after "+elapsed);
+                if(timeout_ms > 0 && elapsed >= timeout_ms) throw new IOException("timeout after "+elapsed);
                 elapsed = System.currentTimeMillis() - startCtm;
 //                if(available==0 && !eofReached()) sendReceipt(); //todo this would be insane - what if the other side is just not sending data?
             }
@@ -187,6 +187,7 @@ class P2LInputStreamV1 extends P2LInputStream {
         available = -1;
         notify();
         sendReceipt();
+        //todo remove this object from the stream message handler - do not remove if it is closed from the other side tho - force close for resource destruction
     }
 
 

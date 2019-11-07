@@ -1021,11 +1021,14 @@ class IntermediateTests {
             }
 //                out.flush();//  works also, but close does an internal, direct eof flush
             out.close();
+            System.out.println("closed");
         });
 
         streamSplitAssertions(in, toSend, false);
 
+        System.out.println("after assert");
         sendTask.waitForIt();
+        System.out.println("after send");
 
         close(nodes);
         P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=128;

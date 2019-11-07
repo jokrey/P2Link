@@ -23,11 +23,12 @@ import java.util.Arrays;
  *
  *
  * TODO TODO TODO  - investigate extreme drops in performance on package loss (requires timeout -> request receipt, which is insane)
+ *     REASON: loss of last package (the package that requests the receipt)
  *
  * @author jokrey
  */
 public class P2LOutputStreamV1 extends P2LOutputStream {
-    private final DataChunk[] unconfirmedSendPackages = new DataChunk[P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE]; //technically + 1, because the receiving input stream does not store the first unreceived package
+    private final DataChunk[] unconfirmedSendPackages = new DataChunk[P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE/2]; //this smaller is a simple, dumb, only mildly effective form of congestion control
 
     private int eofAtIndex = Integer.MAX_VALUE;
     private final DataChunk unsendBuffer;
@@ -65,20 +66,20 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
     }
 
     @Override public synchronized void flush() throws IOException {
-        packAndSend(false); //flush semantics currently means: pack and send, but does not include guarantees about receiving information
+        if(!unsendBuffer.isEmpty())
+            packAndSend(false); //flush semantics currently means: pack and send, but does not include guarantees about receiving information
     }
 
     @Override public synchronized boolean close(int timeout_ms) throws IOException {
         if(eofAtIndex==Integer.MAX_VALUE) {//for reasons of impotence
             eofAtIndex = latestAttemptedIndex + 1;//i.e. next part
-            packAndSend(true);
+            packAndSend(true);//cannot use flush, flush checks if the buffer is empty, this is meant as a marker to the peer's input stream
             boolean confirmation = waitForConfirmationOnAll(timeout_ms);
 
-            //to help gc: (does this help gc? - array list default implementation does it, kinda)
-            for(int i=0;i<unconfirmedSendPackages.length;i++)
-                unconfirmedSendPackages[i] = null;
-            for(int i=0;i<shiftCache.length;i++)
-                shiftCache[i] = null;
+            //help gc:
+            for (int i = 0; i < unconfirmedSendPackages.length; i++) unconfirmedSendPackages[i] = null;
+            for (int i = 0; i < shiftCache.length; i++) shiftCache[i] = null;
+            //todo - clean up stream message handler
             return confirmation;
         }
         return !hasUnconfirmedParts();
@@ -103,10 +104,10 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
                 if(hasUnconfirmedParts())
                     sendExtraordinaryReceiptRequest();
             }
+            return true;
         } catch (InterruptedException e) {
             throw new IOException(e);
         }
-        return true;
     }
     private long lastReceiptRequest = 0;
     private boolean requestRecentlyMade() {
@@ -149,12 +150,12 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
         if(eofAtIndex < latestAttemptedIndex+1) throw new IOException("Stream closed");
         waitForBufferCapacities(0);
         unsendBuffer.offset = headerSize; //because offset is used to mark 'em as confirmed
-        if(!unsendBuffer.isEmpty()) {
-            int partIndexToSend = virtuallySend();
-            send(partIndexToSend, forceRequestReceipt);
 
-            unsendBuffer.offset = unsendBuffer.lastDataIndex = headerSize;//clear to offset
-        }
+        //also send if buffer is empty - could be used as a marker (for example eof marker by close)
+        int partIndexToSend = virtuallySend();
+        send(partIndexToSend, forceRequestReceipt);
+
+        unsendBuffer.offset = unsendBuffer.lastDataIndex = headerSize;//clear to offset
     }
     private synchronized int virtuallySend() {
         latestAttemptedIndex++;
