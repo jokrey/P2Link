@@ -212,15 +212,15 @@ public class P2LFuture<T> {
         try {
             isGetWaiting = true;
             long waitingSince = System.currentTimeMillis();
+            long elapsed_ms = 0;
             synchronized (this) {
                 while (!isCompleted() && !isCanceled()) {
-                    long elapsed_ms = System.currentTimeMillis() - waitingSince;
-                    long remaining_ms = timeout_ms - elapsed_ms;
-                    if (timeout_ms != ENDLESS_WAIT && remaining_ms <= 0) { //waiting for timeout without rechecking whether it has actually timed out is not possible - wait(timeout) is not guaranteed to sleep until timeout
+                    wait(timeout_ms == ENDLESS_WAIT ? ENDLESS_WAIT : timeout_ms - elapsed_ms);
+                    elapsed_ms = System.currentTimeMillis() - waitingSince;
+                    if (timeout_ms != ENDLESS_WAIT && elapsed_ms >= timeout_ms) { //waiting for timeout without rechecking whether it has actually timed out is not possible - wait(timeout) is not guaranteed to sleep until timeout
                         timeout();
                         return null;
                     }
-                    wait(timeout_ms == ENDLESS_WAIT ? ENDLESS_WAIT : remaining_ms);
                 }
             }
             if(isCanceled())

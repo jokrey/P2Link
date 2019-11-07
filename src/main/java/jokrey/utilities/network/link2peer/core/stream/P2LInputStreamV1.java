@@ -12,6 +12,8 @@ import java.util.LinkedList;
 /**
  * TODO - should also send a response at a certain, dynamically changed interval (it should be roughly every half buffer size filled - otherwise there is always a delay at the end of the buffer size
  *
+ * TODO - should itself decide when to send receipts, the current system allows an exploit where many small packages request receipts
+ *
  * @author jokrey
  */
 class P2LInputStreamV1 extends P2LInputStream {
@@ -114,10 +116,11 @@ class P2LInputStreamV1 extends P2LInputStream {
     @Override public synchronized int read(int timeout_ms) throws IOException {
         try {
             long startCtm = System.currentTimeMillis();
+            long elapsed = 0;
             while(available==0 && !eofReached()) {
-                wait(timeout_ms);
-                long elapsed = System.currentTimeMillis() - startCtm;
-                if(timeout_ms > 0 && elapsed > timeout_ms) throw new IOException("timeout after "+elapsed);
+                wait(timeout_ms==0?0:timeout_ms-elapsed);
+                if(timeout_ms > 0 && elapsed >= timeout_ms) throw new IOException("timeout after "+elapsed);
+                elapsed = System.currentTimeMillis() - startCtm;
 //                if(available==0 && !eofReached()) sendReceipt(); //todo this would be insane - what if the other side is just not sending data?
             }
             if(eofReached() && available==0) return -1;
@@ -138,11 +141,11 @@ class P2LInputStreamV1 extends P2LInputStream {
         if(off<0 || off+len>b.length || len < 0) throw new ArrayIndexOutOfBoundsException();
         try {
             long startCtm = System.currentTimeMillis();
+            long elapsed = 0;
             while(available==0 && !eofReached()) {
-                wait(timeout_ms);
-                long elapsed = System.currentTimeMillis() - startCtm;
-//                System.out.println("P2LInputStreamV1.read-array - WAIT - eofReceived= "+eofReceived+", earliestIndexMissing= "+earliestIndexMissing+", waitedFor = " + (elapsed)/1e3);
+                wait(timeout_ms==0?0:timeout_ms-elapsed);
                 if(timeout_ms > 0 && elapsed > timeout_ms) throw new IOException("timeout after "+elapsed);
+                elapsed = System.currentTimeMillis() - startCtm;
 //                if(available==0 && !eofReached()) sendReceipt(); //todo this would be insane - what if the other side is just not sending data?
             }
             if(eofReached() && available==0) return -1;

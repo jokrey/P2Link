@@ -5,14 +5,13 @@ import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader.HeaderIdentifier;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader.ReceiptIdentifier;
 import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
+import jokrey.utilities.network.link2peer.core.stream.P2LOutputStream;
 import jokrey.utilities.network.link2peer.core.stream.P2LOutputStreamV1;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 import jokrey.utilities.simple.data_structure.pairs.Pair;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.SocketAddress;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -101,8 +100,8 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         DisconnectSingleConnectionProtocol.asInitiator(this, from);
     }
 
-    @Override public List<SocketAddress> recursiveGarnerConnections(int newConnectionLimit, SocketAddress... setupLinks) {
-        return GarnerConnectionsRecursivelyProtocol.recursiveGarnerConnections(this, newConnectionLimit, Integer.MAX_VALUE, Arrays.asList(setupLinks));
+    @Override public List<SocketAddress> recursiveGarnerConnections(int newConnectionLimit, int newConnectionLimitPerRecursion, SocketAddress... setupLinks) {
+        return GarnerConnectionsRecursivelyProtocol.recursiveGarnerConnections(this, newConnectionLimit, newConnectionLimitPerRecursion, Arrays.asList(setupLinks));
     }
 
     @Override public P2LFuture<Integer> sendBroadcastWithReceipts(P2LMessage message) {
@@ -197,7 +196,8 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         validateMsgIdNotInternal(messageType);
         return incomingHandler.streamMessageHandler.getInputStream(this, from, messageType, conversationId);
     }
-    @Override public P2LOutputStreamV1 getOutputStream(SocketAddress to, int messageType, int conversationId) {
+    @Override public P2LOutputStream getOutputStream(SocketAddress to, int messageType, int conversationId) {
+        validateMsgIdNotInternal(messageType);
         return incomingHandler.streamMessageHandler.getOutputStream(this, to, messageType, conversationId);
     }
 

@@ -6,6 +6,7 @@ import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.core.message_headers.StreamPartHeader;
 import jokrey.utilities.network.link2peer.util.DataChunk;
+
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.Arrays;
@@ -74,28 +75,38 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
         packAndSend(false); //flush semantics currently means: pack and send, but does not include guarantees about receiving information
     }
 
-    @Override public synchronized void close(int timeout) throws IOException {
+    @Override public synchronized boolean close(int timeout_ms) throws IOException {
         if(eofAtIndex==Integer.MAX_VALUE) {//for reasons of impotence
             eofAtIndex = latestAttemptedIndex + 1;//i.e. next part
             packAndSend(true);
-            waitForConfirmationOnAll(timeout);
+            boolean confirmation = waitForConfirmationOnAll(timeout_ms);
             parent.removeStreamReceiptListener(to, type, conversationId);
+
+            //to help gc: (does this help gc? - array list default implementation does it, kinda)
+            for(int i=0;i<unconfirmedSendPackages.length;i++)
+                unconfirmedSendPackages[i] = null;
+            for(int i=0;i<shiftCache.length;i++)
+                shiftCache[i] = null;
+            return confirmation;
         }
+        return !hasUnconfirmedParts();
     }
 
     @Override public boolean isClosed() {
         return eofAtIndex < earliestUnconfirmedPartIndex && !hasUnconfirmedParts();
     }
 
-    @Override public synchronized void waitForConfirmationOnAll(int timeout) throws IOException {
+    @Override public synchronized boolean waitForConfirmationOnAll(int timeout_ms) throws IOException {
         try {
+            sendExtraordinaryReceiptRequest();
+
             long startCtm = System.currentTimeMillis();
+            long elapsed = 0;
             while(hasUnconfirmedParts()) {
-                sendExtraordinaryReceiptRequest();
 //                System.out.println("P2LOutputStreamV1.waitForConfirmationOnAll - earliestUnconfirmedPartIndex("+earliestUnconfirmedPartIndex+"), latestAttemptedIndex("+latestAttemptedIndex+")");
-                wait(timeout==0? P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS:Math.min(timeout, P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS));
-                long elapsed = System.currentTimeMillis() - startCtm;
-                if(timeout != 0 && elapsed > timeout) throw new IOException("waiting for confirmation timed out after "+elapsed+"ms");
+                wait(timeout_ms ==0? P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS:Math.min(timeout_ms-elapsed, P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS));
+                elapsed = System.currentTimeMillis() - startCtm;
+                if(timeout_ms != 0 && elapsed >= timeout_ms) return false;
 
                 if(hasUnconfirmedParts())
                     sendExtraordinaryReceiptRequest();
@@ -103,6 +114,7 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
         } catch (InterruptedException e) {
             throw new IOException(e);
         }
+        return true;
     }
     private long lastReceiptRequest = 0;
     private boolean requestRecentlyMade() {
@@ -123,15 +135,15 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
     public boolean hasBufferCapacities() {
         return latestAttemptedIndex+1 < earliestUnconfirmedPartIndex+unconfirmedSendPackages.length;
     }
-    public synchronized void waitForBufferCapacities(int timeout) throws IOException {
+    public synchronized void waitForBufferCapacities(int timeout_ms) throws IOException {
         try {
+            sendExtraordinaryReceiptRequest();
             long startCtm = System.currentTimeMillis();
+            long elapsed = 0;
             while(!hasBufferCapacities()) {
-                sendExtraordinaryReceiptRequest();
-//                System.out.println("P2LOutputStreamV1.waitForConfirmationOnAll - earliestUnconfirmedPartIndex("+earliestUnconfirmedPartIndex+"), latestAttemptedIndex("+latestAttemptedIndex+")");
-                wait(timeout==0? P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS:Math.min(timeout, P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS));
-                long elapsed = System.currentTimeMillis() - startCtm;
-                if(timeout != 0 && elapsed > timeout) throw new IOException("waiting for confirmation timed out after "+elapsed+"ms");
+                wait(timeout_ms ==0? P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS:Math.min(timeout_ms-elapsed, P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS));
+                elapsed = System.currentTimeMillis() - startCtm;
+                if(timeout_ms != 0 && elapsed >= timeout_ms) throw new IOException("waiting for confirmation timed out after "+elapsed+"ms");
 
                 if(!hasBufferCapacities())
                     sendExtraordinaryReceiptRequest();
@@ -144,11 +156,13 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
     private synchronized void packAndSend(boolean forceRequestReceipt) throws IOException {
         if(eofAtIndex < latestAttemptedIndex+1) throw new IOException("Stream closed");
         waitForBufferCapacities(0);
-        unsendBuffer.offset = headerSize;
-        int unconfirmedBufferIndex = virtuallySend();
-        send(unconfirmedBufferIndex, forceRequestReceipt);
+        unsendBuffer.offset = headerSize; //because offset is used to mark 'em as confirmed
+        if(!unsendBuffer.isEmpty()) {
+            int partIndexToSend = virtuallySend();
+            send(partIndexToSend, forceRequestReceipt);
 
-        unsendBuffer.offset = unsendBuffer.lastDataIndex = headerSize;//clear to offset
+            unsendBuffer.offset = unsendBuffer.lastDataIndex = headerSize;//clear to offset
+        }
     }
     private synchronized int virtuallySend() {
         latestAttemptedIndex++;

@@ -3,12 +3,11 @@ package jokrey.utilities.network.link2peer;
 import jokrey.utilities.network.link2peer.core.NodeCreator;
 import jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes;
 import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
+import jokrey.utilities.network.link2peer.core.stream.P2LOutputStream;
 import jokrey.utilities.network.link2peer.core.stream.P2LOutputStreamV1;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.SocketAddress;
 import java.util.List;
 import java.util.Set;
@@ -161,9 +160,15 @@ public interface P2LNode {
 
 
     /**
-     * Blocking
+     * Blocking.
      * @see jokrey.utilities.network.link2peer.core.GarnerConnectionsRecursivelyProtocol */
-    List<SocketAddress> recursiveGarnerConnections(int newConnectionLimit, SocketAddress... setupLinks);
+    default List<SocketAddress> recursiveGarnerConnections(int newConnectionLimit, SocketAddress... setupLinks) {
+        return recursiveGarnerConnections(newConnectionLimit, Integer.MAX_VALUE, setupLinks);
+    }
+    /**
+     * Blocking.
+     * @see jokrey.utilities.network.link2peer.core.GarnerConnectionsRecursivelyProtocol */
+    List<SocketAddress> recursiveGarnerConnections(int newConnectionLimit, int newConnectionLimitPerRecursion, SocketAddress... setupLinks);
 
 
 
@@ -247,22 +252,26 @@ public interface P2LNode {
     P2LFuture<P2LMessage> expectBroadcastMessage(String from, int messageType);
 
     /**
-     * Returns the stream for the given identifier. It is possible to have up to (2^31-1) * (2^31-1) streams from a single source (todo this is absolutely idiotic -
+     * Returns the stream for the given identifier. It is possible to have up to (2^31-1) * (2^31-1) streams from a single source (todo this is absolutely idiotic - who would EVER need THAT many different streams)
+     * The multiple streams can be used for comfortable parallel download or communication without establishing multiple, 'real' connections.
      * @param from the sender of the broadcast message (decoded from the raw ip packet)
      * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
      * @param conversationId the conversation id of the message
-     * @return
+     * @return a stream representation of the connection - with the associated guarantees
+     * @see P2LInputStream
      */
     P2LInputStream getInputStream(SocketAddress from, int messageType, int conversationId);
 
     /**
-     * todo
-     * @param to
-     * @param messageType
-     * @param conversationId
-     * @return
+     * Returns the stream for the given identifier. It is possible to have up to (2^31-1) * (2^31-1) streams from a single source (todo this is absolutely idiotic - who would EVER need THAT many different streams)
+     * The multiple streams can be used for comfortable parallel upload or communication without establishing multiple, 'real' connections.
+     * @param to the intended receiver of the stream - does not currently have to be an established connection but might have to be in the future
+     * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
+     * @param conversationId the conversation id of the message
+     * @return a stream representation of the connection - with the associated guarantees
+     * @see P2LOutputStream
      */
-    P2LOutputStreamV1 getOutputStream(SocketAddress to, int messageType, int conversationId);
+    P2LOutputStream getOutputStream(SocketAddress to, int messageType, int conversationId);
 
 
     /**

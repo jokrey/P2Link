@@ -27,8 +27,6 @@ import static jokrey.utilities.network.link2peer.P2LMessage.EXPIRE_INSTANTLY;
  *    (on the other hand it expects less package loss and is expected to behave less well with congestion)
  *
  *
- * TODO - multiple header classes ('SimpleHeader' does not require storage of conversation id and expiration - its getter can statically return the values - should safe on object size)
- *
  * @author jokrey
  */
 public interface P2LMessageHeader {
@@ -82,13 +80,15 @@ public interface P2LMessageHeader {
     boolean isStreamEof();
 
     //cannot be merged, index 0 is not necessarily the first packet received
+    /** The part index (either stream part or long part). Internal use only. */
     int getPartIndex();
+    /** The total number of parts in a split long message. Internal use only. */
     int getNumberOfParts();
 
 
 
 
-
+    /** Internal use only. */
     void mutateToRequestReceipt(byte[] raw);
 
     default boolean equalsIgnoreVolatile(P2LMessageHeader that) {
@@ -119,15 +119,6 @@ public interface P2LMessageHeader {
             throw new Error("missing critical algorithm");
         }
     }
-
-
-
-//    void writeTo(byte[] raw);
-//    static P2LMessageHeader from(byte[] raw, SocketAddress from) {
-//
-//    }
-
-
 
 
 
@@ -245,8 +236,8 @@ public interface P2LMessageHeader {
             return new ConversationHeader(sender, type, conversationId, requestReceipt);
         if(expirationFieldPresent)
             return new CustomExpirationHeader(sender, type, expiresAfter, requestReceipt);
-//        if(!conversationIdFieldPresent && !expirationFieldPresent)
-        return new MinimalHeader(sender, type, requestReceipt);
+//        if(!conversationIdFieldPresent && !expirationFieldPresent) //no need, always true
+            return new MinimalHeader(sender, type, requestReceipt);
         
 //        return new P2LMessageHeaderFull(sender, type, conversationId, expiresAfter, partIndex, partNumberOfParts, isReceipt, isLongPart, isStreamPart, isStreamEof);
     }

@@ -42,7 +42,7 @@ public class StreamMessageHandler {
 
 
 
-    private final ConcurrentHashMap<HeaderIdentifier, P2LOutputStreamV1> outputStreams = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<HeaderIdentifier, P2LOutputStream> outputStreams = new ConcurrentHashMap<>();
     /**
      *
      * @param parent
@@ -52,7 +52,7 @@ public class StreamMessageHandler {
      * @return
      * @throws IllegalStateException if the type and conversationId combination is already occupied
      */
-    public P2LOutputStreamV1 getOutputStream(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
+    public P2LOutputStream getOutputStream(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
         return outputStreams.computeIfAbsent(new SenderTypeConversationIdentifier(WhoAmIProtocol.toString(to), type, conversationId), k -> new P2LOutputStreamV1(parent, to, type, conversationId));
     }
 }

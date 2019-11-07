@@ -50,7 +50,7 @@ public class P2LFragmentInputStream {
             } else if(receivedRangeEndIndex > missingRangeEndIndex)
                 throw new IllegalStateException("bug");
         } else { //newest package received
-            //todo - could also be in between some unreceived range - requires regularly search
+            //todo - could also be in between some unreceived range - requires a search
 
             latestReceivedEndIndex = receivedRangeEndIndex;
         }
