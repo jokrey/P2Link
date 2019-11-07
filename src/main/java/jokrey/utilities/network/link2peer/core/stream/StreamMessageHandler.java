@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class StreamMessageHandler {
     private final ConcurrentHashMap<HeaderIdentifier, P2LInputStream> inputStreams = new ConcurrentHashMap<>();
 
-    public void received(P2LMessage message) {
+    public void receivedPart(P2LMessage message) {
         P2LInputStream stream = getInputStream(message);
         stream.received(message);
 
@@ -28,31 +28,31 @@ public class StreamMessageHandler {
     }
 
     public P2LInputStream getInputStream(P2LNodeInternal parent, SocketAddress from, int type, int conversationId) {
-        return getInputStream(new SenderTypeConversationIdentifier(WhoAmIProtocol.toString(from), type, conversationId), parent, from, type, conversationId);
+        return getInputStream(parent, new SenderTypeConversationIdentifier(WhoAmIProtocol.toString(from), type, conversationId), from);
     }
     private P2LInputStream getInputStream(P2LMessage m) {
-        return getInputStream(new SenderTypeConversationIdentifier(m), null, null, 0, 0);
+        return getInputStream(null, new SenderTypeConversationIdentifier(m),null);
     }
-    private P2LInputStream getInputStream(HeaderIdentifier identifier, P2LNodeInternal parent, SocketAddress from, int type, int conversationId) {
+    private P2LInputStream getInputStream(P2LNodeInternal parent, SenderTypeConversationIdentifier identifier, SocketAddress from) {
         return inputStreams.computeIfAbsent(identifier, k -> {
             if(from == null || parent == null) throw new NullPointerException();
-            return new P2LInputStreamV1(parent, from, type, conversationId);
+            return new P2LInputStreamV1(parent, from, identifier.messageType, identifier.conversationId);
         });
     }
 
 
 
     private final ConcurrentHashMap<HeaderIdentifier, P2LOutputStream> outputStreams = new ConcurrentHashMap<>();
-    /**
-     *
-     * @param parent
-     * @param to
-     * @param type
-     * @param conversationId
-     * @return
-     * @throws IllegalStateException if the type and conversationId combination is already occupied
-     */
+    public void receivedReceipt(P2LMessage rawReceipt) {
+        getOutputStream(null, new SenderTypeConversationIdentifier(rawReceipt),null).receivedReceipt(rawReceipt);
+    }
     public P2LOutputStream getOutputStream(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
-        return outputStreams.computeIfAbsent(new SenderTypeConversationIdentifier(WhoAmIProtocol.toString(to), type, conversationId), k -> new P2LOutputStreamV1(parent, to, type, conversationId));
+        return getOutputStream(parent, new SenderTypeConversationIdentifier(WhoAmIProtocol.toString(to), type, conversationId), to);
+    }
+    private P2LOutputStream getOutputStream(P2LNodeInternal parent, SenderTypeConversationIdentifier identifier, SocketAddress to) {
+        return outputStreams.computeIfAbsent(identifier, k -> {
+            if(parent == null || to == null) throw new NullPointerException();
+            return new P2LOutputStreamV1(parent, to, identifier.messageType, identifier.conversationId);
+        });
     }
 }

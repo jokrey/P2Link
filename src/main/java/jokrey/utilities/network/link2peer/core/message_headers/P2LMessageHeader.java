@@ -386,8 +386,8 @@ public interface P2LMessageHeader {
         }
     }
     class SenderTypeConversationIdentifier extends TypeIdentifier {
-        private final String from;
-        private final int conversationId;
+        public final String from;
+        public final int conversationId;
         public SenderTypeConversationIdentifier(String from, int messageType, int conversationId) {
             super(messageType);
             this.from = from;

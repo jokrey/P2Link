@@ -2,11 +2,8 @@ package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
-import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader.HeaderIdentifier;
-import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader.ReceiptIdentifier;
 import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
 import jokrey.utilities.network.link2peer.core.stream.P2LOutputStream;
-import jokrey.utilities.network.link2peer.core.stream.P2LOutputStreamV1;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 import jokrey.utilities.simple.data_structure.pairs.Pair;
@@ -287,30 +284,17 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     @Override public void addMessageListener(P2LMessageListener listener) { individualMessageListeners.add(listener); }
     @Override public void addBroadcastListener(P2LMessageListener listener) { broadcastMessageListeners.add(listener); }
     @Override public void addConnectionEstablishedListener(Consumer<SocketAddress> listener) { newConnectionEstablishedListeners.add(listener); }
-    @Override public void addConnectionDisconnectedListener(Consumer<SocketAddress> listener) { connectionDisconnectedListeners.add(listener); }
+    @Override public void addConnectionDroppedListener(Consumer<SocketAddress> listener) { connectionDisconnectedListeners.add(listener); }
     @Override public void removeMessageListener(P2LMessageListener listener) { individualMessageListeners.remove(listener); }
     @Override public void removeBroadcastListener(P2LMessageListener listener) { broadcastMessageListeners.remove(listener); }
     @Override public void removeConnectionEstablishedListener(Consumer<SocketAddress> listener) { newConnectionEstablishedListeners.remove(listener); }
-    @Override public void removeConnectionDisconnectedListener(Consumer<SocketAddress> listener) { connectionDisconnectedListeners.remove(listener); }
+    @Override public void removeConnectionDroppedListener(Consumer<SocketAddress> listener) { connectionDisconnectedListeners.remove(listener); }
 
     @Override public void notifyUserBroadcastMessageReceived(P2LMessage message) {
         for (P2LMessageListener l : broadcastMessageListeners) { l.received(message); }
     }
     @Override public void notifyUserMessageReceived(P2LMessage message) {
         for (P2LMessageListener l : individualMessageListeners) { l.received(message); }
-    }
-
-    private final HashMap<HeaderIdentifier, P2LMessageListener> streamReceiptListeners = new HashMap<>();
-    @Override public boolean setStreamReceiptListener(SocketAddress to, int type, int conversationId, P2LMessageListener listener) {
-        return streamReceiptListeners.putIfAbsent(new ReceiptIdentifier(WhoAmIProtocol.toString(to), type, conversationId), listener) == null;
-    }
-    @Override public void removeStreamReceiptListener(SocketAddress to, int type, int conversationId) {
-        streamReceiptListeners.remove(new ReceiptIdentifier(WhoAmIProtocol.toString(to), type, conversationId));
-    }
-    @Override public void notifyStreamReceiptReceived(P2LMessage message) {
-        P2LMessageListener l = streamReceiptListeners.get(new ReceiptIdentifier(message));
-        if(l != null)
-            l.received(message);
     }
 
     private void notifyConnectionEstablished(SocketAddress newAddress) {
@@ -354,6 +338,4 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         System.out.println("runningConversationId = " + runningConversationId.get());
         System.out.println("-END- DEBUG INFORMATION -END-");
     }
-
-
 }

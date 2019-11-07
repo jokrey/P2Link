@@ -57,10 +57,10 @@ public class IncomingHandler {
         //todo:?: allow streams and long messages only from established connections? - why tho?
         if(message.header.isStreamPart()) {
             if(message.header.isReceipt()) {
-                parent.notifyStreamReceiptReceived(message);
+                streamMessageHandler.receivedReceipt(message);
                 NUMBER_OF_STREAM_RECEIPTS_RECEIVED.getAndIncrement();
             } else {
-                streamMessageHandler.received(message);
+                streamMessageHandler.receivedPart(message);
                 NUMBER_OF_STREAM_PARTS_RECEIVED.getAndIncrement();
             }
             return;

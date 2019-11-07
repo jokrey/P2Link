@@ -41,13 +41,6 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
         byte[] rawBuffer = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT];
         headerSize = new StreamPartHeader(null, type, conversationId, 0, false, false).getSize();
         unsendBuffer = new DataChunk(rawBuffer, headerSize, 0);
-
-        boolean registeringReceiptListenerSuccessful = parent.setStreamReceiptListener(to, type, conversationId, message -> {
-            StreamReceipt missingParts = StreamReceipt.decode(message);
-            handleReceipt(missingParts);//blocking
-        });
-        if(!registeringReceiptListenerSuccessful)
-            throw new IllegalStateException("Stream occupied - another stream is already listening for the specific type-conversationId combination");
     }
 
     @Override public synchronized void write(int b) throws IOException {
@@ -80,7 +73,6 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
             eofAtIndex = latestAttemptedIndex + 1;//i.e. next part
             packAndSend(true);
             boolean confirmation = waitForConfirmationOnAll(timeout_ms);
-            parent.removeStreamReceiptListener(to, type, conversationId);
 
             //to help gc: (does this help gc? - array list default implementation does it, kinda)
             for(int i=0;i<unconfirmedSendPackages.length;i++)
@@ -195,6 +187,10 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
     }
 
 
+    @Override void receivedReceipt(P2LMessage rawReceipt) {
+        StreamReceipt missingParts = StreamReceipt.decode(rawReceipt);
+        handleReceipt(missingParts);//blocking
+    }
 
     private final DataChunk[] shiftCache = new DataChunk[unconfirmedSendPackages.length/2];
     private synchronized void handleReceipt(StreamReceipt receipt) {

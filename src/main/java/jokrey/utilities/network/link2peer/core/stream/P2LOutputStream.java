@@ -1,5 +1,6 @@
 package jokrey.utilities.network.link2peer.core.stream;
 
+import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
 
 import java.io.IOException;
@@ -25,6 +26,9 @@ public abstract class P2LOutputStream extends OutputStream implements AutoClosea
         this.type = type;
         this.conversationId = conversationId;
     }
+
+    /** Internal use only. */
+    abstract void receivedReceipt(P2LMessage rawReceipt);
 
     /**
      * Writes a single byte of data. This method is non blocking.

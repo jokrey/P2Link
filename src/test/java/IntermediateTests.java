@@ -8,15 +8,13 @@ import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.core.message_headers.StreamPartHeader;
 import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
-import jokrey.utilities.network.link2peer.core.stream.P2LOutputStreamV1;
+import jokrey.utilities.network.link2peer.core.stream.P2LOutputStream;
 import jokrey.utilities.network.link2peer.util.*;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -24,7 +22,6 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
-import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
@@ -1072,7 +1069,7 @@ class IntermediateTests {
         P2LNode[] nodes = generateNodes(2, 62880);
 
         P2LInputStream in = nodes[0].getInputStream(local(nodes[1]), 1, P2LNode.NO_CONVERSATION_ID);
-        P2LOutputStreamV1 out = nodes[1].getOutputStream(local(nodes[0]), 1, P2LNode.NO_CONVERSATION_ID);
+        P2LOutputStream out = nodes[1].getOutputStream(local(nodes[0]), 1, P2LNode.NO_CONVERSATION_ID);
 
         P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
             out.write(new byte[] {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16});
@@ -1104,7 +1101,7 @@ class IntermediateTests {
         P2LNode[] nodes = generateNodes(2, 62880);
 
         P2LInputStream in = nodes[0].getInputStream(local(nodes[1]), 1, P2LNode.NO_CONVERSATION_ID);
-        P2LOutputStreamV1 out = nodes[1].getOutputStream(local(nodes[0]), 1, P2LNode.NO_CONVERSATION_ID);
+        P2LOutputStream out = nodes[1].getOutputStream(local(nodes[0]), 1, P2LNode.NO_CONVERSATION_ID);
 
         P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
             out.write(new byte[] {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16});

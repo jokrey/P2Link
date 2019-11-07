@@ -4,7 +4,6 @@ import jokrey.utilities.network.link2peer.core.NodeCreator;
 import jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes;
 import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
 import jokrey.utilities.network.link2peer.core.stream.P2LOutputStream;
-import jokrey.utilities.network.link2peer.core.stream.P2LOutputStreamV1;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
@@ -265,6 +264,12 @@ public interface P2LNode {
     /**
      * Returns the stream for the given identifier. It is possible to have up to (2^31-1) * (2^31-1) streams from a single source (todo this is absolutely idiotic - who would EVER need THAT many different streams)
      * The multiple streams can be used for comfortable parallel upload or communication without establishing multiple, 'real' connections.
+     *
+     * Note: Before a peer can receive data {@link #getInputStream(SocketAddress, int, int)} has to be called with the same typ-conversationId combination on the peer side.
+     * Before that has occurred it is useless to send data. Appropriate synchronization remains the responsibility of the application.
+     *
+     * Tcp-like, most simple synchronization would be to call both {@link #getInputStream(SocketAddress, int, int)} and {@link #getOutputStream(SocketAddress, int, int)} when the connection is established (using {@link #addConnectionEstablishedListener(Consumer)}).
+     *
      * @param to the intended receiver of the stream - does not currently have to be an established connection but might have to be in the future
      * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
      * @param conversationId the conversation id of the message
@@ -344,7 +349,7 @@ public interface P2LNode {
      * The given listener will receive all disconnected connections.
      * @param listener listener to add
      */
-    void addConnectionDisconnectedListener(Consumer<SocketAddress> listener);
+    void addConnectionDroppedListener(Consumer<SocketAddress> listener);
 
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
@@ -357,7 +362,7 @@ public interface P2LNode {
     void removeConnectionEstablishedListener(Consumer<SocketAddress> listener);
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
-    void removeConnectionDisconnectedListener(Consumer<SocketAddress> listener);
+    void removeConnectionDroppedListener(Consumer<SocketAddress> listener);
     /** Trivial message listener - dual use for direct messages and broadcasts */
     interface P2LMessageListener { void received(P2LMessage message);}
 }
