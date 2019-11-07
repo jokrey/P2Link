@@ -10,7 +10,7 @@ import java.net.SocketAddress;
 import java.util.HashMap;
 
 /**
- * TODO this entire function is just a basic concept at this point
+ * TODO this entire functionality is just a basic concept at this point
  *
  * Fragments other than stream parts do not have a package index, but rather a 'start' byte offset value.
  *    Unlike Streams this requires a mapping of said start index to a buffer, because it can no longer be directly calculated from the index and earliest received index.

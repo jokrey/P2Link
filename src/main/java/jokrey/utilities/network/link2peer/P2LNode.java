@@ -50,6 +50,8 @@ import java.util.function.Function;
  *        ping all established connections every 2 minutes
  *        allow disconnecting from established connections
  *        allow broadcasting to all established connections
+ *    allows maintaining broken/previously-established connections
+ *        broken connections will be retried at a growing interval
  *    allows asking socket addresses for own ip (temp/potential connection)
  *    allows asking socket addresses for their established connections (temp/potential connection)
  *    allows sending individual messages to socket addresses (temp/potential connection - with optional received receipt)
@@ -57,7 +59,6 @@ import java.util.function.Function;
  *        allow breaking up messages and sending them in parts
  *        allow streaming very long messages (i.e. break up messages, but requery lost part-packets) todo improve upon the current(naive) streaming protocol (better congestion control + receipt synchronization)
  *      both internal and user messages can use this functionality.
- *    allows maintaining broken/previously-established connections
  *
  * todo - allow automatically finding mtu using icmp for established connections (require streams to be to established connections and use mtu there, mtu can be different to every node, mtu max = CUSTOM_RAW_SIZE of a peer node)
  * todo - eliminate string type sender of sender in P2LMessage and the repeated calls to WhoAmIProtocol.toString() - replace with wrapper to a socket address and its string representation
