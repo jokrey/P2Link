@@ -58,7 +58,7 @@ public class RelayServer {
 //            NATDevice matchComp = checkMatchingNATDevice(destinationComp);
 //            if (matchComp != null) {
 //                System.out.println("Already present.. now sending packets to both of them...");
-//                //send to the socket from previously saved first NAT Device infos from the second NAT Device
+//                //send to the socket from previously saved first NAT Device info from the second NAT Device
 //                send(serverSocket, matchComp, startComp);
 //                Thread.sleep(1000);
 //                send(serverSocket, startComp, matchComp);
@@ -75,7 +75,7 @@ public class RelayServer {
     }
 
     private synchronized void sendPacket(DatagramSocket socket, NATDevice natDeviceHome, NATDevice natDeviceRemote) throws IOException{
-        byte[] sendData = new byte[50];
+        byte[] sendData;
         InetAddress homeIPAddress = natDeviceHome.getPublicIpOfNAT();
         int homePort =  natDeviceHome.getPortOfNAT();
 

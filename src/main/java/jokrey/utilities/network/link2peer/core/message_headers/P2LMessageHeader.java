@@ -20,9 +20,9 @@ import static jokrey.utilities.network.link2peer.P2LMessage.EXPIRE_INSTANTLY;
  * Header size is +8, because of underlying udp protocol
  *
  * Max header size(for broken up messages):
- *    1(flags) + 4(type) + 4(convId, optional) + 2(expiration, optional) + 8(long msg, index+size) + 8(udp) = 19 + 8 = 27 bytes (on top of ip)
+ *    1(flags) + 4(type) + 4(conversationId, optional) + 2(expiration, optional) + 8(long msg, index+size) + 8(udp) = 19 + 8 = 27 bytes (on top of ip)
  * Header size for stream messages(tcp / udt comparable):
- *    1(flags) + 4(type) + (4convId, optional) + 4(index) + 8(udp) = 9/13 + 8 = 17/21 bytes (on top of ip)
+ *    1(flags) + 4(type) + (conversationId, optional) + 4(index) + 8(udp) = 9/13 + 8 = 17/21 bytes (on top of ip)
  *    compared to ip that is pretty good, additionally this protocol allows 2^31-1(*2^31-1) simultaneous streaming connections with the same peer
  *    (on the other hand it expects less package loss and is expected to behave less well with congestion)
  *

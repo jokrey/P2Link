@@ -148,7 +148,7 @@ public class P2LMessage {
     public P2LMessage createReceipt() {
         if(header.isLongPart() || header.isStreamPart()) throw new UnsupportedOperationException("receipt cannot be created for parts - that would be like tcp ACK, but we wants receipts for many parts and this requires a difference functionality");
         //todo - use less cryptographic function - the checksum of udp is already pretty safe - so even without the hash at all it is pretty safe
-        //todo     - interesting would be a hash id that allows getting two receipts for the same sender-type-conv simultaneously  (though we are quickly approaching overkill territory here)
+        //todo     - interesting would be a hash id that allows getting two receipts for the same sender-type-conversationId simultaneously  (though we are quickly approaching overkill territory here)
         Hash receiptHash = header.contentHashFromIgnoreSender(raw, payloadLength);
         P2LMessageHeader receiptHeader = new ReceiptHeader(null, header.getType(), header.getConversationId());
         return receiptHeader.generateMessage(receiptHash.raw());
@@ -209,7 +209,6 @@ public class P2LMessage {
      * Mutates the header bytes of this message to request a receipt (used to simplify the factory methods)
      * MUTATES RAW!! (does not mutate contentHash though)
      * SHOULD ONLY BE USED INTERNALLY
-     * @return the message that has {@link P2LMessageHeader#requestReceipt} set to true
      */
     public void mutateToRequestReceipt() {
         header.mutateToRequestReceipt(raw);

@@ -13,12 +13,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 /**
  * @author jokrey
  */
-public class LongMessageHandler {
+class LongMessageHandler {
     //todo requires some sort of short timeout - if the entire message is never received...
     private final ConcurrentHashMap<HeaderIdentifier, MessagePartReceiver> receivedPartsMap = new ConcurrentHashMap<>();
     private ReentrantReadWriteLock cleanUpLock = new ReentrantReadWriteLock();
 
-    public P2LMessage received(P2LMessage part) {
+    P2LMessage received(P2LMessage part) {
         cleanUpLock.readLock().lock();
         try {
             HeaderIdentifier identifier = new P2LMessageHeader.SenderTypeConversationIdentifier(part);
@@ -38,7 +38,7 @@ public class LongMessageHandler {
             cleanUpLock.readLock().unlock();
         }
     }
-    public void clean() {
+    void clean() {
         cleanUpLock.writeLock().lock();
         try {
             receivedPartsMap.values().removeIf(MessagePartReceiver::isExpired);
@@ -47,7 +47,7 @@ public class LongMessageHandler {
         }
     }
 
-    public void send(P2LNodeInternal parent, P2LMessage overLongMessage, SocketAddress to) throws IOException {
+    void send(P2LNodeInternal parent, P2LMessage overLongMessage, SocketAddress to) throws IOException {
         if(overLongMessage.canBeSentInSinglePacket()) throw new IllegalArgumentException("message could be send in a single packet...");
         int maxPayloadSize = P2LMessage.CUSTOM_RAW_SIZE_LIMIT -
                 P2LMessageHeader.getSize(overLongMessage.header.isConversationIdPresent(), overLongMessage.header.isExpirationPresent(), true, false, false);
@@ -101,11 +101,11 @@ public class LongMessageHandler {
             }
             //else it is a resend message - ignore that it can happen, it is not that bad.. todo should not happen here... (unless conversation id is reused)
         }
-        public boolean isFullyReceived() {
+        boolean isFullyReceived() {
             return numberOfPartsReceived == parts.length;
         }
-        public boolean isExpired() {
-            return (System.currentTimeMillis() - numberOfPartsReceived) > P2LHeuristics.LONG_MESSAGE_RECEIVE_NO_PART_TIMEOUT_MS;
+        boolean isExpired() {
+            return (System.currentTimeMillis() - lastMessageReceivedAtCtm) > P2LHeuristics.LONG_MESSAGE_RECEIVE_NO_PART_TIMEOUT_MS;
             //even if the timeout is only 10 seconds, a slow loris attack is still feasible - send a very fragmented message of only a few bytes each and send them slowly (the timeout would be reset..)
         }
 
@@ -114,7 +114,7 @@ public class LongMessageHandler {
             return "MessagePartReceiver{numberOfPartsReceived=" + numberOfPartsReceived + ", totalByteSize=" + totalByteSize + ", parts=" + Arrays.toString(parts) + '}';
         }
 
-        public P2LMessage assemble() {
+        P2LMessage assemble() {
             if(!isFullyReceived()) throw new IllegalStateException();
             return P2LMessage.Factory.reassembleFromParts(parts, (int) totalByteSize);
         }

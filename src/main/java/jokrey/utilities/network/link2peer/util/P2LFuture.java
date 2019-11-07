@@ -393,7 +393,7 @@ public class P2LFuture<T> {
      * Creates a new future that represents a combination of this future and the future created by the given function.
      * The function is only called when and if this future completes. If either future are canceled the creating future is canceled.
      *
-     * This method is especially useful to create retrieable conversations in a p2l application.
+     * This method is especially useful to create retryable conversations in a p2l application.
      * Since the given function takes the input of the this future,
      *   this can be used to receive intermediate results from the other peer and use it to calculate the next conversation step.
      * @param next function that calculates the next future, with which this future will be combined

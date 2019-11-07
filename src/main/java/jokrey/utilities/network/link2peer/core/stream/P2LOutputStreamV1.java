@@ -12,7 +12,7 @@ import java.net.SocketAddress;
 import java.util.Arrays;
 
 /**
- * TODO - missing more advanced congestion control algorithm - current 'algorithm' works soley based on buffer size
+ * TODO - missing more advanced congestion control algorithm - current 'algorithm' works exclusively based on buffer size
  *     TODO - this entire stream algorithm should not be considered 'ready' - it is highly experimental and is missing critical features and optimizations
  *     TODO - it is little more than a demonstration of a
  *
@@ -116,19 +116,14 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
     private synchronized void sendExtraordinaryReceiptRequest() throws IOException {
         if(!hasUnconfirmedParts() || requestRecentlyMade()) return;
         lastReceiptRequest=System.currentTimeMillis();
-        try {
-            StreamPartHeader header = new StreamPartHeader(null, type, conversationId, -1, true, false);
-            parent.sendInternalMessage(new P2LMessage(header, null, header.generateRaw(0), 0, null), to);
-        } catch (IOException e) {
-            //todo mark broken, etc...
-            throw e;
-        }
+        StreamPartHeader header = new StreamPartHeader(null, type, conversationId, -1, true, false);
+        parent.sendInternalMessage(new P2LMessage(header, null, header.generateRaw(0), 0, null), to);
     }
 
-    public boolean hasBufferCapacities() {
+    private boolean hasBufferCapacities() {
         return latestAttemptedIndex+1 < earliestUnconfirmedPartIndex+unconfirmedSendPackages.length;
     }
-    public synchronized void waitForBufferCapacities(int timeout_ms) throws IOException {
+    private synchronized void waitForBufferCapacities(int timeout_ms) throws IOException {
         try {
             sendExtraordinaryReceiptRequest();
             long startCtm = System.currentTimeMillis();

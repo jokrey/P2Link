@@ -79,7 +79,7 @@ class P2LInputStreamV1 extends P2LInputStream {
             if(!message.header.requestReceipt())//first things first, when the sender requests a receipt - that means that the sender buffer is full - we should send them a receipt of what we have and do not have immediately
                 throw new IllegalStateException("message had negative index, but was not requesting receipt");
         } else if(m_index_received < earliestIndexMissing) {
-            //delayed package REreceived... ignore it - data is already available
+            //delayed package RE-received... ignore it - data is already available
         } else if(m_index_received >= earliestIndexMissing+1 + unqueuedChunks.length) {
             //sender is sending more packages than can be handled by this buffer - send a receipt that indicates the earliest missing package, so that the sender can resend it
             //   typically only happens when the send buffer is larger than this receive buffer
@@ -106,7 +106,7 @@ class P2LInputStreamV1 extends P2LInputStream {
     @Override public int available() {
         return available;
     }
-    public boolean eofReached() {
+    private boolean eofReached() {
         return eofReceived && earliestIndexMissing-1 == latestIndexReceived;
     }
     @Override public boolean isClosed() {

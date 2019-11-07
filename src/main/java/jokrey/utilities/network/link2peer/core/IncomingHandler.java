@@ -90,7 +90,7 @@ public class IncomingHandler {
         } else if (message.header.getType() == SL_PING) {
             PingProtocol.asAnswerer(parent, from);
         } else if (message.header.getType() == SL_PONG) {
-            //already notify packet received from called, i.e. it is no longer marked as dormant
+            //already 'notify packet received from' called, i.e. it is no longer marked as dormant
         } else if (message.header.getType() == SL_PEER_CONNECTION_REQUEST) {
             if (!parent.connectionLimitReached()) {
                 EstablishSingleConnectionProtocol.asAnswerer(parent, new InetSocketAddress(receivedPacket.getAddress(), receivedPacket.getPort()), message);
@@ -127,7 +127,7 @@ public class IncomingHandler {
 
         new Thread(() -> {
             while(!serverSocket.isClosed()) {
-                byte[] receiveBuffer = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT]; //asAnswerer buffer needs to be new for each run, otherwise handlereceivedmessages might get weird results - maximum safe size allegedly 512
+                byte[] receiveBuffer = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT]; //asAnswerer buffer needs to be new for each run, otherwise handleReceivedMessages" might get weird results - maximum safe size allegedly 512
 
                 DatagramPacket receivedPacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
                 try {
@@ -135,7 +135,7 @@ public class IncomingHandler {
 
                     handleReceivedMessagesPool.execute(() -> {
                         //has to be on a thread, because most protocols also wait for an answer - that has to be done outside of the thread that receives the answer (the outer thread here...)
-                        //    ((( DOS mitigation:: could be exploited by sending(for example) many broadcast supercauses, but not sending anything else.. (the thread would hang for 5000 ms because it waits for the data to be send...)
+                        //    ((( DOS mitigation:: could be exploited by sending(for example) many broadcast super causes, but not sending anything else.. (the thread would hang for many ms because it waits for the data to be send...)
 
                         try {
                             handleReceivedMessage(receivedPacket);

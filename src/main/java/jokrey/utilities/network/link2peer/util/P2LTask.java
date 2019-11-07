@@ -12,9 +12,8 @@ public abstract class P2LTask<R> extends P2LFuture<R> {
     /**
      * Runs the operation of this task. It produces an arbitrary result that completes the underlying future.
      * If it throws an exception this tasks underlying future is canceled.
-     * @return the value created by this task
      */
-    protected void start() {
+    void start() {
         started = true;
         try {
             R resultOrNull = run();

@@ -31,9 +31,7 @@ public class ClientBehindNAT {
 
     /**
      * Main method used for outer access
-     * @par
      * @return the free NAT port of the Firewall
-     * @throws IOException
      */
     public synchronized int createConnectionToPeer(String relayServerIP, String destinationIP, int socketTimeout) throws IOException{
         this.destinationIP = destinationIP;
@@ -66,7 +64,7 @@ public class ClientBehindNAT {
 
     private byte[] createInternetAddressFromString(String address){
         byte[] inetAddressBytes = new byte[4];
-        int index = address.indexOf('.');
+        int index;
         int i=0;
         while((index = address.indexOf('.')) != -1){
             int part = Integer.valueOf(address.substring(0, index));
@@ -79,7 +77,7 @@ public class ClientBehindNAT {
     }
 
     private synchronized void sendPacket(DatagramSocket socket, InetAddress destIPAddress, int port, String data) throws IOException{
-        byte[] sendData = new byte[data.length()];
+        byte[] sendData;
         sendData = data.getBytes();
         DatagramPacket sendPacket = new DatagramPacket(sendData,
                 sendData.length, destIPAddress, port);
@@ -129,7 +127,7 @@ public class ClientBehindNAT {
                 byte[] receiveData = new byte[50];
                 DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
                 System.out.println(clientIP+" listening on port: "+natPort);
-                while(true){
+                while(natPort!=-1){
                     serverSocket.receive(receivePacket);
                     String data = new String(receivePacket.getData());
                     System.out.println(clientIP+" FROM "+destinationIP+" WITH "+data);
@@ -153,7 +151,7 @@ public class ClientBehindNAT {
         public void run() {
             try {
                 DatagramSocket clientSocket = new DatagramSocket();
-                while(true){
+                while(destinationIP!=null){
                     sendPacket(clientSocket, destIPAddress, port, "Hello from "+clientIP);
                     Thread.sleep(2000);
                 }

@@ -10,11 +10,11 @@ import java.net.SocketAddress;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
+ * Internal use only
  * @author jokrey
  */
 public class StreamMessageHandler {
     private final ConcurrentHashMap<HeaderIdentifier, P2LInputStream> inputStreams = new ConcurrentHashMap<>();
-
     public void receivedPart(P2LMessage message) {
         P2LInputStream stream = getInputStream(message);
         stream.received(message);
@@ -26,12 +26,11 @@ public class StreamMessageHandler {
         //             additionally require that for a packet to be accepted,
         //                 it is required that the input stream is read from currently (i.e. someone is waiting/or rather a stream was requested and is not closed) - any other packages are disregarded
     }
-
-    public P2LInputStream getInputStream(P2LNodeInternal parent, SocketAddress from, int type, int conversationId) {
-        return getInputStream(parent, new SenderTypeConversationIdentifier(WhoAmIProtocol.toString(from), type, conversationId), from);
-    }
     private P2LInputStream getInputStream(P2LMessage m) {
         return getInputStream(null, new SenderTypeConversationIdentifier(m),null);
+    }
+    public P2LInputStream getInputStream(P2LNodeInternal parent, SocketAddress from, int type, int conversationId) {
+        return getInputStream(parent, new SenderTypeConversationIdentifier(WhoAmIProtocol.toString(from), type, conversationId), from);
     }
     private P2LInputStream getInputStream(P2LNodeInternal parent, SenderTypeConversationIdentifier identifier, SocketAddress from) {
         return inputStreams.computeIfAbsent(identifier, k -> {

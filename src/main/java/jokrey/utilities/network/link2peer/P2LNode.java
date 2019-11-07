@@ -33,10 +33,12 @@ import java.util.function.Function;
  *
  *
  * LATER:
- * TODO? support for multicast - usage instead of broadcast when multiple peers in same local network? - unlikely advantage in practical applications
- * TODO: fixed size networks (with much improved broadcast efficiency and maybe send to id[mpi-style](instead of send to link), though that would require potentially complex routing)
- * TODO:     improving upon fixed size: limit size networks..
+ * TODO: fixed size networks (with much improved broadcast efficiency
+ *           and maybe send to id[mpi-style](instead of send to link), though that would require potentially complex routing)
+ * TODO:   improving upon fixed size: limit size networks..
  *
+ *
+ * NOT_TODO: support for multicast - usage instead of broadcast when multiple peers in same local network? - unlikely advantage in practical applications
  * NOT_TODO: allow sending messages to a not directly connected peer (i.e. send through the network via a random search - for example useful when it is a light peer or max connections are reached)
  *       could mean a ton of traffic... (same amount of traffic as a broadcast...)
  *       can be implemented with pretty much the same efficiency using broadcasts.....
@@ -53,12 +55,12 @@ import java.util.function.Function;
  *    allows sending individual messages to socket addresses (temp/potential connection - with optional received receipt)
  *        for receipt messages it allows a retry functionality after which an exception is thrown and (if the connection was an established one) the connection is marked as broken
  *        allow breaking up messages and sending them in parts
- *        allow streaming very long messages (i.e. break up messages, but requery lost part-packets) todo improve upon the current(naive) streaming protocol
+ *        allow streaming very long messages (i.e. break up messages, but requery lost part-packets) todo improve upon the current(naive) streaming protocol (better congestion control + receipt synchronization)
  *      both internal and user messages can use this functionality.
  *    allows maintaining broken/previously-established connections
  *
  * todo - allow automatically finding mtu using icmp for established connections (require streams to be to established connections and use mtu there, mtu can be different to every node, mtu max = CUSTOM_RAW_SIZE of a peer node)
- * todo eliminate string type sender of sender in P2LMessage and the repeated calls to WhoAmIProtocol.toString() - replace with wrapper to a socket address and its string representation
+ * todo - eliminate string type sender of sender in P2LMessage and the repeated calls to WhoAmIProtocol.toString() - replace with wrapper to a socket address and its string representation
  *
  * @author jokrey
  */
@@ -296,7 +298,7 @@ public interface P2LNode {
             try {
                 T gotten = conversationWithResult.request().getOrNull(timeout);
                 if (gotten != null) return gotten;
-            } catch (Throwable ignore) {ignore.printStackTrace();}
+            } catch (Throwable ignore) {}
             timeout *= 2;
         }
         throw new IOException(getPort()+" could not get result after "+attempts+" attempts");

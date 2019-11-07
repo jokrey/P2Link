@@ -24,7 +24,7 @@ class EstablishSingleConnectionProtocol {
 //            parent.attachIpToSelfLink(ip);
 //        }
 
-        //todo - REestablish connection protocol that does not do the nonce check - for historic connections (more efficient retry)
+        //todo - RE-establish connection protocol that does not do the nonce check - for historic connections (more efficient retry)
 
         boolean success = parent.tryReceive(attempts, initialTimeout, () -> {
             if (parent.isConnectedTo(to)) return new P2LFuture<>(false);

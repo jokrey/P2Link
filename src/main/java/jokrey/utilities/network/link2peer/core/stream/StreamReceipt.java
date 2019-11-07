@@ -7,11 +7,11 @@ import jokrey.utilities.network.link2peer.core.message_headers.StreamReceiptHead
 /**
  * @author jokrey
  */
-public class StreamReceipt {
-    public final int latestReceived;
-    public final boolean eof;
-    public final int[] missingParts;
-    public StreamReceipt(int latestReceived, boolean eof, int[] missingParts) {
+class StreamReceipt {
+    final int latestReceived;
+    final boolean eof;
+    final int[] missingParts;
+    private StreamReceipt(int latestReceived, boolean eof, int[] missingParts) {
         this.latestReceived = latestReceived;
         this.eof = eof;
         this.missingParts = missingParts;

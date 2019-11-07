@@ -56,7 +56,7 @@ public abstract class P2LInputStream extends InputStream implements AutoCloseabl
      * Like {@link #read()}.
      * If no byte is available after given timeout, a timeout exception is thrown.
      * This timeout exception does NOT indicate that no data will ever be read from the stream,
-     *   it simply means that no data is or has become available within the given timeframe
+     *   it simply means that no data is or has become available within the given time frame
      * @param timeout_ms the timeout in milliseconds
      * @return a byte read from the stream or -1 if no byte is available and will ever become available
      * @throws IOException if the timeout is reached, the current thread is interrupted or the stream was closed
@@ -66,7 +66,7 @@ public abstract class P2LInputStream extends InputStream implements AutoCloseabl
      * Like {@link #read(byte[], int, int)}.
      * If no byte is available after given timeout, a timeout exception is thrown.
      * This timeout exception does NOT indicate that no data will ever be read from the stream,
-     *   it simply means that no data is or has become available within the given timeframe
+     *   it simply means that no data is or has become available within the given time frame
      * @param b a byte array of min length = off + len
      * @param off the offset to start writing bytes into the given array
      * @param len maximum number of bytes to read and write

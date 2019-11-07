@@ -9,7 +9,7 @@ import java.util.Objects;
  * Header size is +8, because of underlying udp protocol
  *
  * Max header size(for broken up messages):
- *    1(flags) + 4(type) + 4(convId, optional) + 2(expiration, optional) + 8(long msg, index+size) + 8(udp) = 19 + 8 = 27 byte (on top of ip)
+ *    1(flags) + 4(type) + 4(conversationId, optional) + 2(expiration, optional) + 8(long msg, index+size) + 8(udp) = 19 + 8 = 27 byte (on top of ip)
  *
  * TODO - multiple header classes ('SimpleHeader' does not require storage of conversation id and expiration - its getter can statically return the values - should safe on object size)
  *
@@ -49,7 +49,7 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
      * The time in seconds until this message is removed from the message queues
      * For value <= 0 the message will never be added to the message queue, it is only considered if a consumer is waiting when it arrives.
      */
-    public final short expiresAfter;
+    private final short expiresAfter;
     @Override public short getExpiresAfter() {
         return expiresAfter;
     }
