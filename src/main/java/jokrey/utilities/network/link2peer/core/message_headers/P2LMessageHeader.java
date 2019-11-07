@@ -5,8 +5,6 @@ import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
 import jokrey.utilities.network.link2peer.util.Hash;
-
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -36,11 +34,6 @@ public interface P2LMessageHeader {
      * for broadcast messages this will be the peer that originally began distributing the message
      */
     String getSender();
-
-    /** get the sender of the message as a socket address - uses the {@link WhoAmIProtocol} */
-    default InetSocketAddress getSenderAsSocketAddress() {
-        return WhoAmIProtocol.fromString(getSender());
-    }
 
     /**
      * Type of the message. A shortcut for applications to determine what this message represents without decoding the data field.
@@ -110,8 +103,8 @@ public interface P2LMessageHeader {
             if(sender!=null)
                 hashFunction.update(sender.getBytes(StandardCharsets.UTF_8));
             hashFunction.update(raw, HEADER_BYTES_OFFSET_TYPE, 4); //type
-            if(getConversationId() != P2LNode.NO_CONVERSATION_ID)
-                hashFunction.update(BitHelper.getBytes(getConversationId())); //conversation id
+            if(getConversationIdFieldOffset() != -1)
+                hashFunction.update(raw, getConversationIdFieldOffset(), 4); //conversation id
             if(payloadLength > 0)
                 hashFunction.update(raw, getSize(), payloadLength); //only payload
             return new Hash(hashFunction.digest());
