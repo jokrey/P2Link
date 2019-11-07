@@ -46,11 +46,11 @@ public class IncomingHandler {
             boolean dropped = ThreadLocalRandom.current().nextInt(0, 100) < INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE;
             if (dropped) {
                 System.out.print(" - DROPPED - ");
-                System.out.println(parent.getPort() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
+                System.out.println(parent.getSelfLink() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
                 return;
             }
         }
-        System.out.println(parent.getPort() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
+        System.out.println(parent.getSelfLink() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
 
         parent.notifyPacketReceivedFrom(from);
 
@@ -93,7 +93,7 @@ public class IncomingHandler {
             //already 'notify packet received from' called, i.e. it is no longer marked as dormant
         } else if (message.header.getType() == SL_PEER_CONNECTION_REQUEST) {
             if (!parent.connectionLimitReached()) {
-                EstablishSingleConnectionProtocol.asAnswerer(parent, new InetSocketAddress(receivedPacket.getAddress(), receivedPacket.getPort()), message);
+                EstablishSingleConnectionProtocol.asAnswerer(parent, receivedPacket.getSocketAddress(), message);
             }
         } else if (message.header.getType() == SC_BROADCAST) {
             P2LMessage received = BroadcastMessageProtocol.asAnswerer(parent, broadcastState, from, message);
@@ -121,7 +121,7 @@ public class IncomingHandler {
     IncomingHandler(P2LNodeInternal parentG) throws IOException {
         this.parent = parentG;
 
-        serverSocket = new DatagramSocket(parent.getPort());
+        serverSocket = new DatagramSocket(parent.getSelfLink().getPort());
         serverSocket.setTrafficClass(0x10 | 0x08); //emphasize IPTOS_THROUGHPUT & IPTOS_LOWDELAY  - this option will likely be ignored by the underlying implementation
         serverSocket.setReceiveBufferSize(P2LMessage.CUSTOM_RAW_SIZE_LIMIT);
 

@@ -2,6 +2,7 @@ import jokrey.utilities.debug_analysis_helper.AverageCallTimeMarker;
 import jokrey.utilities.debug_analysis_helper.TimeDiffMarker;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
+import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.core.IncomingHandler;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
@@ -269,8 +270,8 @@ class IntermediateTests {
 
 
     @Test void establishConnectionProtocolTest() throws IOException {
-        P2LNode node1 = P2LNode.create(53189); //creates server thread
-        P2LNode node2 = P2LNode.create(53188); //creates server thread
+        P2LNode node1 = P2LNode.create(P2Link.createPrivateLink(53189)); //creates server thread
+        P2LNode node2 = P2LNode.create(P2Link.createPrivateLink(53188)); //creates server thread
 
         boolean connected = node2.establishConnection(local(node1)).get(1000);
         assertTrue(connected);
@@ -365,7 +366,7 @@ class IntermediateTests {
         int p2 = 54188;
         SocketAddress l1 = new InetSocketAddress("localhost", p1);
         SocketAddress l2 = new InetSocketAddress("localhost", p2);
-        P2LNode node1 = P2LNode.create(p1); //creates server thread
+        P2LNode node1 = P2LNode.create(P2Link.createPrivateLink(p1)); //creates server thread
         node1.addMessageListener(message -> {
             assertEquals(WhoAmIProtocol.toString(l2), message.header.getSender());
             assertArrayEquals(idvMsgToSend, message.asBytes());
@@ -374,7 +375,7 @@ class IntermediateTests {
         node1.addBroadcastListener(message -> {
             throw new IllegalStateException("this should not be called here");
         });
-        P2LNode node2 = P2LNode.create(p2); //creates server thread
+        P2LNode node2 = P2LNode.create(P2Link.createPrivateLink(p2)); //creates server thread
         node2.addMessageListener(message -> {
             assertEquals(WhoAmIProtocol.toString(l1), message.header.getSender());
             assertArrayEquals(idvMsgToSend, message.asBytes());
@@ -413,15 +414,15 @@ class IntermediateTests {
     }
 
     private static SocketAddress local(P2LNode node) {
-        return new InetSocketAddress("localhost", node.getPort());
+        return node.getSelfLink().getSocketAddress();
     }
 
 
     @Test void futureIdvMsgText() throws IOException {
         int p1 = 34189;
         int p2 = 34188;
-        P2LNode node1 = P2LNode.create(p1); //creates server thread
-        P2LNode node2 = P2LNode.create(p2); //creates server thread
+        P2LNode node1 = P2LNode.create(P2Link.createPrivateLink(p1)); //creates server thread
+        P2LNode node2 = P2LNode.create(P2Link.createPrivateLink(p2)); //creates server thread
 
         sleep(100); //let nodes start
 
@@ -465,8 +466,8 @@ class IntermediateTests {
     @Test void longMessageTest() throws IOException {
         int p1 = 34191;
         int p2 = 34192;
-        P2LNode node1 = P2LNode.create(p1); //creates server thread
-        P2LNode node2 = P2LNode.create(p2); //creates server thread
+        P2LNode node1 = P2LNode.create(P2Link.createPrivateLink(p1)); //creates server thread
+        P2LNode node2 = P2LNode.create(P2Link.createPrivateLink(p2)); //creates server thread
 
         byte[] toSend_1To2 = new byte[(P2LMessage.CUSTOM_RAW_SIZE_LIMIT - 13) * 2];
         byte[] toSend_2To1 = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT * 20];
@@ -511,7 +512,7 @@ class IntermediateTests {
             nodesAndNumberOfReceivedMessages.compute(p2Link, (link, counter) -> counter == null? 1 : counter+1);
         });
 
-        P2LNode senderNode = P2LNode.create(senderPort); //creates server thread
+        P2LNode senderNode = P2LNode.create(P2Link.createPrivateLink(senderPort)); //creates server thread
         senderNode.addBroadcastListener(message -> {
             throw new IllegalStateException("broadcastReceivedCalledForSender...");
         });
@@ -1226,7 +1227,7 @@ class IntermediateTests {
         for(int i=0;i<nodes.length;i++) {
             int port = startPort + i;
             links[i] = new InetSocketAddress("127.0.0.1", port);
-            nodes[i] = P2LNode.create(port);
+            nodes[i] = P2LNode.create(P2Link.createPrivateLink(port));
             if(idvListenerCreator != null)
                 nodes[i].addMessageListener(idvListenerCreator.apply(links[i]));
             if(brdListenerCreator != null)
@@ -1265,7 +1266,7 @@ class IntermediateTests {
         for(int i=0; i<nodes.length; i++) {
 //        for(int i=nodes.length-1; i>=0; i--) {
             for (int ii = i + 1; ii < nodes.length; ii++) {
-                System.err.println(nodes[i].getPort() + " -establishTo- " + nodes[ii].getPort());
+                System.err.println(nodes[i].getSelfLink() + " -establishTo- " + nodes[ii].getSelfLink());
 //                nodes[i].establishConnection(local(nodes[ii]));
 //                connectionFutures.add(nodes[i].establishConnection(local(nodes[ii])));
                 connectionFutures.add(nodes[ii].establishConnection(local(nodes[i])));

@@ -28,6 +28,7 @@ import java.util.function.Function;
  *
  * !!!!!
  * TODO: light clients (clients without a public link, i.e. url + free port)
+ *     light client - as their public ip - provide the ip of a relay server (another node they are connected to - and where they are registered as light) - with a note that it is merely the ip of a relay server
  * TODO: allow light clients to connect with each other (using udp hole punching)
  *    - does this work out of the box??
  *
@@ -63,29 +64,40 @@ import java.util.function.Function;
  * todo - allow automatically finding mtu using icmp for established connections (require streams to be to established connections and use mtu there, mtu can be different to every node, mtu max = CUSTOM_RAW_SIZE of a peer node)
  * todo - eliminate string type sender of sender in P2LMessage and the repeated calls to WhoAmIProtocol.toString() - replace with wrapper to a socket address and its string representation
  *
+ *
+ * THREE TYPES OF NODES:
+ *    Public - getSelfLink().isPublic() == true
+ *        i.e. anyone can attempt to establish a connection and send messages using the dns/ip + port combination of a socket address
+ *    Hidden - getSelfLink().isHidden() == true
+ *        i.e. the nodes internet connection is behind a NAT and requires UDP hole punching OR reverse connection to establish a connection to other hidden or public nodes
+ *    Private - getSelfLink() == null
+ *        i.e. no nodes can establish a connection to it, it can only establish outgoing connections and only to public nodes - i.e. reverse connections to public nodes is still possible
+ *
  * @author jokrey
  */
 public interface P2LNode {
     int NO_CONVERSATION_ID = 0;
 
     /**
-     * @param port port on which this node should listen for messages
+     * @param selfLink port on which this node should listen for messages
      * @return a new node listening to the given port
      * @throws IOException if the port is unavailable
      */
-    static P2LNode create(int port) throws IOException { return NodeCreator.create(port); }
+    static P2LNode create(P2Link selfLink) throws IOException { return NodeCreator.create(selfLink); }
 
     /**
-     * @param port port on which this node should listen for messages
+     * @param selfLink port on which this node should listen for messages
      * @param peerLimit final peer limit for this node, this node will never maintain more connections that the given limit - any more connections will be not established or rejected
      * @return a new node listening to the given port
      * @throws IOException if the port is unavailable
      */
-    static P2LNode create(int port, int peerLimit) throws IOException { return NodeCreator.create(port, peerLimit); }
+    static P2LNode create(P2Link selfLink, int peerLimit) throws IOException { return NodeCreator.create(selfLink, peerLimit); }
 
 
     /** @return the port on which this node is listening - an ip or dns plus this port and be used to connect to this node */
-    int getPort();
+    P2Link getSelfLink();
+    void setSelfLink(P2Link link);
+
     /** Irreversibly closes this node and unbinds its server socket */
     void close();
 
@@ -302,7 +314,7 @@ public interface P2LNode {
             } catch (Throwable ignore) {}
             timeout *= 2;
         }
-        throw new IOException(getPort()+" could not get result after "+attempts+" attempts");
+        throw new IOException(getSelfLink()+" could not get result after "+attempts+" attempts");
     }
     /**
      * Like {@link #tryReceive(int, int, Request)}, except that the conversation produces a boolean representing success.
@@ -321,7 +333,7 @@ public interface P2LNode {
             } catch (Throwable ignore) {}
             timeout *= 2;
         }
-        throw new IOException(getPort()+" could not get result after "+attempts+" attempts");
+        throw new IOException(getSelfLink()+" could not get result after "+attempts+" attempts");
     }
 
     /** Function producing something in the future */

@@ -11,9 +11,19 @@ import java.util.Arrays;
 
 import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.*;
 
+/**
+ * IDEA:
+ *   a new node does only need an internet connection and know the link of a single node with a public link
+ *   using only that it can become a node to which other nodes can connect
+ *
+ * Types of connection establishing:
+ * direct - the answerer node has a public link and can be directly accessed
+ */
 class EstablishSingleConnectionProtocol {
     private static final SecureRandom secureRandom = new SecureRandom();
 
+    //todo: mtu detection + exchange
+    //  todo sending and requesting self proclaimed public link(NOT CHECKED FOR DDOS REASONS)
     static boolean asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
         return asInitiator(parent, to, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT);
     }
@@ -53,7 +63,7 @@ class EstablishSingleConnectionProtocol {
         return success;
     }
 
-    static void asAnswerer(P2LNodeInternal parent, InetSocketAddress from, P2LMessage initialRequestMessage) throws Throwable {
+    static void asAnswerer(P2LNodeInternal parent, SocketAddress from, P2LMessage initialRequestMessage) throws Throwable {
 //        if(!parent.getSelfLink().isPublicLinkKnown()) {
 //            String ip = WhoAmIProtocol.asInitiator(parent, link, outgoing);
 //            System.out.println("ip = " + ip);

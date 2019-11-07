@@ -2,6 +2,7 @@ package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
+import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
 import jokrey.utilities.network.link2peer.core.stream.P2LOutputStream;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
@@ -27,12 +28,12 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     private final IncomingHandler incomingHandler;
     private final P2LThreadPool outgoingPool = new P2LThreadPool(4, 64);
 
-    private final int port;
-    P2LNodeImpl(int port) throws IOException {
-        this(port, Integer.MAX_VALUE);
+    private P2Link selfLink;
+    P2LNodeImpl(P2Link selfLink) throws IOException {
+        this(selfLink, Integer.MAX_VALUE);
     }
-    P2LNodeImpl(int port, int connectionLimit) throws IOException {
-        this.port = port;
+    P2LNodeImpl(P2Link selfLink, int connectionLimit) throws IOException {
+        this.selfLink = selfLink;
         this.connectionLimit = connectionLimit;
 
         incomingHandler = new IncomingHandler(this);
@@ -41,6 +42,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
             while(!incomingHandler.isClosed()) {
                 long now = System.currentTimeMillis();
                 try {
+                    //todo - this in the future will also be required to keep alive nat holes - therefore it may need to be called more than the current every two minutes
                     List<SocketAddress> dormantEstablishedBeforePing = getDormantEstablishedConnections(now);
                     for(SocketAddress dormant:dormantEstablishedBeforePing)
                         PingProtocol.asInitiator(this, dormant);
@@ -67,7 +69,10 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         }).start();
     }
 
-    @Override public int getPort() { return port; }
+    @Override public P2Link getSelfLink() { return selfLink; }
+    @Override public void setSelfLink(P2Link selfLink) {
+        this.selfLink = selfLink;
+    }
 
     @Override public void close() {
         disconnectFromAll();
@@ -85,9 +90,8 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         for(int i=0;i<addresses.length;i++) {
             SocketAddress address = addresses[i];
             tasks[i] = () -> {
-                if(!isConnectedTo(address))
-                    EstablishSingleConnectionProtocol.asInitiator(this, address);
-                successes.add(address);
+                if(isConnectedTo(address) || EstablishSingleConnectionProtocol.asInitiator(this, address))
+                    successes.add(address);
             };
         }
 
@@ -120,7 +124,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     //DIRECT MESSAGING:
     @Override public void sendInternalMessage(P2LMessage message, SocketAddress to) throws IOException {
         if(message.header.getSender() != null) throw new IllegalArgumentException("sender of message has to be this null and will be automatically set by the sender");
-        System.out.println(getPort()+" - P2LNodeImpl_sendInternalMessage - to = [" + to + "], message = [" + message + "]");
+        System.out.println(getSelfLink()+" - P2LNodeImpl_sendInternalMessage - to = [" + to + "], message = [" + message + "]");
 
         //todo - is it really desirable to have packages be broken up THIS automatically???
         //todo    - like it is cool that breaking up packages does not make a difference, but... like it is so transparent it could lead to inefficiencies
@@ -204,12 +208,12 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
      * established connections
      * the value(the long) here indicates the last time a message was received from the connection - NOT THE LAST TIME A MESSAGE WAS SENT
      */
-    private final ConcurrentHashMap<SocketAddress, Long> establishedConnections = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<SocketAddress, Pair<String, Long>> establishedConnections = new ConcurrentHashMap<>();
     /**
      * previously established connections
      * the value(the long) here indicates the time in ms since 1970, at which point a retry connection attempt should be made to the connection
      */
-    private final ConcurrentHashMap<SocketAddress, Pair<Long, Integer>> historicConnections = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<SocketAddress, Pair<String, Pair<Long, Integer>>> historicConnections = new ConcurrentHashMap<>();
     private final int connectionLimit;
     @Override public boolean isConnectedTo(SocketAddress address) {
         return establishedConnections.containsKey(address);
@@ -227,40 +231,47 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         return connectionLimit - establishedConnections.size();
     }
     @Override public void graduateToEstablishedConnection(SocketAddress address) {
-        establishedConnections.put(address, System.currentTimeMillis());
+        String publicIp = null;
+
+        //PROBLEM: if the initiator of a connection tells the other side its public ip(which differs from package.getAddress() - because we are in the same, non public NAT)
+        //   if they lie about who they are, then we will attempt a connection to the public ip - and DDOS it inadvertently
+
+
+        establishedConnections.put(address, new Pair<>(publicIp, System.currentTimeMillis()));
         historicConnections.remove(address);
         notifyConnectionEstablished(address);
     }
     @Override public void markBrokenConnection(SocketAddress address, boolean retry) {
-        Long wasRemoved = establishedConnections.remove(address);
+        Pair<String, Long> wasRemoved = establishedConnections.remove(address);
         if(wasRemoved==null) {
             System.err.println(address+" is not an established connection - could not mark as broken (already marked??)");
         } else {
-            historicConnections.put(address, retry ? new Pair<>(System.currentTimeMillis() + 1000 * 60 * 2, 0) : new Pair<>(Long.MAX_VALUE, -1));
+            historicConnections.put(address, new Pair<>(wasRemoved.l, retry ? new Pair<>(System.currentTimeMillis() + 1000 * 60 * 2, 0) : new Pair<>(Long.MAX_VALUE, -1)));
             notifyConnectionDisconnected(address);
         }
     }
     @Override public void notifyPacketReceivedFrom(SocketAddress from) {
-        boolean isEstablished = establishedConnections.computeIfPresent(from, (f,p)->System.currentTimeMillis()) != null;
-        Pair<Long, Integer> retryStateOfHistoricConnection = isEstablished||connectionLimitReached()?null:historicConnections.get(from);
+        //todo this operation may be to slow to compute EVERY TIME a packet is received - on the other hand..
+        boolean isEstablished = establishedConnections.computeIfPresent(from, (f,p)-> new Pair<>(p.l, System.currentTimeMillis())) != null;
+        Pair<String, Pair<Long, Integer>> retryStateOfHistoricConnection = isEstablished||connectionLimitReached()?null:historicConnections.get(from);
         if(retryStateOfHistoricConnection != null/* && retryStateOfHistoricConnection.r>0*/) //not actively retrying does not mean the connection should not be reestablished
             graduateToEstablishedConnection(from);
     }
     private List<SocketAddress> getDormantEstablishedConnections(long now) {
         ArrayList<SocketAddress> dormantConnections = new ArrayList<>(establishedConnections.size());
-        for(Map.Entry<SocketAddress, Long> e:establishedConnections.entrySet())
-            if((now - e.getValue()) > P2LHeuristics.ESTABLISHED_CONNECTION_IS_DORMANT_THRESHOLD_MS)
+        for(Map.Entry<SocketAddress, Pair<String, Long>> e:establishedConnections.entrySet())
+            if((now - e.getValue().r) > P2LHeuristics.ESTABLISHED_CONNECTION_IS_DORMANT_THRESHOLD_MS)
                 dormantConnections.add(e.getKey());
         return dormantConnections;
     }
     /** Already sets the new retry time - so after using this method it is mandatory to actually retry the given connections  */
     private List<SocketAddress> getRetryableHistoricConnections() {
         ArrayList<SocketAddress> retryableHistoricConnections = new ArrayList<>(Math.min(16, historicConnections.size()));
-        for(Map.Entry<SocketAddress, Pair<Long, Integer>> e:historicConnections.entrySet()) {
-            long nextRetry = e.getValue().l;
-            int totalNumberOfPreviousRetries = e.getValue().r;
+        for(Map.Entry<SocketAddress, Pair<String, Pair<Long, Integer>>> e:historicConnections.entrySet()) {
+            long nextRetry = e.getValue().r.l;
+            int totalNumberOfPreviousRetries = e.getValue().r.r;
             if(nextRetry <= System.currentTimeMillis()) {
-                e.setValue(new Pair<>(Math.min(Long.MAX_VALUE, (long) (nextRetry + P2LHeuristics.ORIGINAL_RETRY_HISTORIC_TIMEOUT_MS * Math.pow(2, totalNumberOfPreviousRetries))), totalNumberOfPreviousRetries+1));
+                e.setValue(new Pair<>(e.getValue().l, new Pair<>(Math.min(Long.MAX_VALUE, (long) (nextRetry + P2LHeuristics.ORIGINAL_RETRY_HISTORIC_TIMEOUT_MS * Math.pow(2, totalNumberOfPreviousRetries))), totalNumberOfPreviousRetries+1)));
 
                 retryableHistoricConnections.add(e.getKey());
             }

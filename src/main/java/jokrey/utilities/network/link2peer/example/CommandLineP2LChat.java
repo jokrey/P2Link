@@ -4,6 +4,7 @@ import jokrey.utilities.command.line.helper.Argument;
 import jokrey.utilities.command.line.helper.CommandLoop;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
+import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
@@ -31,7 +32,7 @@ public class CommandLineP2LChat {
 
         System.out.println("Given port = " + port);
 
-        P2LNode node = P2LNode.create(port);
+        P2LNode node = P2LNode.create(P2Link.createPrivateLink(port));
 
         node.addMessageListener(message -> System.out.println(port+" received message(from "+message.header.getSender()+"):\n"+message.asString()));
         node.addBroadcastListener(message -> System.out.println(port+" received broadcast(from "+message.header.getSender()+"):\n"+message.asString()));
@@ -57,8 +58,8 @@ public class CommandLineP2LChat {
         }, "exit");
         loop.addCommand("printActivePeers", "Prints all active peer links", Argument.noargs(), args -> System.out.println(node.getEstablishedConnections()),
                 "peers");
-        loop.addCommand("printOwnPort", "Prints own nodes link", Argument.noargs(), args -> System.out.println(node.getPort()),
-                "self", "port");
+        loop.addCommand("printSelf", "Prints own nodes link", Argument.noargs(), args -> System.out.println(node.getSelfLink()),
+                "self", "port", "me");
         loop.addCommand("sendBroadcast", "Sends a string(args[0]) as a broadcast", Argument.with(String.class), args ->
                 node.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast("iam"+port, 0, args[0].getRaw())), "broadcast", "brd");
         loop.addCommand("sendIndividualMessage", "Sends a string(args[1]) as an individual message to an active peer link(args[0])", Argument.with(String.class, String.class), args -> {

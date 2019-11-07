@@ -32,8 +32,8 @@ class GarnerConnectionsRecursivelyProtocol {
                 return connectedSetupLinks;
             try {
                 if(!parent.isConnectedTo(peerLink)) {
-                    EstablishSingleConnectionProtocol.asInitiator(parent, peerLink);
-                    newlyConnectedCounter++;
+                    if(EstablishSingleConnectionProtocol.asInitiator(parent, peerLink))
+                        newlyConnectedCounter++;
                 }
                 connectedSetupLinks.add(peerLink);
             } catch (IOException  e) {

@@ -25,8 +25,4 @@ public interface P2LNodeInternal extends P2LNode {
 
     void notifyUserBroadcastMessageReceived(P2LMessage message);
     void notifyUserMessageReceived(P2LMessage message);
-
-    interface StreamReceiptReceivedListener {
-
-    }
 }
