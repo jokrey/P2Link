@@ -1,6 +1,7 @@
 package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.P2Link;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -14,24 +15,15 @@ import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.SL
  * @author jokrey
  */
 public class WhoAmIProtocol {
-    public static String asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
-        return parent.tryReceive(P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT, () ->
+    static P2Link asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
+        return P2Link.fromBytes(parent.tryReceive(P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT, () ->
                 parent.expectInternalMessage(to, R_WHO_AM_I_ANSWER)
                 .nowOrCancel(() -> parent.sendInternalMessage(P2LMessage.Factory.createSendMessageFrom(SL_WHO_AM_I), to))
-        ).asString();
+        ).asBytes());
     }
     static void asAnswerer(P2LNodeInternal parent, DatagramPacket receivedPacket) throws IOException {
-        parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_WHO_AM_I_ANSWER, P2LMessage.EXPIRE_INSTANTLY, toString(receivedPacket.getSocketAddress())), receivedPacket.getSocketAddress());
-    }
-
-
-    public static String toString(SocketAddress from) {
-        InetSocketAddress f = (InetSocketAddress)from;
-        return f.getAddress().getCanonicalHostName()+":"+f.getPort();
-    }
-    public static InetSocketAddress fromString(String str) {
-        if(str == null) return null;
-        String[] split = str.split(":");
-        return new InetSocketAddress(split[0], Integer.parseInt(split[1]));
+        parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_WHO_AM_I_ANSWER, P2LMessage.EXPIRE_INSTANTLY,
+                P2Link.createPublicLink(receivedPacket.getAddress().getCanonicalHostName(), receivedPacket.getPort()).getBytesRepresentation()
+        ), receivedPacket.getSocketAddress());
     }
 }

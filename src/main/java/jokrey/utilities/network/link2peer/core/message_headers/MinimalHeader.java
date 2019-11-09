@@ -3,6 +3,7 @@ package jokrey.utilities.network.link2peer.core.message_headers;
 import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
+import jokrey.utilities.network.link2peer.P2Link;
 
 import java.util.Objects;
 
@@ -10,16 +11,16 @@ import java.util.Objects;
  * @author jokrey
  */
 public class MinimalHeader implements P2LMessageHeader {
-    private final String sender;
+    private final P2Link sender;
     private final int type;
     private boolean requestReceipt;
-    public MinimalHeader(String sender, int type, boolean requestReceipt) {
+    public MinimalHeader(P2Link sender, int type, boolean requestReceipt) {
         this.sender = sender;
         this.type = type;
         this.requestReceipt = requestReceipt;
     }
 
-    @Override public String getSender() {
+    @Override public P2Link getSender() {
         return sender;
     }
 

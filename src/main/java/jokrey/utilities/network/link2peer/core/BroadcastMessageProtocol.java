@@ -1,6 +1,7 @@
 package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.util.Hash;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
@@ -26,7 +27,7 @@ class BroadcastMessageProtocol {
                     boolean peerHashKnowledgeOfMessage = peerHashKnowledgeOfMessage_msg.nextBool();
 
                     if(!peerHashKnowledgeOfMessage) {
-                        byte[] senderBytes = message.header.getSender().getBytes(StandardCharsets.UTF_8);
+                        byte[] senderBytes = message.header.getSender().getBytesRepresentation();
                         try {
                             parent.sendInternalMessage(
                                     P2LMessage.Factory.createSendMessageFromWithExpiration(C_BROADCAST_MSG, P2LMessage.EXPIRE_INSTANTLY, message.header.getType(),
@@ -65,7 +66,7 @@ class BroadcastMessageProtocol {
                         .nowOrCancel(()-> parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(C_BROADCAST_MSG_KNOWLEDGE_RETURN, P2LMessage.EXPIRE_INSTANTLY, false), from))
                         .get(P2LHeuristics.DEFAULT_PROTOCOL_ANSWER_RECEIVE_TIMEOUT);
                 int brdMsgType = message.nextInt();
-                String sender = message.nextVariableString();
+                P2Link sender = P2Link.fromString(message.nextVariableString());
                 byte[] data = message.nextVariable();
     //            System.out.println("receiving message at " + parent.getSelfLink() + " - read data");
                 if(sender == null || data == null) {
@@ -94,11 +95,11 @@ class BroadcastMessageProtocol {
         return relayBroadcast(parent, message, null);
     }
     private static P2LFuture<Integer> relayBroadcast(P2LNodeInternal parent, P2LMessage message, SocketAddress directlyReceivedFrom) {
-        SocketAddress[] originallyEstablishedConnections = parent.getEstablishedConnections().toArray(new SocketAddress[0]);
+        P2Link[] originallyEstablishedConnections = parent.getEstablishedConnections().toArray(new P2Link[0]);
 
-        ArrayList<SocketAddress> establishedConnectionsExcept = new ArrayList<>(originallyEstablishedConnections.length);
-        for(SocketAddress established:originallyEstablishedConnections)
-            if(!WhoAmIProtocol.toString(established).equals(message.header.getSender()) && !Objects.equals(established, directlyReceivedFrom))
+        ArrayList<P2Link> establishedConnectionsExcept = new ArrayList<>(originallyEstablishedConnections.length);
+        for(P2Link established:originallyEstablishedConnections)
+            if(!established.equals(message.header.getSender()) && !Objects.equals(established.getSocketAddress(), directlyReceivedFrom))
                 establishedConnectionsExcept.add(established);
 
         if(establishedConnectionsExcept.isEmpty())
@@ -106,8 +107,8 @@ class BroadcastMessageProtocol {
 
         P2LThreadPool.Task[] tasks = new P2LThreadPool.Task[establishedConnectionsExcept.size()];
         for (int i = 0; i < establishedConnectionsExcept.size(); i++) {
-            SocketAddress connection = establishedConnectionsExcept.get(i);
-            tasks[i] = () -> asInitiator(parent, message, connection);
+            P2Link connection = establishedConnectionsExcept.get(i);
+            tasks[i] = () -> asInitiator(parent, message, connection.getSocketAddress());
         }
 
         return parent.executeAllOnSendThreadPool(tasks); //required, because send also waits for a response...

@@ -2,6 +2,7 @@ package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
+import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
@@ -9,8 +10,8 @@ import java.io.IOException;
 import java.net.SocketAddress;
 
 public interface P2LNodeInternal extends P2LNode {
-    void graduateToEstablishedConnection(SocketAddress address);
-    void markBrokenConnection(SocketAddress address, boolean retry);
+    void graduateToEstablishedConnection(P2Link address);
+    void markBrokenConnection(P2Link address, boolean retry);
     int remainingNumberOfAllowedPeerConnections();
 
     void sendInternalMessage(P2LMessage message, SocketAddress to) throws IOException;
@@ -25,4 +26,6 @@ public interface P2LNodeInternal extends P2LNode {
 
     void notifyUserBroadcastMessageReceived(P2LMessage message);
     void notifyUserMessageReceived(P2LMessage message);
+
+    P2Link toEstablished(SocketAddress address);
 }

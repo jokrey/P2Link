@@ -125,7 +125,7 @@ public class P2LMessage {
     public static P2LMessage fromPacket(DatagramPacket packet) {
         byte[] raw = packet.getData();
 
-        P2LMessageHeader header = P2LMessageHeader.from(raw, packet.getSocketAddress());
+        P2LMessageHeader header = P2LMessageHeader.from(raw, P2Link.raw(packet.getSocketAddress()));//todo check if this is acceptable or if a look up in parent is required
 
         if(raw.length > packet.getLength()*2 && raw.length > 4096) //fixme heuristic
             raw =  Arrays.copyOfRange(packet.getData(), 0, packet.getLength());
@@ -331,10 +331,10 @@ public class P2LMessage {
             return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, sizeCounter, total);
         }
 
-        public static P2LMessage createBroadcast(String sender, int brdMsgType, Object payload) {
+        public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, Object payload) {
             return createBroadcast(sender, brdMsgType, trans.transform(payload));
         }
-        public static P2LMessage createBroadcast(String sender, int brdMsgType, byte[] payload) {
+        public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, byte[] payload) {
             P2LMessageHeader header = new CustomExpirationHeader(sender, brdMsgType, MAX_EXPIRATION_TIMEOUT, false);
             return header.generateMessage(payload);
         }

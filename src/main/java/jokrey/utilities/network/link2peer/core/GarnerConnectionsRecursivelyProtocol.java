@@ -1,5 +1,7 @@
 package jokrey.utilities.network.link2peer.core;
 
+import jokrey.utilities.network.link2peer.P2Link;
+
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.ArrayList;
@@ -19,15 +21,15 @@ class GarnerConnectionsRecursivelyProtocol {
      * @param setupLinks links to begin discovering connections from, setup links are connected to and count as new connections in the newConnectionLimit
      * @return newly, successfully connected links
      */
-    static List<SocketAddress> recursiveGarnerConnections(P2LNodeInternal parent, int newConnectionLimit, int newConnectionLimitPerRecursion, List<SocketAddress> setupLinks) {
+    static List<P2Link> recursiveGarnerConnections(P2LNodeInternal parent, int newConnectionLimit, int newConnectionLimitPerRecursion, List<P2Link> setupLinks) {
         //also naturally limited by peerLimit set in constructor (and ram cap)
 
         if(setupLinks.isEmpty() || newConnectionLimit <=0)
             return Collections.emptyList();
 
-        List<SocketAddress> connectedSetupLinks = new ArrayList<>(setupLinks.size());
+        List<P2Link> connectedSetupLinks = new ArrayList<>(setupLinks.size());
         int newlyConnectedCounter = 0;
-        for(SocketAddress peerLink : setupLinks) {
+        for(P2Link peerLink : setupLinks) {
             if(newlyConnectedCounter >= newConnectionLimit || newlyConnectedCounter >= newConnectionLimitPerRecursion)
                 return connectedSetupLinks;
             try {
@@ -42,13 +44,12 @@ class GarnerConnectionsRecursivelyProtocol {
             }
         }
 
-        List<SocketAddress> foundUnconnectedLinks = new ArrayList<>();
+        List<P2Link> foundUnconnectedLinks = new ArrayList<>();
         for (int i = 0, connectedSetupLinksSize = connectedSetupLinks.size(); i < connectedSetupLinksSize; i++) {
-            SocketAddress connectedSetupLink = connectedSetupLinks.get(i);
+            P2Link connectedSetupLink = connectedSetupLinks.get(i);
             try {
-                String[] foundLinks = RequestPeerLinksProtocol.asInitiator(parent, connectedSetupLink);
-                for (String foundLink : foundLinks) {
-                    SocketAddress address = WhoAmIProtocol.fromString(foundLink);
+                P2Link[] foundLinks = RequestPeerLinksProtocol.asInitiator(parent, connectedSetupLink.getSocketAddress());
+                for (P2Link address : foundLinks) {
                     if (!parent.isConnectedTo(address))
                         foundUnconnectedLinks.add(address);
                 }

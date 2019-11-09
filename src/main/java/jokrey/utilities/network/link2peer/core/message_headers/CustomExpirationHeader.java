@@ -1,12 +1,14 @@
 package jokrey.utilities.network.link2peer.core.message_headers;
 
+import jokrey.utilities.network.link2peer.P2Link;
+
 /**
  * @author jokrey
  */
 public class CustomExpirationHeader extends MinimalHeader {
     private final short expiresAfter;
     private final long createdAtCtm;
-    public CustomExpirationHeader(String sender, int type, short expiresAfter, boolean requestReceipt) {
+    public CustomExpirationHeader(P2Link sender, int type, short expiresAfter, boolean requestReceipt) {
         super(sender, type, requestReceipt);
         this.expiresAfter = expiresAfter;
         createdAtCtm = System.currentTimeMillis();

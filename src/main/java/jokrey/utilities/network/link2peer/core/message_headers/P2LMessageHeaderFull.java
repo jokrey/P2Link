@@ -1,6 +1,7 @@
 package jokrey.utilities.network.link2peer.core.message_headers;
 
 import jokrey.utilities.bitsandbytes.BitHelper;
+import jokrey.utilities.network.link2peer.P2Link;
 
 import java.util.Objects;
 
@@ -16,8 +17,8 @@ import java.util.Objects;
  * @author jokrey
  */
 public class P2LMessageHeaderFull implements P2LMessageHeader {
-    private final String sender;
-    @Override public String getSender() { return sender; }
+    private final P2Link sender;
+    @Override public P2Link getSender() { return sender; }
 
     private final int type;
     @Override public int getType() { return type; }
@@ -61,7 +62,7 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
 
 
 
-    public P2LMessageHeaderFull(String sender,
+    public P2LMessageHeaderFull(P2Link sender,
                                 int type, int conversationId, short expiresAfter,
                                 int partIndex, int partNumberOfParts,
                                 boolean isReceipt, boolean isLongPart, boolean isStreamPart, boolean isStreamEof) {

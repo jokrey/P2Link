@@ -3,7 +3,7 @@ package jokrey.utilities.network.link2peer.core.message_headers;
 import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
-import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
+import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.util.Hash;
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -33,7 +33,7 @@ public interface P2LMessageHeader {
      * for individual messages this will be the peer the message was received from (automatically determined from the udp package sender address)
      * for broadcast messages this will be the peer that originally began distributing the message
      */
-    String getSender();
+    P2Link getSender();
 
     /**
      * Type of the message. A shortcut for applications to determine what this message represents without decoding the data field.
@@ -91,7 +91,7 @@ public interface P2LMessageHeader {
                 getExpiresAfter() == that.getExpiresAfter();
     }
     default Hash contentHashFrom(byte[] raw, int payloadLength) {
-        return contentHashFrom(getSender(), raw, payloadLength);
+        return contentHashFrom(getSender().getStringRepresentation(), raw, payloadLength);
     }
     default Hash contentHashFromIgnoreSender(byte[] raw, int payloadLength) {
         return contentHashFrom(null, raw, payloadLength);
@@ -165,7 +165,7 @@ public interface P2LMessageHeader {
         if(requestReceipt()) flagByte = BitHelper.setBit(flagByte, HEADER_FLAG_BIT_OFFSET_REQUEST_RECEIPT);
         raw[HEADER_OFFSET_FLAG_BYTE] = flagByte;
     }
-    static P2LMessageHeader from(byte[] raw, SocketAddress from) {
+    static P2LMessageHeader from(byte[] raw, P2Link from) {
         int type = readTypeFromHeader(raw);
         byte flagByte = raw[HEADER_OFFSET_FLAG_BYTE];
 
@@ -182,15 +182,13 @@ public interface P2LMessageHeader {
         int partIndex = readPartIndexFromHeader(raw, conversationIdFieldPresent, expirationFieldPresent, isLongPart, isStreamPart, isReceipt);
         int partNumberOfParts = readPartSizeFromHeader(raw, conversationIdFieldPresent, expirationFieldPresent, isLongPart);
 
-        String sender = WhoAmIProtocol.toString(from);
-
-        return from(sender, type, conversationId, expiresAfter, partIndex, partNumberOfParts, requestReceipt, isReceipt, isLongPart, isStreamPart, isStreamEof);
+        return from(from, type, conversationId, expiresAfter, partIndex, partNumberOfParts, requestReceipt, isReceipt, isLongPart, isStreamPart, isStreamEof);
     }
-    static P2LMessageHeader from(String sender,
+    static P2LMessageHeader from(P2Link sender,
                                  int type, int conversationId, short expiresAfter) {
         return from(sender, type, conversationId, expiresAfter, false);
     }
-    static P2LMessageHeader from(String sender,
+    static P2LMessageHeader from(P2Link sender,
                                  int type, int conversationId, short expiresAfter, boolean requestReceipt) {
         boolean conversationIdFieldPresent = conversationId != P2LNode.NO_CONVERSATION_ID;
         boolean expirationFieldPresent = expiresAfter != EXPIRE_INSTANTLY;
@@ -203,7 +201,7 @@ public interface P2LMessageHeader {
             return new CustomExpirationHeader(sender, type, expiresAfter, requestReceipt);
         return new MinimalHeader(sender, type, requestReceipt);
     }
-    static P2LMessageHeader from(String sender,
+    static P2LMessageHeader from(P2Link sender,
                                  int type, int conversationId, short expiresAfter,
                                  int partIndex, int partNumberOfParts,
                                  boolean requestReceipt, boolean isReceipt, boolean isLongPart, boolean isStreamPart, boolean isStreamEof) {
@@ -379,15 +377,15 @@ public interface P2LMessageHeader {
         }
     }
     class SenderTypeConversationIdentifier extends TypeIdentifier {
-        public final String from;
+        public final SocketAddress from;
         public final int conversationId;
-        public SenderTypeConversationIdentifier(String from, int messageType, int conversationId) {
+        public SenderTypeConversationIdentifier(SocketAddress from, int messageType, int conversationId) {
             super(messageType);
             this.from = from;
             this.conversationId = conversationId;
         }
         public SenderTypeConversationIdentifier(P2LMessage msg) {
-            this(msg.header.getSender(), msg.header.getType(), msg.header.getConversationId());
+            this(msg.header.getSender().getSocketAddress(), msg.header.getType(), msg.header.getConversationId());
         }
 
         @Override public boolean equals(Object o) {
@@ -403,7 +401,7 @@ public interface P2LMessageHeader {
         }
     }
     class ReceiptIdentifier extends SenderTypeConversationIdentifier {
-        public ReceiptIdentifier(String from, int messageType, int conversationId) {
+        public ReceiptIdentifier(SocketAddress from, int messageType, int conversationId) {
             super(from, messageType, conversationId);
         }
         public ReceiptIdentifier(P2LMessage msg) {

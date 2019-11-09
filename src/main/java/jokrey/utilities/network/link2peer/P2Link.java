@@ -1,9 +1,8 @@
 package jokrey.utilities.network.link2peer;
 
-import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
-
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 /**
@@ -13,69 +12,101 @@ public class P2Link {
     private String stringRepresentation;
     private final InetSocketAddress rawAddr;
     private final int port;
+    private final P2Link relayServerLink;
 
-    private P2Link(String stringRepresentation, InetSocketAddress rawAddr, int port) {
-        this.stringRepresentation = stringRepresentation;
+    private P2Link(InetSocketAddress rawAddr, P2Link relayServerLink, int port) {
+//        if(rawAddr!=null && rawAddr.getAddress().getCanonicalHostName().equals("localhost"))
+//            rawAddr=null;
         this.rawAddr = rawAddr;
         this.port = port;
-    }
-    private P2Link(String stringRepresentation, InetSocketAddress rawAddr) {
-        this(stringRepresentation, rawAddr, rawAddr.getPort());
-    }
-    private P2Link(InetSocketAddress rawAddr) {
-        this(null, rawAddr);
-//        this(WhoAmIProtocol.toString(rawAddr), rawAddr);
-    }
-    private P2Link(int port) {
-        this(null, null, port);
-//        this(WhoAmIProtocol.toString(rawAddr), rawAddr);
+        this.relayServerLink = relayServerLink;
     }
 
     public int getPort() {
         return port;
     }
+    public SocketAddress getSocketAddress() {
+        return rawAddr;
+    }
+
+    public boolean isPublic() {
+        return relayServerLink ==null && rawAddr != null;
+    }
+    public boolean isHiddenLink() {
+        return relayServerLink !=null && rawAddr != null;
+    }
+    public boolean isPrivate() {
+        return rawAddr == null;
+    }
+
+
 
     public String getStringRepresentation() {
+        //todo
         if(stringRepresentation==null) {
-            if(rawAddr==null)
+            if(rawAddr==null) //private/local/unknown link
                 stringRepresentation = port+"";
-            else
-                stringRepresentation = WhoAmIProtocol.toString(rawAddr);
+            else if(relayServerLink ==null) //public link
+                stringRepresentation = rawAddr.getAddress().getCanonicalHostName() + ":" + rawAddr.getPort();
+            else {//hidden link
+                stringRepresentation = relayServerLink.getStringRepresentation()+"for ("+rawAddr.getAddress().getCanonicalHostName() + ":" + rawAddr.getPort()+")";
+            }
         }
         return stringRepresentation;
     }
-
-    @Override public String toString() {
-        return stringRepresentation;
+    public byte[] getBytesRepresentation() {
+        return getStringRepresentation().getBytes(StandardCharsets.UTF_8);
     }
-
     public static P2Link fromString(String stringRepresentation) {
-        return null;
+        if(stringRepresentation.contains("(")) { //hidden
+            String[] splitOuter = stringRepresentation.split("for \\(");
+            String[] split = stringRepresentation.split(":");
+            return P2Link.createHiddenLink(fromString(splitOuter[0]), new InetSocketAddress(split[0], Integer.parseInt(split[1])));
+        } else if(stringRepresentation.contains(":")) {//public, because already not hidden
+            String[] split = stringRepresentation.split(":");
+            return P2Link.createPublicLink(split[0], Integer.parseInt(split[1]));
+        } else {
+            return P2Link.createPrivateLink(Integer.parseInt(stringRepresentation));
+        }
+    }
+    public static P2Link fromBytes(byte[] asBytes) {
+        return fromString(new String(asBytes, StandardCharsets.UTF_8));
     }
 
-    public boolean isHiddenLink() {
-        return false; //todo
+
+
+
+
+
+    public static P2Link createPublicLink(String publicIpOrDns, int port) {
+        return new P2Link(new InetSocketAddress(publicIpOrDns, port), null, port);
+    }
+    public static P2Link createPublicLink(InetSocketAddress socketAddress) {
+        return new P2Link(socketAddress, null, socketAddress.getPort());
+    }
+    public static P2Link raw(SocketAddress socketAddress) {
+        return createPublicLink((InetSocketAddress) socketAddress);
     }
 
-    public static P2Link createHiddenLink(P2Link relayServerLink) {
-        return null;
+    public static P2Link createHiddenLink(P2Link relayServerLink, InetSocketAddress naiveAddress) {
+        return new P2Link(naiveAddress, relayServerLink, naiveAddress.getPort());
     }
 
     public static P2Link createPrivateLink(int port) {
-        return new P2Link(null, new InetSocketAddress("localhost", port), port);
+        return new P2Link( null, null, port);
     }
+
 
 
     @Override public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        return Objects.equals(stringRepresentation, ((P2Link) o).stringRepresentation);
+        return Objects.equals(getStringRepresentation(), ((P2Link) o).getStringRepresentation());
     }
     @Override public int hashCode() {
-        return Objects.hash(stringRepresentation);
+        return Objects.hash(getStringRepresentation());
     }
-
-    public SocketAddress getSocketAddress() {
-        return rawAddr;
+    @Override public String toString() {
+        return getStringRepresentation();
     }
 }

@@ -70,8 +70,8 @@ import java.util.function.Function;
  *        i.e. anyone can attempt to establish a connection and send messages using the dns/ip + port combination of a socket address
  *    Hidden - getSelfLink().isHidden() == true
  *        i.e. the nodes internet connection is behind a NAT and requires UDP hole punching OR reverse connection to establish a connection to other hidden or public nodes
- *    Private - getSelfLink() == null
- *        i.e. no nodes can establish a connection to it, it can only establish outgoing connections and only to public nodes - i.e. reverse connections to public nodes is still possible
+ *    Private - getSelfLink().isPrivate == true
+ *        Self link of hidden nodes - hidden links conceptually do not known their own ip addresses - they exclusively know their own port (and not even their public port[nat changed])
  *
  * @author jokrey
  */
@@ -120,11 +120,11 @@ public interface P2LNode {
      * @return currently active peer links, the links can be used as ids to identify individual peer nodes
      * Note: It is not guaranteed that any peer in the returned set is still active when used.
      */
-    Set<SocketAddress> getEstablishedConnections();
+    Set<P2Link> getEstablishedConnections();
     /**
      * @return addresses of peers that this node had previously maintained an established connection, the connections however have since timed out or proven to be unreliable and were therefore closed
      */
-    Set<SocketAddress> getPreviouslyEstablishedConnections();
+    Set<P2Link> getPreviouslyEstablishedConnections();
 
     /** @return whether any more connections can be established or the final limit has already been reached */
     boolean connectionLimitReached();
@@ -135,10 +135,7 @@ public interface P2LNode {
      * @param to address of the node to establish a connection to
      * @return a future of whether it was possible to establish the connection to parameter to
      */
-    P2LFuture<Boolean> establishConnection(SocketAddress to);
-//    {
-//        return establishConnections(to).toBooleanFuture(success -> success.size()==1 && success.contains(to));
-//    }
+    P2LFuture<Boolean> establishConnection(P2Link to);
     /**
      * Attempts to establish a connection to the given addresses.
      * Returns future of a subset of connections from given addresses to which the node now maintains a connection.
@@ -147,27 +144,27 @@ public interface P2LNode {
      * @param addresses to connect to
      * @return future set of established given connections
      */
-    P2LFuture<Set<SocketAddress>> establishConnections(SocketAddress... addresses);
+    P2LFuture<Set<P2Link>> establishConnections(P2Link... addresses);
 
     /**
      * @param to is connected to?
      * @return whether this node is connected to to
      */
-    boolean isConnectedTo(SocketAddress to);
+    boolean isConnectedTo(P2Link to);
 
     /**
      * Sends a disconnect request to the node at the given address.
      * Additionally it marks from as a broken connection and removes it from established connections.
      * @param from node address to disconnect from
      */
-    void disconnectFrom(SocketAddress from);
+    void disconnectFrom(P2Link from);
 
     /**
      * Gracefully closes all connections to peers and makes sure to add them to the list of historic connections.
      * Should be used when closing the application or
      */
     default void disconnectFromAll() {
-        for(SocketAddress connectionLink: getEstablishedConnections()) {
+        for(P2Link connectionLink: getEstablishedConnections()) {
             disconnectFrom(connectionLink);
         }
     }
@@ -176,15 +173,27 @@ public interface P2LNode {
     /**
      * Blocking.
      * @see jokrey.utilities.network.link2peer.core.GarnerConnectionsRecursivelyProtocol */
-    default List<SocketAddress> recursiveGarnerConnections(int newConnectionLimit, SocketAddress... setupLinks) {
+    default List<P2Link> recursiveGarnerConnections(int newConnectionLimit, P2Link... setupLinks) {
         return recursiveGarnerConnections(newConnectionLimit, Integer.MAX_VALUE, setupLinks);
     }
     /**
      * Blocking.
      * @see jokrey.utilities.network.link2peer.core.GarnerConnectionsRecursivelyProtocol */
-    List<SocketAddress> recursiveGarnerConnections(int newConnectionLimit, int newConnectionLimitPerRecursion, SocketAddress... setupLinks);
+    List<P2Link> recursiveGarnerConnections(int newConnectionLimit, int newConnectionLimitPerRecursion, P2Link... setupLinks);
 
 
+    /**
+     * Queries and returns the p2link of this node as it is visible to the specified peer.
+     * The returned link is always a public link, despite the fact that it may not be a public ip - or even registered with the specified peer as a public link.
+     * However that distinction cannot be easily made from that point of view.
+     *
+     * If the returned address is determined to be a public ip, it can be set as the self link of this node.
+     *
+     * @param requestFrom the raw address to request the ip from
+     * @return a future for the requested self link as seen by the specified peer
+     * @throws IOException if the send went to garbage
+     */
+    P2LFuture<P2Link> whoAmI(SocketAddress requestFrom) throws IOException;
 
     /**
      * Sends the given message to the given address.
@@ -194,6 +203,11 @@ public interface P2LNode {
      * @throws IOException if the send went to garbage
      */
     void sendMessage(SocketAddress to, P2LMessage message) throws IOException;
+    /**@see #sendMessage(SocketAddress, P2LMessage)*/
+    default void sendMessage(P2Link to, P2LMessage message) throws IOException {
+        sendMessage(to.getSocketAddress(), message);
+    }
+
     /**
      * Sends the given message to the given address and request a receipt.
      * Non-Blocking. After this methods returns it is not guaranteed that the receiver has or will ever receive the send message(udp maybe semantic).
@@ -207,6 +221,11 @@ public interface P2LNode {
      * @throws IOException if the send went to garbage
      */
     P2LFuture<Boolean> sendMessageWithReceipt(SocketAddress to, P2LMessage message) throws IOException;
+    /**@see #sendMessageWithReceipt(SocketAddress, P2LMessage)*/
+    default P2LFuture<Boolean> sendMessageWithReceipt(P2Link to, P2LMessage message) throws IOException {
+        return sendMessageWithReceipt(to.getSocketAddress(), message);
+    }
+
     /**
      * Sends the given message to the given address.
      * Additionally block as long as no receipt for the given message has been received.
@@ -222,6 +241,11 @@ public interface P2LNode {
      * @throws IOException if any send went to garbage
      */
     void sendMessageBlocking(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) throws IOException; //initial timeout is doubled
+    /**@see #sendMessageBlocking(SocketAddress, P2LMessage, int, int)*/
+    default void sendMessageBlocking(P2Link to, P2LMessage message, int attempts, int initialTimeout) throws IOException {
+        sendMessageBlocking(to.getSocketAddress(), message, attempts, initialTimeout);
+    }
+
 
     /**
      * Creates a future for an expected message with the given messageType.
@@ -236,6 +260,11 @@ public interface P2LNode {
      * @return the created future
      */
     P2LFuture<P2LMessage> expectMessage(SocketAddress from, int messageType);
+    /**@see #expectMessage(SocketAddress, int)*/
+    default P2LFuture<P2LMessage> expectMessage(P2Link from, int messageType) {
+        return expectMessage(from.getSocketAddress(), messageType);
+    }
+
     /**
      * Creates a future for an expected message with the given sender, messageType and conversationId (see {@link #createUniqueConversationId()}).
      * @param from the sender of the broadcast message (decoded from the raw ip packet)
@@ -244,6 +273,10 @@ public interface P2LNode {
      * @return the created future
      */
     P2LFuture<P2LMessage> expectMessage(SocketAddress from, int messageType, int conversationId);
+    /**@see #expectMessage(SocketAddress, int, int)*/
+    default P2LFuture<P2LMessage> expectMessage(P2Link from, int messageType, int conversationId) {
+        return expectMessage(from.getSocketAddress(), messageType, conversationId);
+    }
 
     /**
      * @param message message to be send, sender field can be null in that case it will be filled automatically
@@ -257,13 +290,13 @@ public interface P2LNode {
      * @return the created future
      */
     P2LFuture<P2LMessage> expectBroadcastMessage(int messageType);
-    /**
-     * Creates a future for an expected broadcast message with the given sender and messageType.
-     * @param from the self named sender of the broadcast message (never validated to be anything)
-     * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
-     * @return the created future
-     */
-    P2LFuture<P2LMessage> expectBroadcastMessage(String from, int messageType);
+//    /**
+//     * Creates a future for an expected broadcast message with the given sender and messageType.
+//     * @param from the self named sender of the broadcast message (never validated to be anything)
+//     * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
+//     * @return the created future
+//     */
+//    P2LFuture<P2LMessage> expectBroadcastMessage(String from, int messageType);
 
     /**
      * Returns the stream for the given identifier. It is possible to have up to (2^31-1) * (2^31-1) streams from a single source (todo this is absolutely idiotic - who would EVER need THAT many different streams)
@@ -275,6 +308,10 @@ public interface P2LNode {
      * @see P2LInputStream
      */
     P2LInputStream getInputStream(SocketAddress from, int messageType, int conversationId);
+    /**@see #getInputStream(SocketAddress, int, int)*/
+    default P2LInputStream getInputStream(P2Link from, int messageType, int conversationId) {
+        return getInputStream(from.getSocketAddress(), messageType, conversationId);
+    }
 
     /**
      * Returns the stream for the given identifier. It is possible to have up to (2^31-1) * (2^31-1) streams from a single source (todo this is absolutely idiotic - who would EVER need THAT many different streams)
@@ -292,6 +329,10 @@ public interface P2LNode {
      * @see P2LOutputStream
      */
     P2LOutputStream getOutputStream(SocketAddress to, int messageType, int conversationId);
+    /**@see #getOutputStream(SocketAddress, int, int)*/
+    default P2LOutputStream getOutputStream(P2Link to, int messageType, int conversationId) {
+        return getOutputStream(to.getSocketAddress(), messageType, conversationId);
+    }
 
 
     /**
@@ -306,15 +347,16 @@ public interface P2LNode {
      * @throws IOException if no result could be obtained after given number of retries or the send went to garbage
      */
     default <T> T tryReceive(int attempts, int initialTimeout, Request<T> conversationWithResult) throws IOException {
+        Throwable t = null;
         int timeout = initialTimeout;
         for(int attempt=0; attempt<attempts; attempt++) {
             try {
                 T gotten = conversationWithResult.request().getOrNull(timeout);
                 if (gotten != null) return gotten;
-            } catch (Throwable ignore) {}
+            } catch (Throwable thrown) {t=thrown;}
             timeout *= 2;
         }
-        throw new IOException(getSelfLink()+" could not get result after "+attempts+" attempts");
+        throw new IOException(getSelfLink()+" could not get result after "+attempts+" attempts", t);
     }
     /**
      * Like {@link #tryReceive(int, int, Request)}, except that the conversation produces a boolean representing success.
@@ -325,15 +367,16 @@ public interface P2LNode {
      * @throws IOException if no result could be obtained after given number of retries or the send went to garbage
      */
     default void tryComplete(int attempts, int initialTimeout, Request<Boolean> conversation) throws IOException {
+        Throwable t = null;
         int timeout = initialTimeout;
         for(int attempt=0; attempt<attempts; attempt++) {
             try {
                 Boolean success = conversation.request().getOrNull(timeout);
                 if(success!=null && success) return;
-            } catch (Throwable ignore) {}
+            } catch (Throwable thrown) {t=thrown;}
             timeout *= 2;
         }
-        throw new IOException(getSelfLink()+" could not get result after "+attempts+" attempts");
+        throw new IOException(getSelfLink()+" could not get result after "+attempts+" attempts", t);
     }
 
     /** Function producing something in the future */
@@ -359,12 +402,12 @@ public interface P2LNode {
      * The given listener will receive all newly established connections.
      * @param listener listener to add
      */
-    void addConnectionEstablishedListener(Consumer<SocketAddress> listener);
+    void addConnectionEstablishedListener(Consumer<P2Link> listener);
     /**
      * The given listener will receive all disconnected connections.
      * @param listener listener to add
      */
-    void addConnectionDroppedListener(Consumer<SocketAddress> listener);
+    void addConnectionDroppedListener(Consumer<P2Link> listener);
 
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
@@ -374,10 +417,10 @@ public interface P2LNode {
     void removeBroadcastListener(P2LMessageListener listener);
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
-    void removeConnectionEstablishedListener(Consumer<SocketAddress> listener);
+    void removeConnectionEstablishedListener(Consumer<P2Link> listener);
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
-    void removeConnectionDroppedListener(Consumer<SocketAddress> listener);
+    void removeConnectionDroppedListener(Consumer<P2Link> listener);
     /** Trivial message listener - dual use for direct messages and broadcasts */
     interface P2LMessageListener { void received(P2LMessage message);}
 }

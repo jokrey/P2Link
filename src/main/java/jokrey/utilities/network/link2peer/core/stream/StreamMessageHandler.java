@@ -1,8 +1,8 @@
 package jokrey.utilities.network.link2peer.core.stream;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
-import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader.HeaderIdentifier;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader.SenderTypeConversationIdentifier;
 
@@ -30,7 +30,7 @@ public class StreamMessageHandler {
         return getInputStream(null, new SenderTypeConversationIdentifier(m),null);
     }
     public P2LInputStream getInputStream(P2LNodeInternal parent, SocketAddress from, int type, int conversationId) {
-        return getInputStream(parent, new SenderTypeConversationIdentifier(WhoAmIProtocol.toString(from), type, conversationId), from);
+        return getInputStream(parent, new SenderTypeConversationIdentifier(from, type, conversationId), from);
     }
     private P2LInputStream getInputStream(P2LNodeInternal parent, SenderTypeConversationIdentifier identifier, SocketAddress from) {
         return inputStreams.computeIfAbsent(identifier, k -> {
@@ -46,7 +46,7 @@ public class StreamMessageHandler {
         getOutputStream(null, new SenderTypeConversationIdentifier(rawReceipt),null).receivedReceipt(rawReceipt);
     }
     public P2LOutputStream getOutputStream(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
-        return getOutputStream(parent, new SenderTypeConversationIdentifier(WhoAmIProtocol.toString(to), type, conversationId), to);
+        return getOutputStream(parent, new SenderTypeConversationIdentifier(to, type, conversationId), to);
     }
     private P2LOutputStream getOutputStream(P2LNodeInternal parent, SenderTypeConversationIdentifier identifier, SocketAddress to) {
         return outputStreams.computeIfAbsent(identifier, k -> {
