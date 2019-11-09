@@ -66,11 +66,11 @@ import java.util.function.Function;
  *
  *
  * THREE TYPES OF NODES:
- *    Public - getSelfLink().isPublic() == true
+ *    Public - getSelfLink().isPublicLink() == true
  *        i.e. anyone can attempt to establish a connection and send messages using the dns/ip + port combination of a socket address
  *    Hidden - getSelfLink().isHidden() == true
  *        i.e. the nodes internet connection is behind a NAT and requires UDP hole punching OR reverse connection to establish a connection to other hidden or public nodes
- *    Private - getSelfLink().isPrivate == true
+ *    Private - getSelfLink().isPrivateLink == true
  *        Self link of hidden nodes - hidden links conceptually do not known their own ip addresses - they exclusively know their own port (and not even their public port[nat changed])
  *
  * @author jokrey
@@ -180,6 +180,13 @@ public interface P2LNode {
      * Blocking.
      * @see jokrey.utilities.network.link2peer.core.GarnerConnectionsRecursivelyProtocol */
     List<P2Link> recursiveGarnerConnections(int newConnectionLimit, int newConnectionLimitPerRecursion, P2Link... setupLinks);
+
+    /** Blocking. */
+    default List<P2Link> queryKnownLinksOf(P2Link from) throws IOException {
+        return queryKnownLinksOf(from.getSocketAddress());
+    }
+    /** Blocking. */
+    List<P2Link> queryKnownLinksOf(SocketAddress from) throws IOException;
 
 
     /**

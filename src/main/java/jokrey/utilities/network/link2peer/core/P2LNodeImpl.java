@@ -108,6 +108,10 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         return GarnerConnectionsRecursivelyProtocol.recursiveGarnerConnections(this, newConnectionLimit, newConnectionLimitPerRecursion, Arrays.asList(setupLinks));
     }
 
+    @Override public List<P2Link> queryKnownLinksOf(SocketAddress from) throws IOException {
+        return RequestPeerLinksProtocol.asInitiator(this, from);
+    }
+
     @Override public P2LFuture<Integer> sendBroadcastWithReceipts(P2LMessage message) {
         if(message.header.getSender() == null) throw new IllegalArgumentException("sender of message has to be attached in broadcasts");
         validateMsgIdNotInternal(message.header.getType());

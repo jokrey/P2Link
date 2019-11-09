@@ -67,8 +67,6 @@ class P2LMessageQueue {
     synchronized P2LFuture<P2LMessage> receiptFutureFor(SocketAddress from, int messageType, int conversationId) {
         if(from == null) return futureFor(messageType);
         ReceiptIdentifier request = new ReceiptIdentifier(from, messageType, conversationId);
-        System.out.println("receiptFutureFor - from = " + from);
-        System.out.println("receiptFutureFor - request = " + request);
 
         P2LFuture<P2LMessage> future = new P2LFuture<>();
         List<P2LMessage> unconsumedMessagesForRequest = unconsumedMessages_byExactRequest.get(request);
@@ -79,9 +77,6 @@ class P2LMessageQueue {
     synchronized void handleNewMessage(P2LMessage received) {
         HeaderIdentifier answersRequest = received.header.isReceipt()?new ReceiptIdentifier(received):new SenderTypeConversationIdentifier(received);
         TypeIdentifier answersTypeRequest = new TypeIdentifier(received);
-
-        System.out.println("handleNewMessage - answersRequest = " + answersRequest);
-        System.out.println("handleNewMessage - received.header.getSender().getSocketAddress = " + received.header.getSender().getSocketAddress());
 
         Stack<P2LFuture<P2LMessage>> waitingForMessage = waitingReceivers.get(answersRequest); //higher priority
         Stack<P2LFuture<P2LMessage>> waitingForMessageId = waitingReceivers.get(answersTypeRequest);

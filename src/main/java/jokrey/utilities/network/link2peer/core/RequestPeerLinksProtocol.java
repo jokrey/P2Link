@@ -7,12 +7,13 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
+import java.util.List;
 
 import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.C_PEER_LINKS;
 import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS;
 
 class RequestPeerLinksProtocol {
-    static P2Link[] asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
+    static List<P2Link> asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
         return parent.tryReceive(P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT, () ->
                 parent.expectInternalMessage(to, C_PEER_LINKS)
                 .nowOrCancel(() -> parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS), to))
@@ -21,7 +22,7 @@ class RequestPeerLinksProtocol {
                     String raw;
                     while((raw = message.nextVariableString()) != null)
                         peers.add(P2Link.fromString(raw));
-                    return peers.toArray(new P2Link[0]);
+                    return peers;
                 }));
     }
     static void asAnswerer(P2LNodeInternal parent, SocketAddress fromRaw) throws IOException {

@@ -25,17 +25,17 @@ public class P2Link {
     public int getPort() {
         return port;
     }
-    public SocketAddress getSocketAddress() {
+    public InetSocketAddress getSocketAddress() {
         return rawAddr;
     }
 
-    public boolean isPublic() {
+    public boolean isPublicLink() {
         return relayServerLink ==null && rawAddr != null;
     }
     public boolean isHiddenLink() {
         return relayServerLink !=null && rawAddr != null;
     }
-    public boolean isPrivate() {
+    public boolean isPrivateLink() {
         return rawAddr == null;
     }
 
@@ -49,7 +49,7 @@ public class P2Link {
             else if(relayServerLink ==null) //public link
                 stringRepresentation = rawAddr.getAddress().getCanonicalHostName() + ":" + rawAddr.getPort();
             else {//hidden link
-                stringRepresentation = relayServerLink.getStringRepresentation()+"for ("+rawAddr.getAddress().getCanonicalHostName() + ":" + rawAddr.getPort()+")";
+                stringRepresentation = relayServerLink.getStringRepresentation()+" for ("+rawAddr.getAddress().getCanonicalHostName() + ":" + rawAddr.getPort()+")";
             }
         }
         return stringRepresentation;
@@ -59,9 +59,9 @@ public class P2Link {
     }
     public static P2Link fromString(String stringRepresentation) {
         if(stringRepresentation.contains("(")) { //hidden
-            String[] splitOuter = stringRepresentation.split("for \\(");
-            String[] split = stringRepresentation.split(":");
-            return P2Link.createHiddenLink(fromString(splitOuter[0]), new InetSocketAddress(split[0], Integer.parseInt(split[1])));
+            String[] splitOuter = stringRepresentation.split(" for \\(");
+            String[] split = splitOuter[1].split(":");
+            return P2Link.createHiddenLink(fromString(splitOuter[0]), new InetSocketAddress(split[0], Integer.parseInt(split[1].replace(")",""))));
         } else if(stringRepresentation.contains(":")) {//public, because already not hidden
             String[] split = stringRepresentation.split(":");
             return P2Link.createPublicLink(split[0], Integer.parseInt(split[1]));

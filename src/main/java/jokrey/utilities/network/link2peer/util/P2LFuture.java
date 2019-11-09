@@ -297,9 +297,19 @@ public class P2LFuture<T> {
     }
 
 
-
-
-
+    /**
+     * Despite its name this method is kinda meant to do the opposite than run the task before.
+     * Since the parameters of a method in java are NOT calculated lazily the future is actually waiting before the task is run.
+     * If the future depends on the task having been run (for example an expecting future for an instantly expiring message), then this is the desired behaviour.
+     * Internally it works by running {@link #nowOrCancel(Task)} on the given future with the given task. The advantage is the more intuitive semantic order of the actions.
+     * @param task a given task to execute immediately (before or after the future is complete, but after it exists and can be completed)
+     * @param future a future
+     * @return the given future itself to allow for chained calls
+     * @throws Throwable if the given task throws an exception that exception is rethrown
+     */
+    public static <T> P2LFuture<T> before(Task task, P2LFuture<T> future) throws Throwable {
+        return future.nowOrCancel(task);
+    }
 
     /**
      * Executes the given task instantly.
@@ -307,7 +317,8 @@ public class P2LFuture<T> {
      *     but it has to returned from a method.
      * @param task a given task to execute immediately (before or after the future is complete, but after it exists and can be completed)
      * @throws Throwable any given exception the task throws is rethrown and causes this future to be canceled
-     * @return this future
+     * @return this future to allow for chained calls
+     * @throws Throwable if the given task throws an exception that exception is rethrown
      */
     public P2LFuture<T> nowOrCancel(Task task) throws Throwable {
         try {
@@ -515,6 +526,24 @@ public class P2LFuture<T> {
         if(futures.isEmpty())
             allResults.setCompleted(collector);
         return allResults;
+    }
+
+    /**
+     * Waits for the given futures or throws an exception if not all are available in time
+     * @param timeoutMs maximum time to wait, if not all results are available in time an exception will be thrown
+     * @param futures futures to wait for
+     * @throws TimeoutException if not all results are available in time
+     */
+    public static void waitForEm(int timeoutMs, P2LFuture<?>... futures) {
+        long startTime = System.currentTimeMillis();
+        for(P2LFuture<?> future:futures) {
+            long elapsed = System.currentTimeMillis() - startTime;
+            long remaining = timeoutMs - elapsed;
+            if (remaining > 0)
+                future.waitForIt(remaining);
+            else
+                throw new TimeoutException();
+        }
     }
 
     /**

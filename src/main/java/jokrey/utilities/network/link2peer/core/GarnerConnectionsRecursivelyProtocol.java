@@ -48,7 +48,7 @@ class GarnerConnectionsRecursivelyProtocol {
         for (int i = 0, connectedSetupLinksSize = connectedSetupLinks.size(); i < connectedSetupLinksSize; i++) {
             P2Link connectedSetupLink = connectedSetupLinks.get(i);
             try {
-                P2Link[] foundLinks = RequestPeerLinksProtocol.asInitiator(parent, connectedSetupLink.getSocketAddress());
+                List<P2Link> foundLinks = RequestPeerLinksProtocol.asInitiator(parent, connectedSetupLink.getSocketAddress());
                 for (P2Link address : foundLinks) {
                     if (!parent.isConnectedTo(address))
                         foundUnconnectedLinks.add(address);
