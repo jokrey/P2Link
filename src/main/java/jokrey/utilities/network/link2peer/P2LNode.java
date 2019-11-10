@@ -350,7 +350,7 @@ public interface P2LNode {
      * @param initialTimeout initial timeout - since doubled with each retry, max timeout is: (initialTimeout * 2^retries)
      * @param conversationWithResult function that produces future which represents a result.
      *                               Complex conversations will likely want to chain that future, with each waiting for a message as a combined future.
-     *                               For this purpose {@link P2LFuture#combine(Function)} can be used.
+     *                               For this purpose {@link P2LFuture#andThen(Function)} can be used.
      * @return the received final result
      * @throws IOException if no result could be obtained after given number of retries or the send went to garbage
      */

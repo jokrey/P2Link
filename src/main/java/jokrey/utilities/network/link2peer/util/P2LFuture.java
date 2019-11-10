@@ -1,9 +1,11 @@
 package jokrey.utilities.network.link2peer.util;
 
+import com.sun.xml.internal.ws.util.CompletedFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool.Task;
 import jokrey.utilities.simple.data_structure.stack.LinkedStack;
 import jokrey.utilities.simple.data_structure.stack.Stack;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -410,7 +412,7 @@ public class P2LFuture<T> {
      * @param next function that calculates the next future, with which this future will be combined
      * @return the newly created, combined future.
      */
-    public <U> P2LFuture<U> combine(Function<T, P2LFuture<U>> next) {
+    public <U> P2LFuture<U> andThen(Function<T, P2LFuture<U>> next) {
         //CANNOT BE FED INTO OTHER COMBINE DIRECTLY - NEXT IS ONLY CALCULATED AFTER T IS AVAILABLE
         P2LFuture<U> f = new P2LFuture<>();
         callMeBack(t -> {
@@ -426,15 +428,15 @@ public class P2LFuture<T> {
         else setCompleted(resultOrNull);
     }
 
-    /** Build in reduce or combine function for Booleans (using and) */
+    /** Build in reduce or andThen function for Booleans (using and) */
     public static final BiFunction<Boolean, Boolean, Boolean> AND = (a, b) -> a && b;
-    /** Build in reduce or combine function for Booleans (using or) */
+    /** Build in reduce or andThen function for Booleans (using or) */
     public static final BiFunction<Boolean, Boolean, Boolean> OR = (a, b) -> a || b;
-    /** Build in reduce or combine function for Integers (using +) */
+    /** Build in reduce or andThen function for Integers (using +) */
     public static final BiFunction<Integer, Integer, Integer> PLUS = (a, b) -> a + b;
-    /** Build in reduce or combine function for Integers (using -) */
+    /** Build in reduce or andThen function for Integers (using -) */
     public static final BiFunction<Integer, Integer, Integer> MINUS = (a, b) -> a - b;
-    /** Build in reduce or combine function for Integers (using *) */
+    /** Build in reduce or andThen function for Integers (using *) */
     public static final BiFunction<Integer, Integer, Integer> MUL = (a, b) -> a * b;
 
     /**

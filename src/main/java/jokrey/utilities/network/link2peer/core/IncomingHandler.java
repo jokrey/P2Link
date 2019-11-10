@@ -102,7 +102,7 @@ public class IncomingHandler {
         } else if(message.header.getType() == SL_RELAY_REQUEST_DIRECT_CONNECT) {
             EstablishConnectionProtocol.asAnswererRelayRequestReverseConnection(parent, message);
         } else if (message.header.getType() == SC_BROADCAST) {
-            P2LMessage received = BroadcastMessageProtocol.asAnswerer(parent, broadcastState, from, message);
+            P2LMessage received = BroadcastMessageProtocol.asAnswererWithHash(parent, broadcastState, from, message);
             if (received != null) {
                 if(received.isInternalMessage()) {
                     System.err.println("someone managed to send an internal broadcast message...? How? And more importantly why?");

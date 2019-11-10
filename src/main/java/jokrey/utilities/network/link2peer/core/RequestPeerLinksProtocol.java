@@ -2,6 +2,7 @@ package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
+import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -15,8 +16,9 @@ import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.SL
 class RequestPeerLinksProtocol {
     static List<P2Link> asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
         return parent.tryReceive(P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT, () ->
-                parent.expectInternalMessage(to, C_PEER_LINKS)
-                .nowOrCancel(() -> parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS), to))
+                P2LFuture.before(() ->
+                        parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS), to),
+                        parent.expectInternalMessage(to, C_PEER_LINKS))
                 .toType(message -> {
                     ArrayList<P2Link> peers = new ArrayList<>();
                     String raw;

@@ -1,7 +1,6 @@
 package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
@@ -94,7 +93,7 @@ class EstablishConnectionProtocol {
             return P2LFuture.before(
                     () -> parent.sendInternalMessage(selfLinkToMessage(parent, SL_DIRECT_CONNECTION_REQUEST, conversationId), to.getSocketAddress()),
                     parent.expectInternalMessage(to.getSocketAddress(), R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId))
-                    .combine(message -> {
+                    .andThen(message -> {
                         byte[] verifyNonce = message.asBytes();
                         if (verifyNonce.length == 0)
                             return new P2LFuture<>(to); //indicates 'already connected' todo problem is 'to' equal to actual link
@@ -142,10 +141,9 @@ class EstablishConnectionProtocol {
         //next line blocking, due to the following problem: if the packet is lost, the initiator will retry the connection:
         //     sending a new connection-request + receiving a verify nonce request WITH A DIFFERENT NONCE - however, since this came first, we will receive the nonce here...
 
-        byte[] verifyNonce = parent.expectInternalMessage(from, R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_ANSWER, conversationId)
-                .nowOrCancel(() ->
-                        parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId, nonce), from)
-                )
+        byte[] verifyNonce = P2LFuture.before(() ->
+                parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId, nonce), from),
+                parent.expectInternalMessage(from, R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_ANSWER, conversationId))
                 .get(P2LHeuristics.DEFAULT_PROTOCOL_ANSWER_RECEIVE_TIMEOUT).asBytes();
         if (Arrays.equals(nonce, verifyNonce)) {
             parent.graduateToEstablishedConnection(peerLink, initialRequestMessage.header.getConversationId());

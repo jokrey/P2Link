@@ -156,8 +156,9 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     @Override public P2LFuture<Boolean> sendInternalMessageWithReceipt(P2LMessage message, SocketAddress to) throws IOException {
         message.mutateToRequestReceipt();
         try {
-            return incomingHandler.receiptsQueue.receiptFutureFor(to, message.header.getType(), message.header.getConversationId())
-                    .nowOrCancel(() -> sendInternalMessage(message, to)) //weird syntax, but we have to make sure we already wait for the receipt when we send the message (receipt expire instantly
+            return P2LFuture.before(() ->
+                    sendInternalMessage(message, to),
+                    incomingHandler.receiptsQueue.receiptFutureFor(to, message.header.getType(), message.header.getConversationId()))
                     .toBooleanFuture(receipt -> receipt.validateIsReceiptFor(message));
         } catch (IOException t) {
             throw t;
