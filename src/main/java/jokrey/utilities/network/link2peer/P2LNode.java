@@ -248,10 +248,10 @@ public interface P2LNode {
      * @param initialTimeout initial timeout - since doubled with each retry, max timeout is: (initialTimeout * 2^retries)
      * @throws IOException if any send went to garbage
      */
-    void sendMessageBlocking(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) throws IOException; //initial timeout is doubled
-    /**@see #sendMessageBlocking(SocketAddress, P2LMessage, int, int)*/
-    default void sendMessageBlocking(P2Link to, P2LMessage message, int attempts, int initialTimeout) throws IOException {
-        sendMessageBlocking(to.getSocketAddress(), message, attempts, initialTimeout);
+    void sendMessageWithRetries(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) throws IOException; //initial timeout is doubled
+    /**@see #sendMessageWithRetries(SocketAddress, P2LMessage, int, int)*/
+    default void sendMessageWithRetries(P2Link to, P2LMessage message, int attempts, int initialTimeout) throws IOException {
+        sendMessageWithRetries(to.getSocketAddress(), message, attempts, initialTimeout);
     }
 
 

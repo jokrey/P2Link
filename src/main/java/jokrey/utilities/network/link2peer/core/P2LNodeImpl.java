@@ -149,7 +149,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         validateMsgIdNotInternal(message.header.getType());
         return sendInternalMessageWithReceipt(message, to);
     }
-    @Override public void sendMessageBlocking(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) throws IOException {
+    @Override public void sendMessageWithRetries(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) throws IOException {
         validateMsgIdNotInternal(message.header.getType());
         sendInternalMessageBlocking(message, to, attempts, initialTimeout);
     }
@@ -200,6 +200,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
     @Override public P2LFuture<P2LMessage> expectBroadcastMessage(int messageType) {
         validateMsgIdNotInternal(messageType);
+        System.out.println("incomingHandler.userBrdMessageQueue.debugString() = " + incomingHandler.userBrdMessageQueue.debugString());
         return incomingHandler.userBrdMessageQueue.futureFor(messageType);
     }
 //    @Override public P2LFuture<P2LMessage> expectBroadcastMessage(P2Link from, int messageType) {
@@ -326,7 +327,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
 
 
-    private AtomicInteger runningConversationId = new AtomicInteger(1);
+    private AtomicInteger runningConversationId = new AtomicInteger(NO_CONVERSATION_ID + 1);
     @Override public int createUniqueConversationId() {
         int uniqueConversationId;
         do {

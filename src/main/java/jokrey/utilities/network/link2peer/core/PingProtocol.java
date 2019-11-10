@@ -13,9 +13,9 @@ import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.SL
  */
 class PingProtocol {
     static void asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
-        parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SL_PING, P2LMessage.EXPIRE_INSTANTLY), to);
+        parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SL_PING), to);
     }
     static void asAnswerer(P2LNodeInternal parent, SocketAddress from) throws IOException {
-        parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SL_PONG, P2LMessage.EXPIRE_INSTANTLY), from);
+        parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SL_PONG), from);
     }
 }

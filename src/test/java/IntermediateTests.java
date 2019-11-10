@@ -6,7 +6,6 @@ import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.core.IncomingHandler;
 import jokrey.utilities.network.link2peer.core.NodeCreator;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
-import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.core.message_headers.StreamPartHeader;
 import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
@@ -20,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -30,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
+import static jokrey.utilities.network.link2peer.P2LMessage.MAX_EXPIRATION_TIMEOUT;
 import static jokrey.utilities.network.link2peer.core.IncomingHandler.NUMBER_OF_STREAM_PARTS_RECEIVED;
 import static jokrey.utilities.network.link2peer.core.IncomingHandler.NUMBER_OF_STREAM_RECEIPTS_RECEIVED;
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.rand;
@@ -438,9 +437,9 @@ class IntermediateTests {
         printPeers(node1, node2);
 
         P2LFuture<Boolean> sendResult;
-        sendResult = node2.sendMessageWithReceipt(node1.getSelfLink(), P2LMessage.Factory.createSendMessage(1, "hallo"));
+        sendResult = node2.sendMessageWithReceipt(node1.getSelfLink(), P2LMessage.Factory.createSendMessage(1, MAX_EXPIRATION_TIMEOUT, "hallo"));
         assertTrue(sendResult.get(200));
-        sendResult = node1.sendMessageWithReceipt(node2.getSelfLink(), P2LMessage.Factory.createSendMessage(1, "welt"));
+        sendResult = node1.sendMessageWithReceipt(node2.getSelfLink(), P2LMessage.Factory.createSendMessage(1, MAX_EXPIRATION_TIMEOUT, "welt"));
         assertTrue(sendResult.get(200));
 
         String node2Received = node2.expectMessage(1).get(200).asString();
@@ -448,14 +447,14 @@ class IntermediateTests {
         String node1Received = node1.expectMessage(1).get(200).asString();
         assertEquals("hallo", node1Received);
 
-        sendResult = node2.sendMessageWithReceipt(node1.getSelfLink(), P2LMessage.Factory.createSendMessage(25, "hallo welt!"));
+        sendResult = node2.sendMessageWithReceipt(node1.getSelfLink(), P2LMessage.Factory.createSendMessage(25, MAX_EXPIRATION_TIMEOUT, "hallo welt!"));
         assertTrue(sendResult.get(200));
 
         assertThrows(TimeoutException.class, () -> {
             node1.expectMessage(1).get(100); //will timeout, because message was consumed
         });
 
-        sendResult = node2.sendMessageWithReceipt(node1.getSelfLink(), P2LMessage.Factory.createSendMessage(1, "hallo welt"));
+        sendResult = node2.sendMessageWithReceipt(node1.getSelfLink(), P2LMessage.Factory.createSendMessage(1, MAX_EXPIRATION_TIMEOUT, "hallo welt"));
         assertTrue(sendResult.get(200));
         String node1Received2 = node1.expectMessage(1).get(100).asString(); //no longer times out, because node 2 has send another message now
         assertEquals("hallo welt", node1Received2);
@@ -485,9 +484,9 @@ class IntermediateTests {
         printPeers(node1, node2);
 
         P2LFuture<Boolean> sendResult;
-        sendResult = node1.sendMessageWithReceipt(node2.getSelfLink(), P2LMessage.Factory.createSendMessage(randomType, toSend_1To2));
+        sendResult = node1.sendMessageWithReceipt(node2.getSelfLink(), P2LMessage.Factory.createSendMessage(randomType, MAX_EXPIRATION_TIMEOUT, toSend_1To2));
         assertTrue(sendResult.get(2000));
-        sendResult = node2.sendMessageWithReceipt(node1.getSelfLink(), P2LMessage.Factory.createSendMessage(randomType, toSend_2To1));
+        sendResult = node2.sendMessageWithReceipt(node1.getSelfLink(), P2LMessage.Factory.createSendMessage(randomType, MAX_EXPIRATION_TIMEOUT, toSend_2To1));
         assertTrue(sendResult.get(2000));
 
         P2LMessage message = node1.expectMessage(randomType).get(200);
@@ -662,7 +661,7 @@ class IntermediateTests {
 
         brdMsgToSend.set(new byte[] {1,2,3,4,5,6,7,8,9}); //note that it is the same message as before, the hash nonetheless changes...
 
-        sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(senderLink, 10, brdMsgToSend.get())); //IF NOT SUPPLYING A MESSAGE ID, THE OLD MESSAGES WILL BE RECEIVED HERE FIRST....
+        sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(senderLink, 10, MAX_EXPIRATION_TIMEOUT, brdMsgToSend.get())); //IF NOT SUPPLYING A MESSAGE ID, THE OLD MESSAGES WILL BE RECEIVED HERE FIRST....
         assertEquals(10, sendResult.get(1000).intValue());
 
         for(P2LNode node:nodes) {
@@ -730,7 +729,7 @@ class IntermediateTests {
         sleep(50);
         future.get().cancel();
 //        sleep(500);
-        nodes[0].sendMessage(nodes[1].getSelfLink(), P2LMessage.Factory.createSendMessage(1, new Integer(142)));
+        nodes[0].sendMessage(nodes[1].getSelfLink(), P2LMessage.Factory.createSendMessage(1, MAX_EXPIRATION_TIMEOUT, 142));
         sleep(500);//ensure other, canceled future could theoretically receive it, before the next line takes precedence
         assertEquals(142, nodes[1].expectMessage(1).get(100).nextInt());
         assertEquals(1, successCounter.get());
@@ -771,17 +770,17 @@ class IntermediateTests {
             for (P2LNode node : nodes)
                 node.addBroadcastListener(message -> System.out.println("message = " + message));
 
-            nodes[0].sendMessageBlocking(nodes[1].getSelfLink(), P2LMessage.Factory.createSendMessage(1, "sup"), 3, 500); //not even an established connection
-            nodes[0].sendMessageBlocking(nodes[2].getSelfLink(), P2LMessage.Factory.createSendMessage(1, "sup"), 3, 500);
+            nodes[0].sendMessageWithRetries(nodes[1].getSelfLink(), P2LMessage.Factory.createSendMessage(1, MAX_EXPIRATION_TIMEOUT, "sup"), 3, 500); //not even an established connection
+            nodes[0].sendMessageWithRetries(nodes[2].getSelfLink(), P2LMessage.Factory.createSendMessage(1, MAX_EXPIRATION_TIMEOUT, "sup"), 3, 500);
             assertEquals("sup", nodes[1].expectMessage(1).get(1).asString());
             assertEquals("sup", nodes[2].expectMessage(1).get(1).asString());
             assertThrows(TimeoutException.class, () -> nodes[3].expectMessage(1).get(1));
 
-            nodes[6].sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(nodes[6].getSelfLink(), 1, "sup")).waitForIt(20000);
+            nodes[6].sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(nodes[6].getSelfLink(), 1, MAX_EXPIRATION_TIMEOUT, "sup")).waitForIt(20000);
 
             for (P2LNode node : nodes)
                 if (node != nodes[6])
-                    node.expectBroadcastMessage(1).get(1000);
+                    node.expectBroadcastMessage(1).waitForIt(2500);
 
             close(nodes);
         } finally {

@@ -32,6 +32,6 @@ class RequestPeerLinksProtocol {
             if (!origEstablishedConnection.getSocketAddress().equals(fromRaw))
                 establishedAsStrings.add(origEstablishedConnection.getStringRepresentation());
 
-        parent.sendInternalMessage(P2LMessage.Factory.createSendMessageFromVariables(C_PEER_LINKS, P2LMessage.EXPIRE_INSTANTLY, establishedAsStrings), fromRaw);
+        parent.sendInternalMessage(P2LMessage.Factory.createSendMessageFromVariables(C_PEER_LINKS, establishedAsStrings), fromRaw);
     }
 }

@@ -6,6 +6,7 @@ import jokrey.utilities.encoder.as_union.li.bytes.LIbae;
 import jokrey.utilities.encoder.tag_based.implementation.paired.length_indicator.type.transformer.LITypeToBytesTransformer;
 import jokrey.utilities.encoder.type_transformer.bytes.TypeToBytesTransformer;
 import jokrey.utilities.network.link2peer.core.message_headers.CustomExpirationHeader;
+import jokrey.utilities.network.link2peer.core.message_headers.MinimalHeader;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.core.message_headers.ReceiptHeader;
 import jokrey.utilities.network.link2peer.util.Hash;
@@ -218,8 +219,6 @@ public class P2LMessage {
     }
 
 
-
-
     /**
      * Factory for P2LMessages.
      * Since received messages are automatically decoded, this factory only provides public methods to create send messages.
@@ -236,16 +235,16 @@ public class P2LMessage {
          * @return the new message
          */
         public static P2LMessage createSendMessage(int type) {
-            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, MAX_EXPIRATION_TIMEOUT, 0);
+            return createRawSendMessage(type, P2LNode.NO_CONVERSATION_ID, EXPIRE_INSTANTLY, 0);
         }
         public static P2LMessage createSendMessage(int type, int conversationId) {
-            return createSendMessageWith(type, conversationId, MAX_EXPIRATION_TIMEOUT, 0);
+            return createRawSendMessage(type, conversationId, EXPIRE_INSTANTLY, 0);
         }
         public static P2LMessage createSendMessage(int type, short expiresAfter) {
-            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, 0);
+            return createRawSendMessage(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, 0);
         }
         public static P2LMessage createSendMessage(int type, int conversationId, short expiresAfter) {
-            return createSendMessageWith(type, conversationId, expiresAfter, 0);
+            return createRawSendMessage(type, conversationId, expiresAfter, 0);
         }
 
         /**
@@ -255,19 +254,19 @@ public class P2LMessage {
          * @return the new message
          */
         public static P2LMessage createSendMessage(int type, byte[] payload) {
-            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, MAX_EXPIRATION_TIMEOUT, payload.length, payload);
+            return createRawSendMessage(type, P2LNode.NO_CONVERSATION_ID, EXPIRE_INSTANTLY, payload.length, payload);
         }
         public static P2LMessage createSendMessage(int type, int conversationId, byte[] payload) {
-            return createSendMessageWith(type, conversationId, MAX_EXPIRATION_TIMEOUT, payload.length, payload);
+            return createRawSendMessage(type, conversationId, EXPIRE_INSTANTLY, payload.length, payload);
         }
         public static P2LMessage createSendMessage(int type, short expiresAfter, byte[] payload) {
-            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, payload.length, payload);
+            return createRawSendMessage(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, payload.length, payload);
         }
         public static P2LMessage createSendMessage(int type, int conversationId, short expiresAfter, byte[] payload) {
-            return createSendMessageWith(type, conversationId, expiresAfter, payload.length, payload);
+            return createRawSendMessage(type, conversationId, expiresAfter, payload.length, payload);
         }
 
-        public static P2LMessage createSendMessageWith(int type, int conversationId, short expiresAfter, int totalPayloadSize, byte[]... payloads) {
+        public static P2LMessage createRawSendMessage(int type, int conversationId, short expiresAfter, int totalPayloadSize, byte[]... payloads) {
             P2LMessageHeader header = P2LMessageHeader.from(null, type, conversationId, expiresAfter);
             byte[] raw = header.generateRaw(totalPayloadSize);
             int index = header.getSize();
@@ -285,11 +284,11 @@ public class P2LMessage {
         public static <T>P2LMessage createSendMessage(int type, short expiresAfter, T payload) {
             return createSendMessage(type, expiresAfter, trans.transform(payload));
         }
-        public static P2LMessage createSendMessageFrom(int type, Object... payloads) {
+        public static P2LMessage createSendMessageWith(int type, Object... payloads) {
             return createSendMessageFrom(type, P2LNode.NO_CONVERSATION_ID, payloads);
         }
         public static P2LMessage createSendMessageFrom(int type, int conversationId, Object... payloads) {
-            return createSendMessageFrom(type, conversationId, MAX_EXPIRATION_TIMEOUT, payloads);
+            return createSendMessageFrom(type, conversationId, EXPIRE_INSTANTLY, payloads);
         }
         public static P2LMessage createSendMessageFromWithExpiration(int type, short expiresAfter, Object... payloads) {
             return createSendMessageFrom(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, payloads);
@@ -301,16 +300,16 @@ public class P2LMessage {
                 total[i] = trans.transform(payloads[i]);
                 sizeCounter+=total[i].length;
             }
-            return createSendMessageWith(type, conversationId, expiresAfter, sizeCounter, total);
+            return createRawSendMessage(type, conversationId, expiresAfter, sizeCounter, total);
         }
         public static P2LMessage createSendMessageFromVariables(int type, Object... payloads) {
-            return createSendMessageFromVariablesWithExpiration(type, MAX_EXPIRATION_TIMEOUT, payloads);
+            return createSendMessageFromVariablesWithExpiration(type, EXPIRE_INSTANTLY, payloads);
         }
         public static P2LMessage createSendMessageFromVariablesWithExpiration(int type, short expiresAfter, Object... payloads) {
             return createSendMessageFromVariablesWithExpiration(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, payloads);
         }
         public static P2LMessage createSendMessageFromVariablesWithConversationId(int type, int conversationId, Object... payloads) {
-            return createSendMessageFromVariablesWithExpiration(type, conversationId, MAX_EXPIRATION_TIMEOUT, payloads);
+            return createSendMessageFromVariablesWithExpiration(type, conversationId, EXPIRE_INSTANTLY, payloads);
         }
         public static P2LMessage createSendMessageFromVariablesWithExpiration(int type, int conversationId, short expiresAfter, Object... payloads) {
             byte[][] total = new byte[payloads.length*2][];
@@ -320,10 +319,10 @@ public class P2LMessage {
                 total[i] = makeVariableIndicatorFor(total[i+1].length);
                 sizeCounter+=total[i].length + total[i+1].length;
             }
-            return createSendMessageWith(type, conversationId, expiresAfter, sizeCounter, total);
+            return createRawSendMessage(type, conversationId, expiresAfter, sizeCounter, total);
         }
         public static P2LMessage createSendMessageFromVariables(int type, Collection payloads) {
-            return createSendMessageFromVariables(type, MAX_EXPIRATION_TIMEOUT, payloads);
+            return createSendMessageFromVariables(type, EXPIRE_INSTANTLY, payloads);
         }
         public static P2LMessage createSendMessageFromVariables(int type, short expiresAfter, Collection payloads) {
             Iterator payloadsIterator = payloads.iterator();
@@ -334,15 +333,20 @@ public class P2LMessage {
                 total[i] = makeVariableIndicatorFor(total[i + 1].length);
                 sizeCounter += total[i].length + total[i + 1].length;
             }
-            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, sizeCounter, total);
+            return createRawSendMessage(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, sizeCounter, total);
         }
 
         public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, Object payload) {
             return createBroadcast(sender, brdMsgType, trans.transform(payload));
         }
         public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, byte[] payload) {
-            P2LMessageHeader header = new CustomExpirationHeader(sender, brdMsgType, MAX_EXPIRATION_TIMEOUT, false);
-            return header.generateMessage(payload);
+            return new MinimalHeader(sender, brdMsgType, false).generateMessage(payload);
+        }
+        public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, short expiresAfter, Object payload) {
+            return createBroadcast(sender, brdMsgType, expiresAfter, trans.transform(payload));
+        }
+        public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, short expiresAfter, byte[] payload) {
+            return new CustomExpirationHeader(sender, brdMsgType, expiresAfter, false).generateMessage(payload);
         }
 
 
@@ -378,46 +382,52 @@ public class P2LMessage {
     /** resets the internal iterating pointer */
     public void resetReader() {pointer = header.getSize();}
 
-    /** decodes the next payload byte as a boolean (more context efficient {@link LITypeToBytesTransformer#detransform_boolean(byte[])}) */
+    /** decodes the next payload byte as a boolean (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_boolean(byte[])}) */
     public boolean nextBool() {
         return raw[pointer++] == 1;
     }
-    /** decodes the next payload byte as a byte (more context efficient {@link LITypeToBytesTransformer#detransform_byte(byte[])}) */
+    /** decodes the next payload byte as a byte (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_byte(byte[])}) */
     public byte nextByte() {
         return raw[pointer++];
     }
-    /** decodes the next 4 payload bytes as an integer(32bit) (more context efficient {@link LITypeToBytesTransformer#detransform_int(byte[])}) */
+    /** decodes the next 2 payload bytes as an integer(32bit) (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_int(byte[])}) */
+    public short nextShort() {
+        int before = pointer;
+        pointer+=2; //temp maybe useless if this evaluates to pointer value before...
+        return BitHelper.getInt16From(raw, before);
+    }
+    /** decodes the next 4 payload bytes as an integer(32bit) (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_int(byte[])}) */
     public int nextInt() {
         int before = pointer;
         pointer+=4; //temp maybe useless if this evaluates to pointer value before...
         return BitHelper.getInt32From(raw, before);
     }
-    /** decodes the next 8 payload bytes as an integer(64bit) (more context efficient {@link LITypeToBytesTransformer#detransform_long(byte[])}) */
+    /** decodes the next 8 payload bytes as an integer(64bit) (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_long(byte[])}) */
     public long nextLong() {
         int before = pointer;
         pointer+=8; //temp maybe useless if this evaluates to pointer value before...
         return BitHelper.getIntFromNBytes(raw, before, 8);
     }
-    /** decodes the next 4 payload bytes as a floating point number(32 bit) (more context efficient {@link LITypeToBytesTransformer#detransform_float(byte[])} (byte[])}) */
+    /** decodes the next 4 payload bytes as a floating point number(32 bit) (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_float(byte[])} (byte[])}) */
     public float nextFloat() {
         int before = pointer;
         pointer+=4; //temp maybe useless if this evaluates to pointer value before...
         return BitHelper.getFloat32From(raw, before);
     }
-    /** decodes the next 8 payload bytes as a floating point number(64 bit) (more context efficient {@link LITypeToBytesTransformer#detransform_double(byte[])} (byte[])}) */
+    /** decodes the next 8 payload bytes as a floating point number(64 bit) (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_double(byte[])} (byte[])}) */
     public double nextDouble() {
         int before = pointer;
         pointer+=8; //temp maybe useless if this evaluates to pointer value before...
         return BitHelper.getFloat64From(raw, before);
     }
-    /** decodes the next n payload bytes as bytes - uses length indicator functionality to determine n (more context efficient {@link LIbae#decode(LIPosition)}) */
+    /** decodes the next n payload bytes as bytes - uses length indicator functionality to determine n (same as, but more context efficient {@link LIbae#decode(LIPosition)}) */
     public byte[] nextVariable() {
         long[] li_bounds = LIbae.get_next_li_bounds(raw, pointer, pointer, header.getSize() + payloadLength - 1);
         if(li_bounds == null) return null;
         pointer = (int) li_bounds[1];
         return Arrays.copyOfRange(raw, (int) li_bounds[0], (int) li_bounds[1]);
     }
-    /** decodes the next n payload bytes as a utf8 string - uses length indicator functionality to determine n (more context efficient {@link LIbae#decode(LIPosition)}) */
+    /** decodes the next n payload bytes as a utf8 string - uses length indicator functionality to determine n (same as, but more context efficient {@link LIbae#decode(LIPosition)}) */
     public String nextVariableString() {
         long[] li_bounds = LIbae.get_next_li_bounds(raw, pointer, pointer, header.getSize() + payloadLength - 1);
         if(li_bounds == null) return null;

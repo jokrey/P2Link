@@ -8,7 +8,6 @@ import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
 import java.net.SocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,7 +29,8 @@ class BroadcastMessageProtocol {
                         byte[] senderBytes = message.header.getSender().getBytesRepresentation();
                         try {
                             parent.sendInternalMessage(
-                                    P2LMessage.Factory.createSendMessageFromWithExpiration(C_BROADCAST_MSG, P2LMessage.EXPIRE_INSTANTLY, message.header.getType(),
+                                    P2LMessage.Factory.createSendMessageWith(C_BROADCAST_MSG,
+                                            message.header.getType(), message.header.getExpiresAfter(),
                                             P2LMessage.makeVariableIndicatorFor(senderBytes.length), senderBytes,
                                             P2LMessage.makeVariableIndicatorFor(message.payloadLength), message.asBytes()),
                                     to);
@@ -54,7 +54,7 @@ class BroadcastMessageProtocol {
         if(state.isKnown(brdMessageHash)) {
 //        if(wasKnown) {
 //            System.out.println("receiving message at " + parent.getSelfLink() + " - known - sending msg knowledge return");
-            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(C_BROADCAST_MSG_KNOWLEDGE_RETURN, P2LMessage.EXPIRE_INSTANTLY, true), from);
+            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(C_BROADCAST_MSG_KNOWLEDGE_RETURN, true), from);
 //            System.out.println("receiving message at " + parent.getSelfLink() + " - known - send msg knowledge return");
             return null; //do not tell application about broadcast again
         } else {
@@ -63,9 +63,10 @@ class BroadcastMessageProtocol {
     //            System.out.println("receiving message at " + parent.getSelfLink() + " - NOT known - send msg knowledge return");
 
                 P2LMessage message = parent.expectInternalMessage(from, C_BROADCAST_MSG)
-                        .nowOrCancel(()-> parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(C_BROADCAST_MSG_KNOWLEDGE_RETURN, P2LMessage.EXPIRE_INSTANTLY, false), from))
+                        .nowOrCancel(()-> parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(C_BROADCAST_MSG_KNOWLEDGE_RETURN, false), from))
                         .get(P2LHeuristics.DEFAULT_PROTOCOL_ANSWER_RECEIVE_TIMEOUT);
                 int brdMsgType = message.nextInt();
+                short expiresAfter = message.nextShort();
                 P2Link sender = P2Link.fromString(message.nextVariableString());
                 byte[] data = message.nextVariable();
     //            System.out.println("receiving message at " + parent.getSelfLink() + " - read data");
@@ -77,7 +78,7 @@ class BroadcastMessageProtocol {
                 if(state.markAsKnown(brdMessageHash)) // while receiving this message, this node has received it from somewhere else
                     return null;
 
-                P2LMessage receivedMessage = P2LMessage.Factory.createBroadcast(sender, brdMsgType, data);
+                P2LMessage receivedMessage = P2LMessage.Factory.createBroadcast(sender, brdMsgType, expiresAfter, data);
                 relayBroadcast(parent, receivedMessage, from);
     //            System.out.println("receiving message at " + parent.getSelfLink() + " - relayed broadcast");
 
