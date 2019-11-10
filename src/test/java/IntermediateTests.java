@@ -1225,7 +1225,7 @@ class IntermediateTests {
 
             close(hidNode1, pubNode2);
 
-            //public - hidden
+            //public - hidden (using relay)
             pubNode1 = NodeCreator.create(P2Link.createPublicLink("localhost", 7890));
             hidNode2 = NodeCreator.create(P2Link.createPrivateLink(7891));
 
@@ -1238,11 +1238,29 @@ class IntermediateTests {
             assertTrue(pubRelayConFut.get(1000) && hidRelayConFut.get(1000));
 
             List<P2Link> linksQueriedFromRelayNode = pubNode1.queryKnownLinksOf(pubRelayNode3.getSelfLink());
-            System.out.println("linksQueriedFromRelayNode = " + linksQueriedFromRelayNode);
-            assertEquals(1, linksQueriedFromRelayNode.size());
+            System.out.println("linksQueriedFromRelayNode(pubHid) = " + linksQueriedFromRelayNode);
+            assertEquals(1, linksQueriedFromRelayNode.size()); //NOTE: only equal to 1, because the requesting link is obviously filtered from queried list
             //todo currently operates very wrongly internally..
             P2LFuture<Boolean> pubHidConFut = pubNode1.establishConnection(linksQueriedFromRelayNode.get(0));//automatically establishes a connection - through a reverse connection from hid to pub
-            assertTrue(pubHidConFut.get(10000));
+            assertTrue(pubHidConFut.get(2500));
+
+            close(pubNode1, hidNode2, pubRelayNode3);
+
+            //hidden - hidden (using relay)
+            hidNode1 = NodeCreator.create(P2Link.createPrivateLink(7890));
+            hidNode2 = NodeCreator.create(P2Link.createPrivateLink(7891));
+            pubRelayNode3 = NodeCreator.create(P2Link.createPublicLink("localhost", 7892));
+            P2LFuture<Boolean> hidRelayConFut1 = hidNode1.establishConnection(pubRelayNode3.getSelfLink());
+            P2LFuture<Boolean> hidRelayConFut2 = hidNode2.establishConnection(pubRelayNode3.getSelfLink());
+            assertTrue(hidRelayConFut1.get(1000) && hidRelayConFut2.get(1000));
+
+            linksQueriedFromRelayNode = hidNode1.queryKnownLinksOf(pubRelayNode3.getSelfLink());
+            System.out.println("linksQueriedFromRelayNode(hidHid) = " + linksQueriedFromRelayNode);
+            assertEquals(1, linksQueriedFromRelayNode.size());
+            P2LFuture<Boolean> hidHidConFut = hidNode1.establishConnection(linksQueriedFromRelayNode.get(0));//automatically establishes a connection - through a reverse connection from hid to pub
+            assertTrue(hidHidConFut.get(2500));
+
+            close(hidNode1, hidNode2, pubRelayNode3);
         } finally {
             close(pubNode1, pubNode2, hidNode1, hidNode2, pubRelayNode3);
         }

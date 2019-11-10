@@ -33,17 +33,22 @@ class EstablishConnectionProtocol {
             throw new IllegalArgumentException("cannot connect to private link");
         else if(to.isHiddenLink()) {
             P2Link self = parent.getSelfLink();
-            if(self.isPrivateLink() || self.isHiddenLink()) {
-                throw new UnsupportedOperationException();
+            if(self.isPrivateLink() || self.isHiddenLink()) { //self should always be private or public, but it is possible to manually set it to a hidden link
+                //todo - this scenario could not be realisticly tested as of yet AND cannot be tested automatically
+                //attempt direct connection to the link the relay server sees
+                if(asInitiatorDirect(parent, to, P2LNode.NO_CONVERSATION_ID, attempts, initialTimeout))
+                    return true;
+                //if that does not work, request a reverse connection to the link the relay server sees of this node
+                return asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, false, attempts, initialTimeout);
             } else {
-                return asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, attempts, initialTimeout);
+                return asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, true, attempts, initialTimeout);
             }
         } else {// if(to.isPublicLink()) {
             return asInitiatorDirect(parent, to, P2LNode.NO_CONVERSATION_ID, attempts, initialTimeout);
         }
     }
 
-    private static boolean asInitiatorRequestReverseConnection(P2LNodeInternal parent, SocketAddress relaySocketAddress, P2Link to, int attempts, int initialTimeout) throws IOException {
+    private static boolean asInitiatorRequestReverseConnection(P2LNodeInternal parent, SocketAddress relaySocketAddress, P2Link to, boolean giveExplicitSelfLink, int attempts, int initialTimeout) throws IOException {
         int conversationId = parent.createUniqueConversationId();
         P2LFuture<Boolean> future = new P2LFuture<>();
         parent.addConnectionEstablishedListener((link, connectConversationId) -> {
@@ -54,12 +59,13 @@ class EstablishConnectionProtocol {
         });
         parent.sendInternalMessageBlocking(P2LMessage.Factory.createSendMessageFromVariablesWithConversationId(SL_RELAY_REQUEST_DIRECT_CONNECT,
                 conversationId,
-                parent.getSelfLink().getBytesRepresentation(),
+                !giveExplicitSelfLink?new byte[0]:parent.getSelfLink().getBytesRepresentation(),
                 to.getBytesRepresentation()), relaySocketAddress, attempts, initialTimeout);
         return future.get((long) (initialTimeout*Math.pow(2, attempts)));
     }
     static void asAnswererRelayRequestReverseConnection(P2LNodeInternal parent, P2LMessage initialRequestMessage) throws IOException {
-        P2Link connectTo = P2Link.fromBytes(initialRequestMessage.nextVariable());
+        byte[] connectToRaw = initialRequestMessage.nextVariable();
+        P2Link connectTo = connectToRaw.length==0?initialRequestMessage.header.getSender():P2Link.fromBytes(connectToRaw);
         P2Link requestFrom = P2Link.fromBytes(initialRequestMessage.nextVariable());
         parent.sendInternalMessageBlocking(P2LMessage.Factory.createSendMessage(SL_REQUEST_DIRECT_CONNECT_TO, initialRequestMessage.header.getConversationId(), connectTo.getBytesRepresentation()),
                 requestFrom.getSocketAddress(), P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT);
@@ -92,7 +98,7 @@ class EstablishConnectionProtocol {
                     });
         });
 
-        if (to.equals(peerLink)) {
+        if (to.isHiddenLink() || to.equals(peerLink)) {
             parent.graduateToEstablishedConnection(peerLink, conversationId);
             return true;
         } else {

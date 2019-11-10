@@ -26,11 +26,10 @@ class RequestPeerLinksProtocol {
                 }));
     }
     static void asAnswerer(P2LNodeInternal parent, SocketAddress fromRaw) throws IOException {
-        P2Link from = P2Link.createPublicLink((InetSocketAddress) fromRaw);
         P2Link[] origEstablishedConnections = parent.getEstablishedConnections().toArray(new P2Link[0]);
         ArrayList<String> establishedAsStrings = new ArrayList<>(origEstablishedConnections.length);
         for (P2Link origEstablishedConnection : origEstablishedConnections)
-            if (!origEstablishedConnection.equals(from))
+            if (!origEstablishedConnection.getSocketAddress().equals(fromRaw))
                 establishedAsStrings.add(origEstablishedConnection.getStringRepresentation());
 
         parent.sendInternalMessage(P2LMessage.Factory.createSendMessageFromVariables(C_PEER_LINKS, P2LMessage.EXPIRE_INSTANTLY, establishedAsStrings), fromRaw);

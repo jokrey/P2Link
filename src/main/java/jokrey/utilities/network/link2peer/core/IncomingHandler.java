@@ -54,7 +54,7 @@ public class IncomingHandler {
 
         parent.notifyPacketReceivedFrom(from);
 
-        //todo:?: allow streams and long messages only from established connections? - why tho?
+        //todo:?: allow streams and long messages only from established connections? - why tho? - mtu knowledge + some more ddos protection maybe
         if(message.header.isStreamPart()) {
             if(message.header.isReceipt()) {
                 streamMessageHandler.receivedReceipt(message);
