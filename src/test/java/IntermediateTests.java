@@ -750,6 +750,7 @@ class IntermediateTests {
 
     @Test void stillWorksWithDroppedPackagesTest() throws IOException {
         IncomingHandler.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 10;
+        IncomingHandler.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
 
         try {
             P2LNode[] nodes = generateNodes(10, 61408);
@@ -785,6 +786,36 @@ class IntermediateTests {
             close(nodes);
         } finally {
             IncomingHandler.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
+        }
+    }
+
+    @Test void broadcastWithAndWithoutHash() throws IOException {
+        P2LHeuristics.BROADCAST_USES_HASH_DETOUR_RAW_SIZE_THRESHOLD = 100;
+        try {
+            int sameType = 1234;
+
+            P2LNode[] nodes = generateNodes(6, 37412);
+            fullConnect(nodes).waitForIt(2500);
+
+            TimeDiffMarker.setMark_d();
+            byte[] shortPayload = {1, 9, 2, 8, 3, 7, 4, 6, 5};
+            nodes[0].sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(nodes[0].getSelfLink(), sameType, MAX_EXPIRATION_TIMEOUT, shortPayload));
+            for (P2LNode node : nodes)
+                if (node != nodes[0])
+                    assertArrayEquals(shortPayload, node.expectBroadcastMessage(sameType).get(2500).asBytes());
+
+            TimeDiffMarker.println_setMark_d();
+
+            byte[] longPayload = new byte[P2LHeuristics.BROADCAST_USES_HASH_DETOUR_RAW_SIZE_THRESHOLD * 2];
+            ThreadLocalRandom.current().nextBytes(longPayload);
+            nodes[0].sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(nodes[0].getSelfLink(), sameType, MAX_EXPIRATION_TIMEOUT, longPayload));
+            for (P2LNode node : nodes)
+                if (node != nodes[0])
+                    assertArrayEquals(longPayload, node.expectBroadcastMessage(sameType).get(2500).asBytes());
+
+            TimeDiffMarker.println_d();
+        } finally {
+            P2LHeuristics.BROADCAST_USES_HASH_DETOUR_RAW_SIZE_THRESHOLD = P2LMessage.CUSTOM_RAW_SIZE_LIMIT;
         }
     }
 

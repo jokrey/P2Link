@@ -68,7 +68,7 @@ class EstablishConnectionProtocol {
             if(conversationId == connectConversationId)
                 future.setCompleted(true);
         });
-        parent.sendInternalMessageBlocking(P2LMessage.Factory.createSendMessageFromVariablesWithConversationId(SL_RELAY_REQUEST_DIRECT_CONNECT,
+        parent.sendInternalMessageWithRetries(P2LMessage.Factory.createSendMessageFromVariablesWithConversationId(SL_RELAY_REQUEST_DIRECT_CONNECT,
                 conversationId,
                 !giveExplicitSelfLink?new byte[0]:parent.getSelfLink().getBytesRepresentation(),
                 to.getBytesRepresentation()), relaySocketAddress, attempts, initialTimeout);
@@ -78,7 +78,7 @@ class EstablishConnectionProtocol {
         byte[] connectToRaw = initialRequestMessage.nextVariable();
         P2Link connectTo = connectToRaw.length==0?initialRequestMessage.header.getSender():P2Link.fromBytes(connectToRaw);
         P2Link requestFrom = P2Link.fromBytes(initialRequestMessage.nextVariable());
-        parent.sendInternalMessageBlocking(P2LMessage.Factory.createSendMessage(SL_REQUEST_DIRECT_CONNECT_TO, initialRequestMessage.header.getConversationId(), connectTo.getBytesRepresentation()),
+        parent.sendInternalMessageWithRetries(P2LMessage.Factory.createSendMessage(SL_REQUEST_DIRECT_CONNECT_TO, initialRequestMessage.header.getConversationId(), connectTo.getBytesRepresentation()),
                 requestFrom.getSocketAddress(), P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT);
     }
     static void asAnswererRequestReverseConnection(P2LNodeInternal parent, P2LMessage initialRequestMessage) throws IOException {

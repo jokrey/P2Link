@@ -82,7 +82,7 @@ public class P2LMessage {
     /** decodes all payload bytes - the returned array is cached and will be returned when this method is called again - the returned array should NOT BE MUTATED */
     public byte[] asBytes() {
         if(payload == null)//no need for thread safety measures since the same value is calculated...
-            payload = Arrays.copyOfRange(raw, header.getSize(), header.getSize() + payloadLength);
+            payload = Arrays.copyOfRange(raw, header.getSize(), requiredRawSize());
         return payload;
     }
 
@@ -100,7 +100,7 @@ public class P2LMessage {
     /** @return a udp datagram packet from the internal data - it can be decoded on the receiver side using {@link #fromPacket(DatagramPacket)}
      * @param to receiver of the created datagram packet*/
     public DatagramPacket toPacket(SocketAddress to) {
-        int actualLength = header.getSize() + payloadLength;
+        int actualLength = requiredRawSize();
 
         int maxSize = getMaxPacketSize();
         byte[] actual = raw;
@@ -135,8 +135,14 @@ public class P2LMessage {
         return new P2LMessage(header, null, raw, packet.getLength()-header.getSize(), null);
     }
 
+    /** @return whether a single packet will suffice to send the data this message contains */
     public boolean canBeSentInSinglePacket() {
-        return header.getSize() + payloadLength <= getMaxPacketSize();
+        return requiredRawSize() <= getMaxPacketSize();
+    }
+
+    /** @return the minimum required number of bytes to hold all data in this message */
+    public int requiredRawSize() {
+        return header.getSize() + payloadLength;
     }
 
 
@@ -422,14 +428,14 @@ public class P2LMessage {
     }
     /** decodes the next n payload bytes as bytes - uses length indicator functionality to determine n (same as, but more context efficient {@link LIbae#decode(LIPosition)}) */
     public byte[] nextVariable() {
-        long[] li_bounds = LIbae.get_next_li_bounds(raw, pointer, pointer, header.getSize() + payloadLength - 1);
+        long[] li_bounds = LIbae.get_next_li_bounds(raw, pointer, pointer, requiredRawSize() - 1);
         if(li_bounds == null) return null;
         pointer = (int) li_bounds[1];
         return Arrays.copyOfRange(raw, (int) li_bounds[0], (int) li_bounds[1]);
     }
     /** decodes the next n payload bytes as a utf8 string - uses length indicator functionality to determine n (same as, but more context efficient {@link LIbae#decode(LIPosition)}) */
     public String nextVariableString() {
-        long[] li_bounds = LIbae.get_next_li_bounds(raw, pointer, pointer, header.getSize() + payloadLength - 1);
+        long[] li_bounds = LIbae.get_next_li_bounds(raw, pointer, pointer, requiredRawSize() - 1);
         if(li_bounds == null) return null;
         pointer = (int) li_bounds[1];
         return new String(raw, (int) li_bounds[0], (int) (li_bounds[1]-li_bounds[0]), StandardCharsets.UTF_8);

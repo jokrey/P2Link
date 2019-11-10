@@ -151,7 +151,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
     @Override public void sendMessageWithRetries(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) throws IOException {
         validateMsgIdNotInternal(message.header.getType());
-        sendInternalMessageBlocking(message, to, attempts, initialTimeout);
+        sendInternalMessageWithRetries(message, to, attempts, initialTimeout);
     }
     @Override public P2LFuture<Boolean> sendInternalMessageWithReceipt(P2LMessage message, SocketAddress to) throws IOException {
         message.mutateToRequestReceipt();
@@ -167,7 +167,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
             throw new IOException(t.getClass()+" - "+t.getMessage());
         }
     }
-    @Override public void sendInternalMessageBlocking(P2LMessage message, SocketAddress to, int attempts, int initialTimeout) throws IOException {
+    @Override public void sendInternalMessageWithRetries(P2LMessage message, SocketAddress to, int attempts, int initialTimeout) throws IOException {
         try {
             tryComplete(attempts, initialTimeout, () -> sendInternalMessageWithReceipt(message, to));
         } catch(IOException e) {

@@ -8,6 +8,7 @@ import jokrey.utilities.network.link2peer.P2LMessage;
  * todo add explanations on why the values where chosen and what their theoretical bounds are
  */
 public class P2LHeuristics {
+    public static int BROADCAST_USES_HASH_DETOUR_RAW_SIZE_THRESHOLD = P2LMessage.CUSTOM_RAW_SIZE_LIMIT;
     public static long STREAM_RECEIPT_TIMEOUT_MS = 500; //todo should be variable
     /**
      * Has to be smaller 4*({@link P2LMessage#CUSTOM_RAW_SIZE_LIMIT} - ~20). This is so that the indices list in the receipt definitely fits

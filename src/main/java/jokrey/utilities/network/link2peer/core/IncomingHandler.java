@@ -101,7 +101,17 @@ public class IncomingHandler {
             }
         } else if(message.header.getType() == SL_RELAY_REQUEST_DIRECT_CONNECT) {
             EstablishConnectionProtocol.asAnswererRelayRequestReverseConnection(parent, message);
-        } else if (message.header.getType() == SC_BROADCAST) {
+        } else if(message.header.getType() == SC_BROADCAST_WITHOUT_HASH) {
+            P2LMessage received = BroadcastMessageProtocol.asAnswererWithoutHash(parent, broadcastState, from, message);
+            if (received != null) {
+                if(received.isInternalMessage()) {
+                    System.err.println("someone managed to send an internal broadcast message...? How? And more importantly why?");
+                } else {
+                    userBrdMessageQueue.handleNewMessage(received);
+                    parent.notifyUserBroadcastMessageReceived(received);
+                }
+            }
+        } else if (message.header.getType() == SC_BROADCAST_WITH_HASH) {
             P2LMessage received = BroadcastMessageProtocol.asAnswererWithHash(parent, broadcastState, from, message);
             if (received != null) {
                 if(received.isInternalMessage()) {
