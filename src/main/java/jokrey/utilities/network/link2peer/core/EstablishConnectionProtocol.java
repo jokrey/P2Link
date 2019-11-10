@@ -38,7 +38,7 @@ class EstablishConnectionProtocol {
                 //attempt direct connection to the link the relay server sees
                 if(asInitiatorDirect(parent, to, P2LNode.NO_CONVERSATION_ID, attempts, initialTimeout))
                     return true;
-                //if that does not work, request a reverse connection to the link the relay server sees of this node
+                //if that does not work, request a reverse connection to the link the relay server sees of this node (either one should be the correct outside nat address)
                 return asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, false, attempts, initialTimeout);
             } else {
                 return asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, true, attempts, initialTimeout);
