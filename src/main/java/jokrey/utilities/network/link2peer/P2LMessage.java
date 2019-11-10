@@ -307,6 +307,12 @@ public class P2LMessage {
             return createSendMessageFromVariablesWithExpiration(type, MAX_EXPIRATION_TIMEOUT, payloads);
         }
         public static P2LMessage createSendMessageFromVariablesWithExpiration(int type, short expiresAfter, Object... payloads) {
+            return createSendMessageFromVariablesWithExpiration(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, payloads);
+        }
+        public static P2LMessage createSendMessageFromVariablesWithConversationId(int type, int conversationId, Object... payloads) {
+            return createSendMessageFromVariablesWithExpiration(type, conversationId, MAX_EXPIRATION_TIMEOUT, payloads);
+        }
+        public static P2LMessage createSendMessageFromVariablesWithExpiration(int type, int conversationId, short expiresAfter, Object... payloads) {
             byte[][] total = new byte[payloads.length*2][];
             int sizeCounter = 0;
             for(int i=0;i<total.length;i+=2) {
@@ -314,7 +320,7 @@ public class P2LMessage {
                 total[i] = makeVariableIndicatorFor(total[i+1].length);
                 sizeCounter+=total[i].length + total[i+1].length;
             }
-            return createSendMessageWith(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, sizeCounter, total);
+            return createSendMessageWith(type, conversationId, expiresAfter, sizeCounter, total);
         }
         public static P2LMessage createSendMessageFromVariables(int type, Collection payloads) {
             return createSendMessageFromVariables(type, MAX_EXPIRATION_TIMEOUT, payloads);

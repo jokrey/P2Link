@@ -1201,45 +1201,51 @@ class IntermediateTests {
 
 
     @Test void testTestableConnectionCombinations() throws IOException {
-        //public - public
-        P2LNode pubNode1 = NodeCreator.create(P2Link.createPublicLink("localhost", 7890));
-        P2LNode pubNode2 = NodeCreator.create(P2Link.createPublicLink("localhost", 7891));
+        P2LNode pubNode1 = null;
+        P2LNode pubNode2 = null;
+        P2LNode hidNode1 = null;
+        P2LNode hidNode2 = null;
+        P2LNode pubRelayNode3 = null;
+        try {
+            //public - public
+            pubNode1 = NodeCreator.create(P2Link.createPublicLink("localhost", 7890));
+            pubNode2 = NodeCreator.create(P2Link.createPublicLink("localhost", 7891));
 
-        P2LFuture<Boolean> pubPubConFut = pubNode1.establishConnection(pubNode2.getSelfLink());
-        assertTrue(pubPubConFut.get(1000));
+            P2LFuture<Boolean> pubPubConFut = pubNode1.establishConnection(pubNode2.getSelfLink());
+            assertTrue(pubPubConFut.get(1000));
 
-        close(pubNode1, pubNode2);
+            close(pubNode1, pubNode2);
 
+            //hidden - public
+            hidNode1 = NodeCreator.create(P2Link.createPrivateLink(7890));
+            pubNode2 = NodeCreator.create(P2Link.createPublicLink("localhost", 7891));
 
-        //hidden - public
-        P2LNode hidNode1 = NodeCreator.create(P2Link.createPrivateLink(7890));
-        pubNode2 = NodeCreator.create(P2Link.createPublicLink("localhost", 7891));
+            P2LFuture<Boolean> hidPubConFut = hidNode1.establishConnection(pubNode2.getSelfLink());
+            assertTrue(hidPubConFut.get(1000));
 
-        P2LFuture<Boolean> hidPubConFut = hidNode1.establishConnection(pubNode2.getSelfLink());
-        assertTrue(hidPubConFut.get(1000));
+            close(hidNode1, pubNode2);
 
-        close(hidNode1, pubNode2);
+            //public - hidden
+            pubNode1 = NodeCreator.create(P2Link.createPublicLink("localhost", 7890));
+            hidNode2 = NodeCreator.create(P2Link.createPrivateLink(7891));
 
-        //public - hidden
-        pubNode1 = NodeCreator.create(P2Link.createPublicLink("localhost", 7890));
-        P2LNode hidNode2 = NodeCreator.create(P2Link.createPrivateLink(7891));
-
-        //not possible: hidden node is hidden, link is unknown
+            //not possible: hidden node is hidden, link is unknown
 //        P2LFuture<Boolean> pubHidConFut = pubNode1.establishConnection(hidNode2.getSelfLink());
 //        assertTrue(pubHidConFut.get(1000));
-        P2LNode pubRelayNode3 = NodeCreator.create(P2Link.createPublicLink("localhost", 7892));
-        P2LFuture<Boolean> pubRelayConFut = pubNode1.establishConnection(pubRelayNode3.getSelfLink());
-        P2LFuture<Boolean> hidRelayConFut = hidNode2.establishConnection(pubRelayNode3.getSelfLink());
-        assertTrue(pubRelayConFut.get(1000) && hidRelayConFut.get(1000));
+            pubRelayNode3 = NodeCreator.create(P2Link.createPublicLink("localhost", 7892));
+            P2LFuture<Boolean> pubRelayConFut = pubNode1.establishConnection(pubRelayNode3.getSelfLink());
+            P2LFuture<Boolean> hidRelayConFut = hidNode2.establishConnection(pubRelayNode3.getSelfLink());
+            assertTrue(pubRelayConFut.get(1000) && hidRelayConFut.get(1000));
 
-        List<P2Link> linksQueriedFromRelayNode = pubNode1.queryKnownLinksOf(pubRelayNode3.getSelfLink());
-        System.out.println("linksQueriedFromRelayNode = " + linksQueriedFromRelayNode);
-        assertEquals(1, linksQueriedFromRelayNode.size());
-        //todo currently operates very wrongly internally..
-        P2LFuture<Boolean> pubHidConFut = pubNode1.establishConnection(linksQueriedFromRelayNode.get(0));//automatically establishes a connection - through a reverse connection from hid to pub
-        assertTrue(pubHidConFut.get(1000));
-
-        close(pubNode1, hidNode2);
+            List<P2Link> linksQueriedFromRelayNode = pubNode1.queryKnownLinksOf(pubRelayNode3.getSelfLink());
+            System.out.println("linksQueriedFromRelayNode = " + linksQueriedFromRelayNode);
+            assertEquals(1, linksQueriedFromRelayNode.size());
+            //todo currently operates very wrongly internally..
+            P2LFuture<Boolean> pubHidConFut = pubNode1.establishConnection(linksQueriedFromRelayNode.get(0));//automatically establishes a connection - through a reverse connection from hid to pub
+            assertTrue(pubHidConFut.get(10000));
+        } finally {
+            close(pubNode1, pubNode2, hidNode1, hidNode2, pubRelayNode3);
+        }
     }
 
 
@@ -1334,6 +1340,7 @@ class IntermediateTests {
     }
     private static void close(P2LNode... nodes) {
         for(P2LNode node:nodes)
-            node.close();
+            if(node!=null)
+                node.close();
     }
 }

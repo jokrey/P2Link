@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -327,7 +328,7 @@ public interface P2LNode {
      * Note: Before a peer can receive data {@link #getInputStream(SocketAddress, int, int)} has to be called with the same typ-conversationId combination on the peer side.
      * Before that has occurred it is useless to send data. Appropriate synchronization remains the responsibility of the application.
      *
-     * Tcp-like, most simple synchronization would be to call both {@link #getInputStream(SocketAddress, int, int)} and {@link #getOutputStream(SocketAddress, int, int)} when the connection is established (using {@link #addConnectionEstablishedListener(Consumer)}).
+     * Tcp-like, most simple synchronization would be to call both {@link #getInputStream(SocketAddress, int, int)} and {@link #getOutputStream(SocketAddress, int, int)} when the connection is established (using {@link #addConnectionEstablishedListener(BiConsumer)}).
      *
      * @param to the intended receiver of the stream - does not currently have to be an established connection but might have to be in the future
      * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
@@ -409,7 +410,7 @@ public interface P2LNode {
      * The given listener will receive all newly established connections.
      * @param listener listener to add
      */
-    void addConnectionEstablishedListener(Consumer<P2Link> listener);
+    void addConnectionEstablishedListener(BiConsumer<P2Link, Integer> listener);
     /**
      * The given listener will receive all disconnected connections.
      * @param listener listener to add
@@ -424,7 +425,7 @@ public interface P2LNode {
     void removeBroadcastListener(P2LMessageListener listener);
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
-    void removeConnectionEstablishedListener(Consumer<P2Link> listener);
+    void removeConnectionEstablishedListener(BiConsumer<P2Link, Integer> listener);
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
     void removeConnectionDroppedListener(Consumer<P2Link> listener);

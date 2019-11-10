@@ -28,6 +28,9 @@ public class P2Link {
     public InetSocketAddress getSocketAddress() {
         return rawAddr;
     }
+    public SocketAddress getRelaySocketAddress() {
+        return relayServerLink.getSocketAddress();
+    }
 
     public boolean isPublicLink() {
         return relayServerLink ==null && rawAddr != null;

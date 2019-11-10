@@ -3,7 +3,6 @@ package jokrey.utilities.network.link2peer.core;
 import jokrey.utilities.network.link2peer.P2Link;
 
 import java.io.IOException;
-import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -34,7 +33,7 @@ class GarnerConnectionsRecursivelyProtocol {
                 return connectedSetupLinks;
             try {
                 if(!parent.isConnectedTo(peerLink)) {
-                    if(EstablishSingleConnectionProtocol.asInitiator(parent, peerLink))
+                    if(EstablishConnectionProtocol.asInitiator(parent, peerLink))
                         newlyConnectedCounter++;
                 }
                 connectedSetupLinks.add(peerLink);

@@ -83,7 +83,7 @@ public class IncomingHandler {
         }
         if (message.header.isReceipt())
             receiptsQueue.handleNewMessage(message);
-        else if (message.header.getType() == SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS) { //requires connection to asAnswerer data on the other side.....
+        else if (message.header.getType() == SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS) { //requires connection to asAnswererDirect data on the other side.....
             RequestPeerLinksProtocol.asAnswerer(parent, from);
         } else if (message.header.getType() == SL_WHO_AM_I) {
             WhoAmIProtocol.asAnswerer(parent, receivedPacket);
@@ -91,10 +91,16 @@ public class IncomingHandler {
             PingProtocol.asAnswerer(parent, from);
         } else if (message.header.getType() == SL_PONG) {
             //already 'notify packet received from' called, i.e. it is no longer marked as dormant
-        } else if (message.header.getType() == SL_PEER_CONNECTION_REQUEST) {
+        } else if (message.header.getType() == SL_DIRECT_CONNECTION_REQUEST) {
             if (!parent.connectionLimitReached()) {
-                EstablishSingleConnectionProtocol.asAnswerer(parent, receivedPacket.getSocketAddress(), message);
+                EstablishConnectionProtocol.asAnswererDirect(parent, receivedPacket.getSocketAddress(), message);
             }
+        } else if(message.header.getType() == SL_REQUEST_DIRECT_CONNECT_TO) {
+            if (!parent.connectionLimitReached()) {
+                EstablishConnectionProtocol.asAnswererRequestReverseConnection(parent, message);
+            }
+        } else if(message.header.getType() == SL_RELAY_REQUEST_DIRECT_CONNECT) {
+            EstablishConnectionProtocol.asAnswererRelayRequestReverseConnection(parent, message);
         } else if (message.header.getType() == SC_BROADCAST) {
             P2LMessage received = BroadcastMessageProtocol.asAnswerer(parent, broadcastState, from, message);
             if (received != null) {
@@ -127,7 +133,7 @@ public class IncomingHandler {
 
         new Thread(() -> {
             while(!serverSocket.isClosed()) {
-                byte[] receiveBuffer = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT]; //asAnswerer buffer needs to be new for each run, otherwise handleReceivedMessages" might get weird results - maximum safe size allegedly 512
+                byte[] receiveBuffer = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT]; //asAnswererDirect buffer needs to be new for each run, otherwise handleReceivedMessages" might get weird results - maximum safe size allegedly 512
 
                 DatagramPacket receivedPacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
                 try {
