@@ -176,11 +176,6 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         }
     }
 
-    @Override public P2Link toEstablished(SocketAddress address) {
-        P2LConnection con = establishedConnections.get(address);
-        return con==null?null:con.link;
-    }
-
     @Override public P2LFuture<P2LMessage> expectInternalMessage(SocketAddress from, int messageType) {
         return incomingHandler.internalMessageQueue.futureFor(from, messageType);
     }
@@ -232,6 +227,13 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     private final int connectionLimit;
     @Override public boolean isConnectedTo(P2Link address) {
         return address!=null && establishedConnections.containsKey(address.getSocketAddress());
+    }
+    @Override public boolean isConnectedTo(SocketAddress to) {
+        return establishedConnections.containsKey(to);
+    }
+    @Override public P2Link toEstablished(SocketAddress address) {
+        P2LConnection con = establishedConnections.get(address);
+        return con==null?null:con.link;
     }
     @Override public Set<P2Link> getEstablishedConnections() {
         HashSet<P2Link> set = new HashSet<>(establishedConnections.size());

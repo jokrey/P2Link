@@ -30,12 +30,19 @@ class BroadcastMessageProtocol {
         parent.sendInternalMessageWithRetries(packBroadcastMessage(SC_BROADCAST_WITHOUT_HASH, message), to,
                 P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT);
     }
-    static P2LMessage asAnswererWithoutHash(P2LNodeInternal parent, BroadcastState state, SocketAddress from, P2LMessage initialMessage) {
+    static void asAnswererWithoutHash(P2LNodeInternal parent, P2LMessageQueue userBrdMessageQueue, BroadcastState state, SocketAddress from, P2LMessage initialMessage) {
         P2LMessage receivedBroadcastMessage = unpackBroadcastMessage(initialMessage);
-        if(receivedBroadcastMessage==null || state.markAsKnown(receivedBroadcastMessage.getContentHash())) //if message invalid or message was known
-            return null;
+        if(receivedBroadcastMessage==null ||
+                state.markAsKnown(receivedBroadcastMessage.getContentHash())) //if message invalid or message was known
+            return;
         relayBroadcast(parent, receivedBroadcastMessage, from);
-        return receivedBroadcastMessage;
+
+        if(receivedBroadcastMessage.isInternalMessage()) {
+            System.err.println("someone managed to send an internal broadcast message...? How? And more importantly why?");
+        } else {
+            userBrdMessageQueue.handleNewMessage(receivedBroadcastMessage);
+            parent.notifyUserBroadcastMessageReceived(receivedBroadcastMessage);
+        }
     }
 
     private static void asInitiatorWithHash(P2LNodeInternal parent, P2LMessage message, SocketAddress to) throws IOException {
@@ -59,7 +66,7 @@ class BroadcastMessageProtocol {
         );
     }
 
-    static P2LMessage asAnswererWithHash(P2LNodeInternal parent, BroadcastState state, SocketAddress from, P2LMessage initialMessage) throws IOException {
+    static void asAnswererWithHash(P2LNodeInternal parent, P2LMessageQueue userBrdMessageQueue, BroadcastState state, SocketAddress from, P2LMessage initialMessage) throws IOException {
         Hash brdMessageHash = new Hash(initialMessage.asBytes());
 
 //        boolean wasKnown = state.markAsKnown(brdMessageHash); //problem: if the actual message is later dropped, we never receive it at all... so we try to get the message as often as we can, but only once present it to the user
@@ -67,7 +74,7 @@ class BroadcastMessageProtocol {
         if(state.isKnown(brdMessageHash)) {
 //        if(wasKnown) {
             parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(C_BROADCAST_HASH_KNOWLEDGE_ANSWER, true), from);
-            return null; //do not tell application about broadcast again
+            //do not tell application about broadcast again
         } else {
             try {
                 P2LMessage message = P2LFuture.before(
@@ -76,15 +83,19 @@ class BroadcastMessageProtocol {
                         .get(P2LHeuristics.DEFAULT_PROTOCOL_ANSWER_RECEIVE_TIMEOUT);
                 P2LMessage receivedBroadcastMessage = unpackBroadcastMessage(message);
                 if(receivedBroadcastMessage == null || state.markAsKnown(brdMessageHash)) ////if message invalid or message was known - while receiving this message, this node has received it from somewhere else
-                    return null;
+                    return;
 
                 relayBroadcast(parent, receivedBroadcastMessage, from);
 
-                return receivedBroadcastMessage;
+                if(receivedBroadcastMessage.isInternalMessage()) {
+                    System.err.println("someone managed to send an internal broadcast message...? How? And more importantly why?");
+                } else {
+                    userBrdMessageQueue.handleNewMessage(receivedBroadcastMessage);
+                    parent.notifyUserBroadcastMessageReceived(receivedBroadcastMessage);
+                }
             } catch (Throwable t) {
                 t.printStackTrace();
                 state.markAsUnknown(brdMessageHash);
-                return null;
             }
 
         }

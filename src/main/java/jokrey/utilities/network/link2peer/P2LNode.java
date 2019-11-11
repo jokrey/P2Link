@@ -152,6 +152,11 @@ public interface P2LNode {
      * @return whether this node is connected to to
      */
     boolean isConnectedTo(P2Link to);
+    /**
+     * @param to is connected to?
+     * @return whether this node is connected to to
+     */
+    boolean isConnectedTo(SocketAddress to);
 
     /**
      * Sends a disconnect request to the node at the given address.

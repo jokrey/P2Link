@@ -88,6 +88,8 @@ class EstablishConnectionProtocol {
     }
 
     private static boolean asInitiatorDirect(P2LNodeInternal parent, P2Link to, int conversationId, int attempts, int initialTimeout) throws IOException {
+        if(parent.connectionLimitReached()) return false;
+
         P2Link peerLink = parent.tryReceive(attempts, initialTimeout, () -> {
             if (parent.isConnectedTo(to)) return new P2LFuture<>(to);
             return P2LFuture.before(

@@ -90,39 +90,22 @@ public class IncomingHandler {
         } else if (message.header.getType() == SL_PING) {
             PingProtocol.asAnswerer(parent, from);
         } else if (message.header.getType() == SL_PONG) {
-            //already 'notify packet received from' called, i.e. it is no longer marked as dormant
+            //already 'notify packet received from' called, i.e. it is no longer marked as dormant, i.e. pong did what it was supposed to
         } else if (message.header.getType() == SL_DIRECT_CONNECTION_REQUEST) {
-            if (!parent.connectionLimitReached()) {
-                EstablishConnectionProtocol.asAnswererDirect(parent, receivedPacket.getSocketAddress(), message);
-            }
+            EstablishConnectionProtocol.asAnswererDirect(parent, receivedPacket.getSocketAddress(), message);
         } else if(message.header.getType() == SL_REQUEST_DIRECT_CONNECT_TO) {
-            if (!parent.connectionLimitReached()) {
-                EstablishConnectionProtocol.asAnswererRequestReverseConnection(parent, message);
-            }
+            EstablishConnectionProtocol.asAnswererRequestReverseConnection(parent, message);
         } else if(message.header.getType() == SL_RELAY_REQUEST_DIRECT_CONNECT) {
             EstablishConnectionProtocol.asAnswererRelayRequestReverseConnection(parent, message);
         } else if(message.header.getType() == SC_BROADCAST_WITHOUT_HASH) {
-            P2LMessage received = BroadcastMessageProtocol.asAnswererWithoutHash(parent, broadcastState, from, message);
-            if (received != null) {
-                if(received.isInternalMessage()) {
-                    System.err.println("someone managed to send an internal broadcast message...? How? And more importantly why?");
-                } else {
-                    userBrdMessageQueue.handleNewMessage(received);
-                    parent.notifyUserBroadcastMessageReceived(received);
-                }
-            }
+            if(parent.isConnectedTo(from))
+                BroadcastMessageProtocol.asAnswererWithoutHash(parent, userBrdMessageQueue, broadcastState, from, message);
         } else if (message.header.getType() == SC_BROADCAST_WITH_HASH) {
-            P2LMessage received = BroadcastMessageProtocol.asAnswererWithHash(parent, broadcastState, from, message);
-            if (received != null) {
-                if(received.isInternalMessage()) {
-                    System.err.println("someone managed to send an internal broadcast message...? How? And more importantly why?");
-                } else {
-                    userBrdMessageQueue.handleNewMessage(received);
-                    parent.notifyUserBroadcastMessageReceived(received);
-                }
-            }
+            if(parent.isConnectedTo(from))
+                BroadcastMessageProtocol.asAnswererWithHash(parent, userBrdMessageQueue, broadcastState, from, message);
         } else if (message.header.getType() == SC_DISCONNECT) {
-            DisconnectSingleConnectionProtocol.asAnswerer(parent, from);
+            if(parent.isConnectedTo(from))
+                DisconnectSingleConnectionProtocol.asAnswerer(parent, from);
         } else {
             if (message.isInternalMessage()) {
                 internalMessageQueue.handleNewMessage(message);
@@ -138,7 +121,7 @@ public class IncomingHandler {
         this.parent = parentG;
 
         serverSocket = new DatagramSocket(parent.getSelfLink().getPort());
-        serverSocket.setTrafficClass(0x10 | 0x08); //emphasize IPTOS_THROUGHPUT & IPTOS_LOWDELAY  - this option will likely be ignored by the underlying implementation
+        serverSocket.setTrafficClass(0x10 | 0x08); //emphasize IPTOS_THROUGHPUT & IPTOS_LOWDELAY  - these options will likely be ignored by the underlying implementation
         serverSocket.setReceiveBufferSize(P2LMessage.CUSTOM_RAW_SIZE_LIMIT);
 
         new Thread(() -> {
