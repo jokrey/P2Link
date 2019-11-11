@@ -18,10 +18,11 @@ import java.util.HashMap;
  * Ranges (problem on dynamic package size, which is required because mtu might change and generally required by udp and stream logic)
  *
  *
- * Every k(for example:1000) ms a receipt is automatically send, if no receipt was triggered in the last k ms (by being m(for example 10_000_000 bytes ahead))
+ * Every k ms(for example:1000ms) a receipt is automatically send, if no receipt was triggered in the last k ms (by being m(for example 10_000_000 bytes ahead))
  *
  *
  * Idea: System for fast file transfer in regularly reliable system (i.e. systems that can be expected to have a large bandwidth)
+ *    however slow down should be valid
  *
  * @author jokrey
  */
