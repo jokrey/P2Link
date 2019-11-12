@@ -21,23 +21,23 @@ public class CommandLineP2LChat {
     public static void main(String[] arguments) throws IOException {
         Scanner userIn = new Scanner(System.in);
 
-        int port;
+        String rawLink;
         if(arguments.length > 0) {
-            port = Integer.parseInt(arguments[0]);
+            rawLink = arguments[0];
         } else {
-            System.out.println("First argument should be the port on which this node should listen for incoming messages");
-            System.out.print("Enter port:  ");
-            port = Integer.parseInt(userIn.nextLine());
+            System.out.println("First argument should be the port on which this node should listen for incoming messages\n   preferred however is a full socket address (<ip/dns>:<port>) on which other peers can reach this node");
+            System.out.print("Enter port/public-address:  ");
+            rawLink = userIn.nextLine();
         }
 
-        System.out.println("Given port = " + port);
+        System.out.println("Given = " + rawLink);
 
-        P2LNode node = P2LNode.create(P2Link.createPrivateLink(port));
+        P2LNode node = P2LNode.create(P2Link.fromString(rawLink));
 
-        node.addMessageListener(message -> System.out.println(port+" received message(from "+message.header.getSender()+"):\n"+message.asString()));
-        node.addBroadcastListener(message -> System.out.println(port+" received broadcast(from "+message.header.getSender()+"):\n"+message.asString()));
-        node.addConnectionEstablishedListener((newAddress, cId) -> System.out.println(port+" established a new connection to "+newAddress));
-        node.addConnectionDroppedListener(disconnected -> System.out.println(port+" connection to "+disconnected +" disconnected"));
+        node.addMessageListener(message -> System.out.println(rawLink+" received message(from "+message.header.getSender()+"):\n"+message.asString()));
+        node.addBroadcastListener(message -> System.out.println(rawLink+" received broadcast(from "+message.header.getSender()+"):\n"+message.asString()));
+        node.addConnectionEstablishedListener((newAddress, cId) -> System.out.println(rawLink+" established a new connection to "+newAddress));
+        node.addConnectionDroppedListener(disconnected -> System.out.println(rawLink+" connection to "+disconnected +" disconnected"));
 
         CommandLoop loop = new CommandLoop();
         loop.addCommand("connectTo", "Connects to peer at link(args[0]) of the form [ip/dns]:[port]", Argument.with(String.class), args -> {
@@ -52,6 +52,15 @@ public class CommandLineP2LChat {
             List<P2Link> newlyConnected = node.recursiveGarnerConnections(limit, garnerFrom);
             System.out.println("Newly connected to: " + newlyConnected);
         },"garner");
+        loop.addCommand("requestFrom", "Request known connections from setup link(args[0]) - returned links can be connected to", Argument.with(String.class), args -> {
+            P2Link requestFrom = P2Link.fromString(args[0].getRaw());
+            try {
+                node.queryKnownLinksOf(requestFrom);
+            } catch (IOException e) {
+                System.err.println("error requesting "+e.getMessage());
+                e.printStackTrace();
+            }
+        },"request");
         loop.addCommand("disconnectFromAll", "Closes all connections to peers", Argument.noargs(), args -> node.disconnectFromAll());
         loop.addCommand("close", "closes this node and kills the process", args -> {
             node.close();System.exit(0);
@@ -59,7 +68,7 @@ public class CommandLineP2LChat {
         loop.addCommand("printActivePeers", "Prints all active peer links", Argument.noargs(), args -> System.out.println(node.getEstablishedConnections()),
                 "peers");
         loop.addCommand("printSelf", "Prints own nodes link", Argument.noargs(), args -> System.out.println(node.getSelfLink()),
-                "self", "port", "me");
+                "self", "me");
         loop.addCommand("sendBroadcast", "Sends a string(args[0]) as a broadcast", Argument.with(String.class), args ->
                 node.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(node.getSelfLink(), 0, args[0].getRaw())), "broadcast", "brd");
         loop.addCommand("sendIndividualMessage", "Sends a string(args[1]) as an individual message to an active peer link(args[0])", Argument.with(String.class, String.class), args -> {
