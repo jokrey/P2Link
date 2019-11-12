@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.net.SocketAddress;
 import java.security.SecureRandom;
 import java.util.Arrays;
+import java.util.function.Supplier;
 
 import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.*;
 
@@ -35,7 +36,7 @@ class EstablishConnectionProtocol {
             if(self.isPrivateLink() || self.isHiddenLink()) { //self should always be private or public, but it is possible to manually set it to a hidden link
                 //todo - this scenario could not be realisticly tested as of yet AND cannot be tested automatically
                 //attempt direct connection to the link the relay server sees
-                if(asInitiatorDirect(parent, to, createConversationForInitialDirect(parent), attempts, initialTimeout))
+                if(asInitiatorDirect(parent, to, ()->createConversationForInitialDirect(parent), attempts, initialTimeout))
                     return true;
                 //if that does not work, request a reverse connection to the link the relay server sees of this node (either one should be the correct outside nat address)
                 return asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, false, attempts, initialTimeout);
@@ -43,7 +44,7 @@ class EstablishConnectionProtocol {
                 return asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, true, attempts, initialTimeout);
             }
         } else {// if(to.isPublicLink()) {
-            return asInitiatorDirect(parent, to, createConversationForInitialDirect(parent), attempts, initialTimeout);
+            return asInitiatorDirect(parent, to, ()->createConversationForInitialDirect(parent), attempts, initialTimeout);
         }
     }
 
@@ -83,26 +84,27 @@ class EstablishConnectionProtocol {
     }
     static void asAnswererRequestReverseConnection(P2LNodeInternal parent, P2LMessage initialRequestMessage) throws IOException {
         P2Link connectTo = P2Link.fromBytes(initialRequestMessage.asBytes());
-        asInitiatorDirect(parent, connectTo, initialRequestMessage.header.getConversationId(),
+        asInitiatorDirect(parent, connectTo, initialRequestMessage.header::getConversationId,
                 P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT);
     }
 
-    private static boolean asInitiatorDirect(P2LNodeInternal parent, P2Link to, int conversationId, int attempts, int initialTimeout) throws IOException {
+    private static boolean asInitiatorDirect(P2LNodeInternal parent, P2Link to, Supplier<Integer> conversationIdSupplier, int attempts, int initialTimeout) throws IOException {
         if(parent.connectionLimitReached()) return false;
 
-        P2Link peerLink = parent.tryReceive(attempts, initialTimeout, () -> {
-            if (parent.isConnectedTo(to)) return new P2LFuture<>(to);
+        int idWhichWon = parent.tryReceive(attempts, initialTimeout, () -> {
+            int conversationId = conversationIdSupplier.get();
+            if (parent.isConnectedTo(to)) return new P2LFuture<>(conversationId);
             return P2LFuture.before(
                     () -> parent.sendInternalMessage(selfLinkToMessage(parent, SL_DIRECT_CONNECTION_REQUEST, conversationId), to.getSocketAddress()),
                     parent.expectInternalMessage(to.getSocketAddress(), R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId))
                     .andThen(message -> {
                         byte[] verifyNonce = message.asBytes();
                         if (verifyNonce.length == 0)
-                            return new P2LFuture<>(to); //indicates 'already connected' todo problem is 'to' equal to actual link
+                            return new P2LFuture<>(conversationId); //indicates 'already connected' todo problem is 'to' equal to actual link
                         try {
                             return P2LFuture.before(
                                     () -> parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_ANSWER, conversationId, verifyNonce), to.getSocketAddress()),
-                                    parent.expectInternalMessage(to.getSocketAddress(), R_DIRECT_CONNECTION_ESTABLISHED, conversationId).toType(m -> fromMessage(parent, m)));
+                                    parent.expectInternalMessage(to.getSocketAddress(), R_DIRECT_CONNECTION_ESTABLISHED, conversationId).toType(m -> conversationId));
                         } catch (Throwable e) {
                             e.printStackTrace();
                             return new P2LFuture<>(null);//causes retry!!
@@ -113,7 +115,7 @@ class EstablishConnectionProtocol {
         //if 'to' is hidden link, then peer link will likely be a private link (i.e. unknown by peer itself) - in that case we will simply accept it
         //   in case 'to' is a public link we make sure that the link we connected to is the link the peer assumes - otherwise we are connecting over a proxy, which is fishy and we will not stand for fish
 //        if (to.isHiddenLink() || to.equals(peerLink)) {
-            parent.graduateToEstablishedConnection(to, conversationId);
+            parent.graduateToEstablishedConnection(to, idWhichWon);
             return true;
 //        } else {
 //            System.out.println("to.equals(peerLink.get()) = " + to.equals(peerLink));
