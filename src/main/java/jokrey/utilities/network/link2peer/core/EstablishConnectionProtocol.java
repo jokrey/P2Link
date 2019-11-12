@@ -113,7 +113,7 @@ class EstablishConnectionProtocol {
         //if 'to' is hidden link, then peer link will likely be a private link (i.e. unknown by peer itself) - in that case we will simply accept it
         //   in case 'to' is a public link we make sure that the link we connected to is the link the peer assumes - otherwise we are connecting over a proxy, which is fishy and we will not stand for fish
 //        if (to.isHiddenLink() || to.equals(peerLink)) {
-            parent.graduateToEstablishedConnection(peerLink, conversationId);
+            parent.graduateToEstablishedConnection(to, conversationId);
             return true;
 //        } else {
 //            System.out.println("to.equals(peerLink.get()) = " + to.equals(peerLink));
