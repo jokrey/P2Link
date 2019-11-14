@@ -23,7 +23,7 @@ class RequestPeerLinksProtocol {
                     ArrayList<P2Link> peers = new ArrayList<>();
                     String raw;
                     while((raw = message.nextVariableString()) != null)
-                        peers.add(P2Link.fromString(raw));
+                        peers.add(P2Link.fromStringEnsureRelayLinkAvailable(raw, (InetSocketAddress) to));
                     return peers;
                 }));
     }

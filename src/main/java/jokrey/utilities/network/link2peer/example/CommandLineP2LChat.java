@@ -55,7 +55,8 @@ public class CommandLineP2LChat {
         loop.addCommand("requestFrom", "Request known connections from setup link(args[0]) - returned links can be connected to", Argument.with(String.class), args -> {
             P2Link requestFrom = P2Link.fromString(args[0].getRaw());
             try {
-                node.queryKnownLinksOf(requestFrom);
+                List<P2Link> links = node.queryKnownLinksOf(requestFrom);
+                System.out.println("links = " + links);
             } catch (IOException e) {
                 System.err.println("error requesting "+e.getMessage());
                 e.printStackTrace();
@@ -72,10 +73,12 @@ public class CommandLineP2LChat {
         loop.addCommand("sendBroadcast", "Sends a string(args[0]) as a broadcast", Argument.with(String.class), args ->
                 node.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(node.getSelfLink(), 0, args[0].getRaw())), "broadcast", "brd");
         loop.addCommand("sendIndividualMessage", "Sends a string(args[1]) as an individual message to an active peer link(args[0])", Argument.with(String.class, String.class), args -> {
-            P2Link to = P2Link.fromString(args[0].getRaw());
+            P2Link to = P2Link.fromString(args[0].getRaw()); //unresolved, maybe
+//            SocketAddress realTo = node.getConnection(to);
             try {
-                P2LFuture<Boolean> success = node.sendMessageWithReceipt(to, P2LMessage.Factory.createSendMessage(0, args[1].getRaw()));
-                System.out.println(success.get(P2LHeuristics.DEFAULT_PROTOCOL_ANSWER_RECEIVE_TIMEOUT)?"successfully send":"no response (peer did not receive)");
+                P2LFuture<Boolean> successFut = node.sendMessageWithReceipt(to, P2LMessage.Factory.createSendMessage(0, args[1].getRaw()));
+                Boolean success = successFut.getOrNull(P2LHeuristics.DEFAULT_PROTOCOL_ANSWER_RECEIVE_TIMEOUT * 2);
+                System.out.println(success!=null&&success?"successfully send":"no response (peer did not receive)");
             } catch (IOException e) {
                 System.err.println("error sending message "+e.getMessage());
                 e.printStackTrace();

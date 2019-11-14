@@ -14,12 +14,20 @@ public class P2Link {
     private final int port;
     private final P2Link relayServerLink;
 
-    private P2Link(InetSocketAddress rawAddr, P2Link relayServerLink, int port) {
+    private P2Link(String stringRepresentation, InetSocketAddress rawAddr, P2Link relayServerLink, int port) {
 //        if(rawAddr!=null && rawAddr.getAddress().getCanonicalHostName().equals("localhost"))
 //            rawAddr=null;
+        this.stringRepresentation = stringRepresentation;
         this.rawAddr = rawAddr;
         this.port = port;
         this.relayServerLink = relayServerLink;
+    }
+
+    public static P2Link fromStringEnsureRelayLinkAvailable(String raw, InetSocketAddress to) {
+        P2Link link = fromString(raw);
+        if(link.isHiddenLink() && !link.relayServerLink.isPublicLink())
+            return new P2Link(null, link.getSocketAddress(), P2Link.createPublicLink(to), link.getPort());
+        return link;
     }
 
     public int getPort() {
@@ -50,9 +58,9 @@ public class P2Link {
             if(rawAddr==null) //private/local/unknown link
                 stringRepresentation = port+"";
             else if(relayServerLink ==null) //public link
-                stringRepresentation = rawAddr.getAddress().getCanonicalHostName() + ":" + rawAddr.getPort();
+                stringRepresentation = rawAddr.getAddress().getHostName() + ":" + rawAddr.getPort();
             else {//hidden link
-                stringRepresentation = relayServerLink.getStringRepresentation()+" for ("+rawAddr.getAddress().getCanonicalHostName() + ":" + rawAddr.getPort()+")";
+                stringRepresentation = rawAddr.getAddress().getHostName() + ":" + rawAddr.getPort() + " (relay="+relayServerLink.getStringRepresentation()+")";
             }
         }
         return stringRepresentation;
@@ -62,9 +70,9 @@ public class P2Link {
     }
     public static P2Link fromString(String stringRepresentation) {
         if(stringRepresentation.contains("(")) { //hidden
-            String[] splitOuter = stringRepresentation.split(" for \\(");
-            String[] split = splitOuter[1].split(":");
-            return P2Link.createHiddenLink(fromString(splitOuter[0]), new InetSocketAddress(split[0], Integer.parseInt(split[1].replace(")",""))));
+            String[] splitOuter = stringRepresentation.split(" \\(relay=");
+            String[] split = splitOuter[0].split(":");
+            return P2Link.createHiddenLink(fromString(splitOuter[1].replace(")","")), new InetSocketAddress(split[0], Integer.parseInt(split[1])));
         } else if(stringRepresentation.contains(":")) {//public, because already not hidden
             String[] split = stringRepresentation.split(":");
             return P2Link.createPublicLink(split[0], Integer.parseInt(split[1]));
@@ -82,21 +90,21 @@ public class P2Link {
 
 
     public static P2Link createPublicLink(String publicIpOrDns, int port) {
-        return new P2Link(new InetSocketAddress(publicIpOrDns, port), null, port);
+        return new P2Link(publicIpOrDns+":"+port, new InetSocketAddress(publicIpOrDns, port), null, port);
     }
     public static P2Link createPublicLink(InetSocketAddress socketAddress) {
-        return new P2Link(socketAddress, null, socketAddress.getPort());
+        return new P2Link(null, socketAddress, null, socketAddress.getPort());
     }
     public static P2Link raw(SocketAddress socketAddress) {
         return createPublicLink((InetSocketAddress) socketAddress);
     }
 
     public static P2Link createHiddenLink(P2Link relayServerLink, InetSocketAddress naiveAddress) {
-        return new P2Link(naiveAddress, relayServerLink, naiveAddress.getPort());
+        return new P2Link(null, naiveAddress, relayServerLink, naiveAddress.getPort());
     }
 
     public static P2Link createPrivateLink(int port) {
-        return new P2Link( null, null, port);
+        return new P2Link( port+"", null, null, port);
     }
 
 

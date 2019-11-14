@@ -18,7 +18,7 @@ import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.*;
  * @author jokrey
  */
 class BroadcastMessageProtocol {
-    private static void asInitiator(P2LNodeInternal parent, P2LMessage message, SocketAddress to) throws IOException {
+    private static void asInitiator(P2LNodeInternal parent, P2LMessage message, SocketAddress to) {
         if(message.requiredRawSize() <= P2LHeuristics.BROADCAST_USES_HASH_DETOUR_RAW_SIZE_THRESHOLD) {
             asInitiatorWithoutHash(parent, message, to);
         } else {
@@ -26,8 +26,8 @@ class BroadcastMessageProtocol {
         }
     }
 
-    private static void asInitiatorWithoutHash(P2LNodeInternal parent, P2LMessage message, SocketAddress to) throws IOException {
-        parent.sendInternalMessageWithRetries(packBroadcastMessage(SC_BROADCAST_WITHOUT_HASH, message), to,
+    private static boolean asInitiatorWithoutHash(P2LNodeInternal parent, P2LMessage message, SocketAddress to) {
+        return parent.sendInternalMessageWithRetries(packBroadcastMessage(SC_BROADCAST_WITHOUT_HASH, message), to,
                 P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT);
     }
     static void asAnswererWithoutHash(P2LNodeInternal parent, P2LMessageQueue userBrdMessageQueue, BroadcastState state, SocketAddress from, P2LMessage initialMessage) {
@@ -45,8 +45,8 @@ class BroadcastMessageProtocol {
         }
     }
 
-    private static void asInitiatorWithHash(P2LNodeInternal parent, P2LMessage message, SocketAddress to) throws IOException {
-        parent.tryComplete(P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT, () ->
+    private static boolean asInitiatorWithHash(P2LNodeInternal parent, P2LMessage message, SocketAddress to) {
+        return parent.tryComplete(P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT, () ->
                 P2LFuture.before(() ->  parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SC_BROADCAST_WITH_HASH, message.getContentHash().raw()), to),
                                         parent.expectInternalMessage(to, C_BROADCAST_HASH_KNOWLEDGE_ANSWER))
                 .andThen(peerHashKnowledgeOfMessage_msg -> {

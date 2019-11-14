@@ -236,6 +236,7 @@ public interface P2LNode {
     P2LFuture<Boolean> sendMessageWithReceipt(SocketAddress to, P2LMessage message) throws IOException;
     /**@see #sendMessageWithReceipt(SocketAddress, P2LMessage)*/
     default P2LFuture<Boolean> sendMessageWithReceipt(P2Link to, P2LMessage message) throws IOException {
+        //todo - reverse lookup of 'to' in order to get the best, most direct ip
         return sendMessageWithReceipt(to.getSocketAddress(), message);
     }
 
@@ -253,7 +254,7 @@ public interface P2LNode {
      * @param initialTimeout initial timeout - since doubled with each retry, max timeout is: (initialTimeout * 2^retries)
      * @throws IOException if any send went to garbage
      */
-    void sendMessageWithRetries(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) throws IOException; //initial timeout is doubled
+    boolean sendMessageWithRetries(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) throws IOException; //initial timeout is doubled
     /**@see #sendMessageWithRetries(SocketAddress, P2LMessage, int, int)*/
     default void sendMessageWithRetries(P2Link to, P2LMessage message, int attempts, int initialTimeout) throws IOException {
         sendMessageWithRetries(to.getSocketAddress(), message, attempts, initialTimeout);
@@ -372,24 +373,46 @@ public interface P2LNode {
         throw new IOException(getSelfLink()+" could not get result after "+attempts+" attempts", t);
     }
     /**
+     * Retry feature for more complex conversations.
+     * Conversations with a retry feature should always use a conversation id (see {@link #createUniqueConversationId()}).
+     * @param attempts total number of attempts (i.e. 0 will mean no attempt will be made at all)
+     * @param initialTimeout initial timeout - since doubled with each retry, max timeout is: (initialTimeout * 2^retries)
+     * @param conversationWithResult function that produces future which represents a result.
+     *                               Complex conversations will likely want to chain that future, with each waiting for a message as a combined future.
+     *                               For this purpose {@link P2LFuture#andThen(Function)} can be used.
+     * @return the received final result or null (if no result could be obtained after given number of retries or the send went to garbage)
+     */
+    default <T> T tryReceiveOrNull(int attempts, int initialTimeout, Request<T> conversationWithResult) {
+        Throwable t = null;
+        int timeout = initialTimeout;
+        for(int attempt=0; attempt<attempts; attempt++) {
+            try {
+                T gotten = conversationWithResult.request().getOrNull(timeout);
+                if (gotten != null) return gotten;
+            } catch (Throwable thrown) {t=thrown;}
+            timeout *= 2;
+        }
+        return null;
+    }
+    /**
      * Like {@link #tryReceive(int, int, Request)}, except that the conversation produces a boolean representing success.
      * Unlike {@link #tryReceive(int, int, Request)} this method allows triggering a retry early, by setting the returned future to false.
      * @param attempts total number of attempts (i.e. 0 will mean no attempt will be made at all)
      * @param initialTimeout initial timeout - since doubled with each retry, max timeout is: (initialTimeout * 2^retries)
      * @param conversation function that can succeed, but if it does not can be at least retried.
-     * @throws IOException if no result could be obtained after given number of retries or the send went to garbage
+     * @return whether the operation completed successfully
      */
-    default void tryComplete(int attempts, int initialTimeout, Request<Boolean> conversation) throws IOException {
+    default boolean tryComplete(int attempts, int initialTimeout, Request<Boolean> conversation) {
         Throwable t = null;
         int timeout = initialTimeout;
         for(int attempt=0; attempt<attempts; attempt++) {
             try {
                 Boolean success = conversation.request().getOrNull(timeout);
-                if(success!=null && success) return;
+                if(success!=null && success) return true;
             } catch (Throwable thrown) {t=thrown;}
             timeout *= 2;
         }
-        throw new IOException(getSelfLink()+" could not get result after "+attempts+" attempts", t);
+        return false;
     }
 
     /** Function producing something in the future */

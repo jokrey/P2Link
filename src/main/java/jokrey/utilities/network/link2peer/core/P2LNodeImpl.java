@@ -59,6 +59,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
 
                     Thread.sleep(P2LHeuristics.MAIN_NODE_SLEEP_TIMEOUT_MS);
 
+                    now = System.currentTimeMillis();
                     List<P2Link> dormantEstablishedAfterPing = getDormantEstablishedConnections(now);
                     for(P2Link stillDormant:dormantEstablishedAfterPing)
                         markBrokenConnection(stillDormant, true);
@@ -149,9 +150,9 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         validateMsgIdNotInternal(message.header.getType());
         return sendInternalMessageWithReceipt(message, to);
     }
-    @Override public void sendMessageWithRetries(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) throws IOException {
+    @Override public boolean sendMessageWithRetries(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) {
         validateMsgIdNotInternal(message.header.getType());
-        sendInternalMessageWithRetries(message, to, attempts, initialTimeout);
+        return sendInternalMessageWithRetries(message, to, attempts, initialTimeout);
     }
     @Override public P2LFuture<Boolean> sendInternalMessageWithReceipt(P2LMessage message, SocketAddress to) throws IOException {
         message.mutateToRequestReceipt();
@@ -167,13 +168,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
             throw new IOException(t.getClass()+" - "+t.getMessage());
         }
     }
-    @Override public void sendInternalMessageWithRetries(P2LMessage message, SocketAddress to, int attempts, int initialTimeout) throws IOException {
-        try {
-            tryComplete(attempts, initialTimeout, () -> sendInternalMessageWithReceipt(message, to));
-        } catch(IOException e) {
+    @Override public boolean sendInternalMessageWithRetries(P2LMessage message, SocketAddress to, int attempts, int initialTimeout) {
+        boolean success = tryComplete(attempts, initialTimeout, () -> sendInternalMessageWithReceipt(message, to));
+        if(!success)
             markBrokenConnection(toEstablished(to), true);
-            throw e;
-        }
+        return success;
     }
 
     @Override public P2LFuture<P2LMessage> expectInternalMessage(SocketAddress from, int messageType) {
@@ -196,7 +195,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
     @Override public P2LFuture<P2LMessage> expectBroadcastMessage(int messageType) {
         validateMsgIdNotInternal(messageType);
-        System.out.println("incomingHandler.userBrdMessageQueue.debugString() = " + incomingHandler.userBrdMessageQueue.debugString());
+//        System.out.println("incomingHandler.userBrdMessageQueue.debugString() = " + incomingHandler.userBrdMessageQueue.debugString());
         return incomingHandler.userBrdMessageQueue.futureFor(messageType);
     }
 //    @Override public P2LFuture<P2LMessage> expectBroadcastMessage(P2Link from, int messageType) {
@@ -226,6 +225,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     private final ConcurrentHashMap<SocketAddress, HistoricConnection> historicConnections = new ConcurrentHashMap<>();
     private final int connectionLimit;
     @Override public boolean isConnectedTo(P2Link address) {
+        //todo - this is not neccessarily correct - address can contain different socket address, but still be a link in a p2l connection...
         return address!=null && establishedConnections.containsKey(address.getSocketAddress());
     }
     @Override public boolean isConnectedTo(SocketAddress to) {
