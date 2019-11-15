@@ -9,6 +9,7 @@ import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,6 +44,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
                 long now = System.currentTimeMillis();
                 try {
                     //todo - this in the future will also be required to keep alive nat holes - therefore it may need to be called more than the current every two minutes
+
+                    //TODO - constant reestablish connection problem:
+                    //    stored socket address points to the same peer, but when received the socket address may not equal (because on send the dns is also contained
+                    //    potential solution: wrap socket addresses and override equals(not preferred)
+
                     List<P2Link> dormantEstablishedBeforePing = getDormantEstablishedConnections(now);
                     for(P2Link dormant:dormantEstablishedBeforePing)
                         PingProtocol.asInitiator(this, dormant.getSocketAddress());
@@ -59,10 +65,15 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
 
                     Thread.sleep(P2LHeuristics.MAIN_NODE_SLEEP_TIMEOUT_MS);
 
-                    now = System.currentTimeMillis();
-                    List<P2Link> dormantEstablishedAfterPing = getDormantEstablishedConnections(now);
+                    List<P2Link> dormantEstablishedAfterPing = getDormantEstablishedConnections(now); //using the old now here is correct
                     for(P2Link stillDormant:dormantEstablishedAfterPing)
                         markBrokenConnection(stillDormant, true);
+
+                    System.out.println("dormantEstablishedBeforePing = " + dormantEstablishedBeforePing);
+                    System.out.println("retryableHistoricConnections = " + retryableHistoricConnections);
+                    System.out.println("historicConnections = " + historicConnections);
+                    System.out.println("establishedConnections = " + establishedConnections);
+                    System.out.println();
                 } catch (Throwable t) {
                     t.printStackTrace();
                 }
@@ -373,10 +384,36 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         boolean isDormant(long now) {
             return (now - lastPacketReceived) > P2LHeuristics.ESTABLISHED_CONNECTION_IS_DORMANT_THRESHOLD_MS;
         }
+
+        @Override
+        public String toString() {
+            return "P2LConnection{" +
+                    "link=" + link +
+                    ", lastPacketReceived=" + lastPacketReceived +
+                    '}';
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            P2LConnection that = (P2LConnection) o;
+            return lastPacketReceived == that.lastPacketReceived &&
+                    Objects.equals(link, that.link);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(link, lastPacketReceived);
+        }
     }
     static class HistoricConnection {
         P2Link link;
-        public HistoricConnection(P2Link link) {this.link=link;}
+        public HistoricConnection(P2Link link) {
+            this.link=link;
+            if(link.getSocketAddress()==null)
+                throw new NullPointerException("otherwise we would have a problem on retry");
+        }
         long nextAttemptAt = System.currentTimeMillis();
         int numberOfAttemptsMade;
 
@@ -392,6 +429,30 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
                 return true;
             }
             return false;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            HistoricConnection that = (HistoricConnection) o;
+            return nextAttemptAt == that.nextAttemptAt &&
+                    numberOfAttemptsMade == that.numberOfAttemptsMade &&
+                    Objects.equals(link, that.link);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(link, nextAttemptAt, numberOfAttemptsMade);
+        }
+
+        @Override
+        public String toString() {
+            return "HistoricConnection{" +
+                    "link=" + link +
+                    ", nextAttemptAt=" + nextAttemptAt +
+                    ", numberOfAttemptsMade=" + numberOfAttemptsMade +
+                    '}';
         }
     }
 }

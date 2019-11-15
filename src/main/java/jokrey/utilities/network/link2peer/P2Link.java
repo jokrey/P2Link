@@ -21,6 +21,8 @@ public class P2Link {
         this.rawAddr = rawAddr;
         this.port = port;
         this.relayServerLink = relayServerLink;
+        if(relayServerLink!=null && relayServerLink.getSocketAddress() == null)
+            throw new IllegalArgumentException("relay server link cannot be hidden");
     }
 
     public static P2Link fromStringEnsureRelayLinkAvailable(String raw, InetSocketAddress to) {
@@ -44,7 +46,7 @@ public class P2Link {
         return relayServerLink ==null && rawAddr != null;
     }
     public boolean isHiddenLink() {
-        return relayServerLink !=null && rawAddr != null;
+        return relayServerLink != null && rawAddr != null;
     }
     public boolean isPrivateLink() {
         return rawAddr == null;
@@ -60,7 +62,7 @@ public class P2Link {
             else if(relayServerLink ==null) //public link
                 stringRepresentation = rawAddr.getAddress().getHostName() + ":" + rawAddr.getPort();
             else {//hidden link
-                stringRepresentation = rawAddr.getAddress().getHostName() + ":" + rawAddr.getPort() + " (relay="+relayServerLink.getStringRepresentation()+")";
+                stringRepresentation = rawAddr.getAddress().getHostName() + ":" + rawAddr.getPort() + "(relay="+relayServerLink.getStringRepresentation()+")";
             }
         }
         return stringRepresentation;
@@ -70,7 +72,7 @@ public class P2Link {
     }
     public static P2Link fromString(String stringRepresentation) {
         if(stringRepresentation.contains("(")) { //hidden
-            String[] splitOuter = stringRepresentation.split(" \\(relay=");
+            String[] splitOuter = stringRepresentation.split("\\(relay=");
             String[] split = splitOuter[0].split(":");
             return P2Link.createHiddenLink(fromString(splitOuter[1].replace(")","")), new InetSocketAddress(split[0], Integer.parseInt(split[1])));
         } else if(stringRepresentation.contains(":")) {//public, because already not hidden

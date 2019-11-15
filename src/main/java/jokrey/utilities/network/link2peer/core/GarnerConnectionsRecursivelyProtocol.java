@@ -31,16 +31,11 @@ class GarnerConnectionsRecursivelyProtocol {
         for(P2Link peerLink : setupLinks) {
             if(newlyConnectedCounter >= newConnectionLimit || newlyConnectedCounter >= newConnectionLimitPerRecursion)
                 return connectedSetupLinks;
-            try {
-                if(!parent.isConnectedTo(peerLink)) {
-                    if(EstablishConnectionProtocol.asInitiator(parent, peerLink))
-                        newlyConnectedCounter++;
-                }
-                connectedSetupLinks.add(peerLink);
-            } catch (IOException  e) {
-                e.printStackTrace();
-                System.err.println(peerLink+" could not be connected to, because: "+e.getMessage());
+            if(!parent.isConnectedTo(peerLink)) {
+                if(EstablishConnectionProtocol.asInitiator(parent, peerLink))
+                    newlyConnectedCounter++;
             }
+            connectedSetupLinks.add(peerLink);
         }
 
         List<P2Link> foundUnconnectedLinks = new ArrayList<>();

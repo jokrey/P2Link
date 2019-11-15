@@ -26,21 +26,27 @@ class EstablishConnectionProtocol {
 
     //todo: mtu detection + exchange
     //todo - RE-establish connection protocol that does not do the nonce check - for historic connections (more efficient retry)
-    static boolean asInitiator(P2LNodeInternal parent, P2Link to) throws IOException {
+    static boolean asInitiator(P2LNodeInternal parent, P2Link to) {
         return asInitiator(parent, to, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT);
     }
-    static boolean asInitiator(P2LNodeInternal parent, P2Link to, int attempts, int initialTimeout) throws IOException {
+    static boolean asInitiator(P2LNodeInternal parent, P2Link to, int attempts, int initialTimeout) {
         if(to.isPrivateLink())
             throw new IllegalArgumentException("cannot connect to private link");
         else if(to.isHiddenLink()) {
             P2Link self = parent.getSelfLink();
             if(self.isPrivateLink() || self.isHiddenLink()) { //self should always be private or public, but it is possible to manually set it to a hidden link
                 //todo - this scenario could not be realisticly tested as of yet AND cannot be tested automatically
-                //attempt direct connection to the link the relay server sees
-                if(asInitiatorDirect(parent, to, ()->createConversationForInitialDirect(parent), attempts, initialTimeout))
-                    return true;
-                //if that does not work, request a reverse connection to the link the relay server sees of this node (either one should be the correct outside nat address)
-                return asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, false, attempts, initialTimeout);
+                for(int i=0;i<attempts;i++) {
+                    //attempt direct connection to the link the relay server sees
+                    if(asInitiatorDirect(parent, to, ()->createConversationForInitialDirect(parent), 1, initialTimeout))
+                        return true;
+                    //if that does not work, request a reverse connection to the link the relay server sees of this node (either one should be the correct outside nat address)
+                    System.out.println("to.getRelaySocketAddress() = " + to.getRelaySocketAddress());
+                    if(asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, false, 1, initialTimeout))
+                        return false;
+                    initialTimeout*=2;
+                }
+                return false;
             } else {
                 return asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, true, attempts, initialTimeout);
             }
@@ -83,7 +89,7 @@ class EstablishConnectionProtocol {
         return parent.sendInternalMessageWithRetries(P2LMessage.Factory.createSendMessage(SL_REQUEST_DIRECT_CONNECT_TO, initialRequestMessage.header.getConversationId(), connectTo.getBytesRepresentation()),
                 requestFrom.getSocketAddress(), P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT);
     }
-    static void asAnswererRequestReverseConnection(P2LNodeInternal parent, P2LMessage initialRequestMessage) throws IOException {
+    static void asAnswererRequestReverseConnection(P2LNodeInternal parent, P2LMessage initialRequestMessage) {
         P2Link connectTo = P2Link.fromBytes(initialRequestMessage.asBytes());
         asInitiatorDirect(parent, connectTo, initialRequestMessage.header::getConversationId,
                 P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT);
