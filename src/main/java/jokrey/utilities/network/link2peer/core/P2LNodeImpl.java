@@ -9,7 +9,6 @@ import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,35 +44,31 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
                 try {
                     //todo - this in the future will also be required to keep alive nat holes - therefore it may need to be called more than the current every two minutes
 
-                    //TODO - constant reestablish connection problem:
-                    //    stored socket address points to the same peer, but when received the socket address may not equal (because on send the dns is also contained
-                    //    potential solution: wrap socket addresses and override equals(not preferred)
-
-                    List<P2Link> dormantEstablishedBeforePing = getDormantEstablishedConnections(now);
-                    for(P2Link dormant:dormantEstablishedBeforePing)
-                        PingProtocol.asInitiator(this, dormant.getSocketAddress());
+                    List<P2Link> dormant = getDormantEstablishedConnections(now);
+                    P2LFuture<Boolean>[] pingResults = new P2LFuture[dormant.size()];
+                    for (int i = 0; i < dormant.size(); i++)
+                        pingResults[i] = PingProtocol.asInitiator(this, dormant.get(i).getSocketAddress());
                     List<P2Link> retryableHistoricConnections = getRetryableHistoricConnections(now);
                     for(P2Link retryable:retryableHistoricConnections)
                         outgoingPool.execute(() -> EstablishConnectionProtocol.asInitiator(this, retryable, 1, P2LHeuristics.RETRY_HISTORIC_CONNECTION_TIMEOUT_MS)); //result does not matter - initiator will internally graduate a successful connection - and the timeout is much less than 10000
 
-                    incomingHandler.internalMessageQueue.cleanExpiredMessages();
-                    incomingHandler.receiptsQueue.cleanExpiredMessages();
-                    incomingHandler.userBrdMessageQueue.cleanExpiredMessages();
-                    incomingHandler.userMessageQueue.cleanExpiredMessages();
+                    incomingHandler.internalMessageQueue.clean();
+                    incomingHandler.receiptsQueue.clean();
+                    incomingHandler.userBrdMessageQueue.clean();
+                    incomingHandler.userMessageQueue.clean();
                     incomingHandler.broadcastState.clean(true);
                     incomingHandler.longMessageHandler.clean();
 
                     Thread.sleep(P2LHeuristics.MAIN_NODE_SLEEP_TIMEOUT_MS);
 
-                    List<P2Link> dormantEstablishedAfterPing = getDormantEstablishedConnections(now); //using the old now here is correct
-                    for(P2Link stillDormant:dormantEstablishedAfterPing)
-                        markBrokenConnection(stillDormant, true);
-
-                    System.out.println("dormantEstablishedBeforePing = " + dormantEstablishedBeforePing);
-                    System.out.println("retryableHistoricConnections = " + retryableHistoricConnections);
-                    System.out.println("historicConnections = " + historicConnections);
-                    System.out.println("establishedConnections = " + establishedConnections);
-                    System.out.println();
+                    //the following uncommented code would also work - but the ping thing is cooler - maybe - at least it does not require reiterating established connections
+//                    List<P2Link> dormantEstablishedAfterPing = getDormantEstablishedConnections(now); //using the old now here is correct
+//                    for(P2Link stillDormant:dormantEstablishedAfterPing)
+    //                    markBrokenConnection(stillDormant, true);
+                    for(int i = 0; i < pingResults.length; i++) {
+                        if (! (pingResults[i].isCompleted() && pingResults[i].get()))
+                            markBrokenConnection(dormant.get(i), true);
+                    }
                 } catch (Throwable t) {
                     t.printStackTrace();
                 }
@@ -268,9 +263,10 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         //PROBLEM: if the initiator of a connection tells the other side its public ip(which differs from package.getAddress() - because we are in the same, non public NAT)
         //   if they lie about who they are, then we will attempt a connection to the public ip - and DDOS it inadvertently
 
-        establishedConnections.put(address.getSocketAddress(), new P2LConnection(address));
+        boolean previouslyConnected = establishedConnections.put(address.getSocketAddress(), new P2LConnection(address)) != null;
         historicConnections.remove(address.getSocketAddress());
-        notifyConnectionEstablished(address, conversationId);
+        if(!previouslyConnected)
+            notifyConnectionEstablished(address, conversationId);
     }
     @Override public void markBrokenConnection(P2Link address, boolean retry) {
         P2LConnection wasRemoved = establishedConnections.remove(address.getSocketAddress());
@@ -284,9 +280,13 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     @Override public void notifyPacketReceivedFrom(SocketAddress from) {
         //todo this operation may be to slow to compute EVERY TIME a packet is received - on the other hand..
         P2LConnection established = establishedConnections.get(from);
-        HistoricConnection reEstablished = established==null?null:historicConnections.remove(established.link.getSocketAddress());
-        if(reEstablished != null/* && retryStateOfHistoricConnection.r>0*/) //not actively retrying does not mean the connection should not be reestablished
-            graduateToEstablishedConnection(reEstablished.link, -1); //cool: auto remembering of correct(hopefully), link
+        if(established!=null) {
+            established.notifyActivity();
+        } else {
+            HistoricConnection reEstablished = historicConnections.remove(from);
+            if(reEstablished != null/* && retryStateOfHistoricConnection.r>0*/) //actively retrying IS NOT REQUIRED, the connection should be reestablished nonetheless
+                graduateToEstablishedConnection(reEstablished.link, -1);//cool: auto remembering of correct(hopefully), link
+        }
     }
     private List<P2Link> getDormantEstablishedConnections(long now) {
         ArrayList<P2Link> dormantConnections = new ArrayList<>(establishedConnections.size());
@@ -384,6 +384,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         boolean isDormant(long now) {
             return (now - lastPacketReceived) > P2LHeuristics.ESTABLISHED_CONNECTION_IS_DORMANT_THRESHOLD_MS;
         }
+        void notifyActivity() {lastPacketReceived = System.currentTimeMillis();}
 
         @Override
         public String toString() {

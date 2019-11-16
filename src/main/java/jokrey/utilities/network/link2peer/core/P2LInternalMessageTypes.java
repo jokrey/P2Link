@@ -22,7 +22,6 @@ public class P2LInternalMessageTypes {
     static final int R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_ANSWER = -992;
     static final int R_WHO_AM_I_ANSWER = -993;
     static final int R_DIRECT_CONNECTION_ESTABLISHED = -994;
-    static final int SL_PONG = -995;
 
     public static boolean isInternalMessageId(int msgId) {
         return msgId < 0;

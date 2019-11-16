@@ -5,7 +5,6 @@ import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.simple.data_structure.pairs.Pair;
 
-import java.io.IOException;
 import java.net.SocketAddress;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -34,6 +33,7 @@ class EstablishConnectionProtocol {
             throw new IllegalArgumentException("cannot connect to private link");
         else if(to.isHiddenLink()) {
             P2Link self = parent.getSelfLink();
+            boolean relayAvailable = !to.getRelayLink().equals(self) && to.getRelayLink().getRelaySocketAddress()!=null;
             if(self.isPrivateLink() || self.isHiddenLink()) { //self should always be private or public, but it is possible to manually set it to a hidden link
                 //todo - this scenario could not be realisticly tested as of yet AND cannot be tested automatically
                 for(int i=0;i<attempts;i++) {
@@ -41,14 +41,16 @@ class EstablishConnectionProtocol {
                     if(asInitiatorDirect(parent, to, ()->createConversationForInitialDirect(parent), 1, initialTimeout))
                         return true;
                     //if that does not work, request a reverse connection to the link the relay server sees of this node (either one should be the correct outside nat address)
-                    System.out.println("to.getRelaySocketAddress() = " + to.getRelaySocketAddress());
-                    if(asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, false, 1, initialTimeout))
+                    if(relayAvailable && asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, false, 1, initialTimeout))
                         return false;
                     initialTimeout*=2;
                 }
                 return false;
             } else {
-                return asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, true, attempts, initialTimeout);
+                if(!relayAvailable)
+                    return asInitiatorDirect(parent, to, ()->createConversationForInitialDirect(parent), 1, initialTimeout);
+                else
+                    return asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, true, attempts, initialTimeout);
             }
         } else {// if(to.isPublicLink()) {
             return asInitiatorDirect(parent, to, ()->createConversationForInitialDirect(parent), attempts, initialTimeout);
@@ -58,14 +60,14 @@ class EstablishConnectionProtocol {
     //GUARANTEED DIFFERENT CONVERSATION IDS FOR INITIAL DIRECT AND REVERSE CONNECTIONS, BECAUSE OF:
     // theoretical problem: coincidentally it could be possible that a peer initiates a connection using the same conversationId (SOLUTION: NEGATIVE AND POSITIVE CONVERSATION IDS)
     private static int createConversationForInitialDirect(P2LNodeInternal parent) {
-        return Math.abs(parent.createUniqueConversationId()); //ALWAYS POSITIVE
+        return - Math.abs(parent.createUniqueConversationId()); //ALWAYS NEGATIVE
     }
     private static int createConversationForReverse(P2LNodeInternal parent) {
         int conversationId;
         do {
             conversationId = parent.createUniqueConversationId();
         } while(conversationId==Integer.MIN_VALUE); //abs(min value) == min value, therefore min value illegal here
-        return -1 * Math.abs(conversationId); //ALWAYS NEGATIVE
+        return Math.abs(conversationId); //ALWAYS POSITIVE
     }
 
     private static boolean asInitiatorRequestReverseConnection(P2LNodeInternal parent, SocketAddress relaySocketAddress, P2Link to, boolean giveExplicitSelfLink, int attempts, int initialTimeout) {
@@ -170,6 +172,7 @@ class EstablishConnectionProtocol {
     }
     private static P2Link fromMessage(P2LNodeInternal parent, P2LMessage m) {
         byte[] selfProclaimedLinkOfInitiatorRaw = m.asBytes();
+        System.out.println("selfProclaimedLinkOfInitiatorRaw = " + Arrays.toString(selfProclaimedLinkOfInitiatorRaw));
         if(selfProclaimedLinkOfInitiatorRaw.length == 0)
             return P2Link.createHiddenLink(parent.getSelfLink(), m.header.getSender().getSocketAddress());
         else

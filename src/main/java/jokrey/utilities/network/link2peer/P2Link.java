@@ -21,8 +21,10 @@ public class P2Link {
         this.rawAddr = rawAddr;
         this.port = port;
         this.relayServerLink = relayServerLink;
-        if(relayServerLink!=null && relayServerLink.getSocketAddress() == null)
-            throw new IllegalArgumentException("relay server link cannot be hidden");
+
+        //todo
+//        if(relayServerLink!=null && relayServerLink.getSocketAddress() == null)
+//            throw new IllegalArgumentException("relay server link cannot be hidden");
     }
 
     public static P2Link fromStringEnsureRelayLinkAvailable(String raw, InetSocketAddress to) {
@@ -40,6 +42,9 @@ public class P2Link {
     }
     public SocketAddress getRelaySocketAddress() {
         return relayServerLink.getSocketAddress();
+    }
+    public P2Link getRelayLink() {
+        return relayServerLink;
     }
 
     public boolean isPublicLink() {

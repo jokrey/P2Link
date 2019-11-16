@@ -1,11 +1,15 @@
 package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.core.stream.StreamMessageHandler;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
-import java.net.*;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.SocketAddress;
+import java.net.SocketException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -41,7 +45,7 @@ public class IncomingHandler {
 
     private void handleReceivedMessage(DatagramPacket receivedPacket) throws Throwable {
         SocketAddress from = receivedPacket.getSocketAddress();
-        P2LMessage message = P2LMessage.fromPacket(receivedPacket);
+        P2LMessage message = P2LMessage.fromPacket(P2Link.raw(receivedPacket.getSocketAddress()), receivedPacket);
         if(INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE>0) {
             boolean dropped = ThreadLocalRandom.current().nextInt(0, 100) < INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE;
             if (dropped) {
@@ -88,9 +92,8 @@ public class IncomingHandler {
         } else if (message.header.getType() == SL_WHO_AM_I) {
             WhoAmIProtocol.asAnswerer(parent, receivedPacket);
         } else if (message.header.getType() == SL_PING) {
-            PingProtocol.asAnswerer(parent, from);
-        } else if (message.header.getType() == SL_PONG) {
-            //already 'notify packet received from' called, i.e. it is no longer marked as dormant, i.e. pong did what it was supposed to
+//            PingProtocol.asAnswerer(parent, from);
+            //ping always requests a receipt - so that was already sent
         } else if (message.header.getType() == SL_DIRECT_CONNECTION_REQUEST) {
             EstablishConnectionProtocol.asAnswererDirect(parent, receivedPacket.getSocketAddress(), message);
         } else if(message.header.getType() == SL_REQUEST_DIRECT_CONNECT_TO) {

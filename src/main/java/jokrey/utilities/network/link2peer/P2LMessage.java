@@ -97,7 +97,7 @@ public class P2LMessage {
         resetReader();
     }
 
-    /** @return a udp datagram packet from the internal data - it can be decoded on the receiver side using {@link #fromPacket(DatagramPacket)}
+    /** @return a udp datagram packet from the internal data - it can be decoded on the receiver side using {@link #fromPacket(P2Link, DatagramPacket)}
      * @param to receiver of the created datagram packet*/
     public DatagramPacket toPacket(SocketAddress to) {
         int actualLength = requiredRawSize();
@@ -123,10 +123,10 @@ public class P2LMessage {
     }
 
     /** @return Decodes a udp datagram packet into a p2l message */
-    public static P2LMessage fromPacket(DatagramPacket packet) {
+    public static P2LMessage fromPacket(P2Link sender, DatagramPacket packet) {
         byte[] raw = packet.getData();
 
-        P2LMessageHeader header = P2LMessageHeader.from(raw, P2Link.raw(packet.getSocketAddress()));//todo check if this is acceptable or if a look up in parent is required
+        P2LMessageHeader header = P2LMessageHeader.from(raw, sender);
 
         if(raw.length > packet.getLength()*2 && raw.length > 4096) //fixme heuristic
             raw =  Arrays.copyOfRange(packet.getData(), 0, packet.getLength());

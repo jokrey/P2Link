@@ -1,11 +1,9 @@
 package jokrey.utilities.network.link2peer.util;
 
-import com.sun.xml.internal.ws.util.CompletedFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool.Task;
 import jokrey.utilities.simple.data_structure.stack.LinkedStack;
 import jokrey.utilities.simple.data_structure.stack.Stack;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -391,6 +389,10 @@ public class P2LFuture<T> {
      * Converts the this future to a future of type R using the given converter function
      * If the returned future is canceled, the underlying (i.e. this) future is also canceled.
      * If the returned future is completed directly(not automatically through completing the underlying future), then behaviour is undefined.
+     *
+     * The returned future will ALWAYS be waited upon, additionally the original future will automatically be waited upon from now on
+     *    unlike before, where {@link #isWaiting()} could be used to determine whether the 'user' is still waiting on it - this is no longer possible
+     *
      * @param converter T to R converter function
      * @return the newly created future of type R
      */
