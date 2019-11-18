@@ -133,7 +133,7 @@ class BroadcastMessageProtocol {
         return P2LMessage.Factory.createSendMessageWith(carrierMessageType,
                 message.header.getType(), message.header.getExpiresAfter(),
                 P2LMessage.makeVariableIndicatorFor(senderBytes.length), senderBytes,
-                P2LMessage.makeVariableIndicatorFor(message.payloadLength), message.asBytes());
+                P2LMessage.makeVariableIndicatorFor(message.getPayloadLength()), message.asBytes());
     }
     private static P2LMessage unpackBroadcastMessage(P2LMessage message) {
         int brdMsgType = message.nextInt();

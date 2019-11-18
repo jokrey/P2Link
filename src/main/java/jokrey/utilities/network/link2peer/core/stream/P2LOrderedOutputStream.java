@@ -14,13 +14,13 @@ import java.net.SocketAddress;
  *
  * @author jokrey
  */
-public abstract class P2LOutputStream extends OutputStream implements AutoCloseable {
+public abstract class P2LOrderedOutputStream extends OutputStream implements AutoCloseable {
     protected final P2LNodeInternal parent;
     protected final SocketAddress to;
     protected final int type;
     protected final int conversationId;
 
-    protected P2LOutputStream(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
+    protected P2LOrderedOutputStream(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
         this.parent = parent;
         this.to = to;
         this.type = type;

@@ -14,7 +14,8 @@ public class P2LHeuristics {
      * Has to be smaller 4*({@link P2LMessage#CUSTOM_RAW_SIZE_LIMIT} - ~20). This is so that the indices list in the receipt definitely fits
      * For the default value of raw limit this means that the max is: (1024-20)/4 = 251
      */
-    public static int STREAM_CHUNK_BUFFER_ARRAY_SIZE = 128;
+    public static int ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE = 2048;
+    public static int ORDERED_STREAM_CHUNK_RECEIPT_RESEND_LIMITATION_IN_MS = 100;
     public static int ORIGINAL_RETRY_HISTORIC_TIMEOUT_MS = 60*1000;
     public static int DEFAULT_PROTOCOL_ATTEMPT_COUNT = 3;
     public static int DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT = 500;

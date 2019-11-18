@@ -47,7 +47,7 @@ public class MinimalHeader implements P2LMessageHeader {
         return Objects.hash(sender, type, requestReceipt, isReceipt(), isStreamEof(), isLongPart(), isStreamPart(), getConversationId(), getExpiresAfter(), getPartIndex(), getNumberOfParts());
     }
     @Override public String toString() {
-        return getClass().getName()+"{" + "sender='" + sender + '\'' + ", type=" + type + (isConversationIdPresent()?", conversationId=" + getConversationId():"") +
+        return getClass().getSimpleName()+"{" + "sender='" + sender + '\'' + ", type=" + type + (isConversationIdPresent()?", conversationId=" + getConversationId():"") +
                 (isExpirationPresent()?", expiresAfter=" + getExpiresAfter():"") +
                 ", requestReceipt=" + requestReceipt + ", isReceipt=" + isReceipt() + '}';
     }

@@ -2,10 +2,13 @@ package jokrey.utilities.network.link2peer.core.stream;
 
 import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
+import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.core.message_headers.StreamPartHeader;
-import jokrey.utilities.network.link2peer.util.DataChunk;
+import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
+import jokrey.utilities.transparent_storage.bytes.wrapper.SubBytesStorage;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -25,29 +28,42 @@ import java.util.Arrays;
  * TODO TODO TODO  - investigate extreme drops in performance on package loss (requires timeout -> request receipt, which is insane)
  *     REASON: loss of last package (the package that requests the receipt)
  *
+ * dynamically determined parameters:
+ *    mtu
+ *    average round time (request receipt -> received receipt)   (this is used to not resend packages to early)
+ *    number of parallelly sendable packages (determined from number of requeried packages from max batch send[send within time x])
+ *        (this is used for very fine tuned congestion control - though congestion control will also be )
+ *
  * @author jokrey
  */
-public class P2LOutputStreamV1 extends P2LOutputStream {
-    private final DataChunk[] unconfirmedSendPackages = new DataChunk[P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE/2]; //this smaller is a simple, dumb, only mildly effective form of congestion control
+public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
+    private final ByteArrayStorage[] unconfirmedSendPackages = new ByteArrayStorage[P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE /2]; //this smaller is a simple, dumb, only mildly effective form of congestion control
 
     private int eofAtIndex = Integer.MAX_VALUE;
-    private final DataChunk unsendBuffer;
+    private final byte[] unsendBuffer;
+    private int unsendBufferFilledUpToIndex = 0;
+    private boolean isUnsendBufferFull() {
+        return unsendBufferFilledUpToIndex == unsendBuffer.length;
+    }
+    private int remainingBufferSpace() {
+        return unsendBuffer.length - unsendBufferFilledUpToIndex;
+    }
     private int headerSize;
     private int earliestUnconfirmedPartIndex = 0;
     private int latestAttemptedIndex = -1;
 
-    public P2LOutputStreamV1(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
+    public P2LOrderedOutputStreamImplV1(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
         super(parent, to, type, conversationId);
 
-        byte[] rawBuffer = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT];
         headerSize = new StreamPartHeader(null, type, conversationId, 0, false, false).getSize();
-        unsendBuffer = new DataChunk(rawBuffer, headerSize, 0);
+        unsendBuffer = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT - headerSize];
     }
 
     @Override public synchronized void write(int b) throws IOException {
         if(eofAtIndex < latestAttemptedIndex+1) throw new IOException("Stream closed");
-        unsendBuffer.put((byte)(b & 0xFF));
-        if(unsendBuffer.isFull())
+        unsendBuffer[unsendBufferFilledUpToIndex] = (byte) (b & 0xFF);
+        unsendBufferFilledUpToIndex++;
+        if(isUnsendBufferFull())
             packAndSend(false);
     }
 
@@ -56,17 +72,18 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
         int bytesSend = 0;
         while(bytesSend < len) {
             int remainingInB = len-bytesSend;
-            int numBytesToPut = Math.min(unsendBuffer.remainingSpace(), remainingInB);
-            unsendBuffer.put(b, off, numBytesToPut);
+            int numBytesToPut = Math.min(remainingBufferSpace(), remainingInB);
+            System.arraycopy(b, off, unsendBuffer, unsendBufferFilledUpToIndex, numBytesToPut);
+            unsendBufferFilledUpToIndex+=numBytesToPut;
             bytesSend+=numBytesToPut;
             off+=numBytesToPut;
-            if(unsendBuffer.isFull())
+            if(isUnsendBufferFull())
                 packAndSend(false);
         }
     }
 
     @Override public synchronized void flush() throws IOException {
-        if(!unsendBuffer.isEmpty())
+        if(unsendBufferFilledUpToIndex!=0)
             packAndSend(false); //flush semantics currently means: pack and send, but does not include guarantees about receiving information
     }
 
@@ -77,8 +94,8 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
             boolean confirmation = waitForConfirmationOnAll(timeout_ms);
 
             //help gc:
-            for (int i = 0; i < unconfirmedSendPackages.length; i++) unconfirmedSendPackages[i] = null;
-            for (int i = 0; i < shiftCache.length; i++) shiftCache[i] = null;
+            Arrays.fill(unconfirmedSendPackages, null);
+            Arrays.fill(shiftCache, null);
             //todo - clean up stream message handler
             return confirmation;
         }
@@ -114,10 +131,14 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
         return System.currentTimeMillis() - lastReceiptRequest < 500;
     }
     private synchronized void sendExtraordinaryReceiptRequest() throws IOException {
-        if(!hasUnconfirmedParts() || requestRecentlyMade()) return;
-        lastReceiptRequest=System.currentTimeMillis();
-        StreamPartHeader header = new StreamPartHeader(null, type, conversationId, -1, true, false);
-        parent.sendInternalMessage(new P2LMessage(header, null, header.generateRaw(0), 0, null), to);
+        if (!hasUnconfirmedParts() || requestRecentlyMade()) return;
+        lastReceiptRequest = System.currentTimeMillis();
+        if (isClosed()) {
+            StreamPartHeader header = new StreamPartHeader(null, type, conversationId, -1, true, false);
+            parent.sendInternalMessage(new P2LMessage(header, null, header.generateRaw(0), 0), to);
+        } else{
+            send(earliestUnconfirmedPartIndex, true);
+        }
     }
 
     private boolean hasBufferCapacities() {
@@ -144,13 +165,12 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
     private synchronized void packAndSend(boolean forceRequestReceipt) throws IOException {
         if(eofAtIndex < latestAttemptedIndex+1) throw new IOException("Stream closed");
         waitForBufferCapacities(0);
-        unsendBuffer.offset = headerSize; //because offset is used to mark 'em as confirmed
 
         //also send if buffer is empty - could be used as a marker (for example eof marker by close)
         int partIndexToSend = virtuallySend();
         send(partIndexToSend, forceRequestReceipt);
 
-        unsendBuffer.offset = unsendBuffer.lastDataIndex = headerSize;//clear to offset
+        unsendBufferFilledUpToIndex = 0;
     }
     private synchronized int virtuallySend() {
         latestAttemptedIndex++;
@@ -161,16 +181,17 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
         else if(unconfirmedBufferIndex >= unconfirmedSendPackages.length)
             throw new IllegalStateException("unconfirmedBufferIndex("+unconfirmedBufferIndex+") >= unconfirmedSendPackages.length("+unconfirmedSendPackages.length+")");
 
-        if(unconfirmedSendPackages[unconfirmedBufferIndex] == null || unsendBuffer.lastDataIndex > unconfirmedSendPackages[unconfirmedBufferIndex].capacity())
-            unconfirmedSendPackages[unconfirmedBufferIndex] = new DataChunk(unsendBuffer.capacity());
-        unsendBuffer.cloneInto(unconfirmedSendPackages[unconfirmedBufferIndex]);
+        if(unconfirmedSendPackages[unconfirmedBufferIndex] == null)
+            unconfirmedSendPackages[unconfirmedBufferIndex] = new ByteArrayStorage(headerSize + unsendBuffer.length);
+        unconfirmedSendPackages[unconfirmedBufferIndex].size = headerSize;
+        unconfirmedSendPackages[unconfirmedBufferIndex].set(headerSize, unsendBuffer, 0, unsendBufferFilledUpToIndex);
         return latestAttemptedIndex;
     }
     private synchronized void send(int partIndexToSend, boolean forceRequestReceipt) throws IOException {
         int bufferIndexToSend = partIndexToSend - earliestUnconfirmedPartIndex;
         if(bufferIndexToSend < 0) throw new IllegalStateException("buffer index("+bufferIndexToSend+") negative - this should not happen");
         if(bufferIndexToSend >= unconfirmedSendPackages.length) throw new IllegalStateException("buffer index("+bufferIndexToSend+") positive out of bounds("+unconfirmedSendPackages.length+") - this should not happen");
-        DataChunk chunk = unconfirmedSendPackages[bufferIndexToSend];
+        ByteArrayStorage chunk = unconfirmedSendPackages[bufferIndexToSend];
 
         boolean eof = eofAtIndex == partIndexToSend;
         boolean thisPartIsLastInUnconfirmedBuffer = partIndexToSend + 1 >= earliestUnconfirmedPartIndex + unconfirmedSendPackages.length;
@@ -178,8 +199,8 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
         StreamPartHeader header = new StreamPartHeader(null, type, conversationId, partIndexToSend, requestReceipt, eof);
         if(requestReceipt)
             lastReceiptRequest=System.currentTimeMillis();
-        header.writeTo(chunk.data);
-        parent.sendInternalMessage(new P2LMessage(header, null, chunk.data, chunk.lastDataIndex - headerSize, null), to);
+        header.writeTo(chunk.content); //if request receipt was changed...
+        parent.sendInternalMessage(new P2LMessage(header, null, chunk.content, (int) (chunk.contentSize() - headerSize)), to);
     }
 
 
@@ -188,7 +209,7 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
         handleReceipt(missingParts);//blocking
     }
 
-    private final DataChunk[] shiftCache = new DataChunk[unconfirmedSendPackages.length/2];
+    private final ByteArrayStorage[] shiftCache = new ByteArrayStorage[unconfirmedSendPackages.length/2];
     private synchronized void handleReceipt(StreamReceipt receipt) {
         int latestIndexReceivedByPeer = receipt.latestReceived;
         int[] missingParts = receipt.missingParts;
@@ -259,12 +280,12 @@ public class P2LOutputStreamV1 extends P2LOutputStream {
 
     private synchronized boolean isConfirmed(int partIndex) {
         int bufferIndex = partIndex - earliestUnconfirmedPartIndex;
-        return unconfirmedSendPackages[bufferIndex] == null || unconfirmedSendPackages[bufferIndex].offset==-1;
+        return unconfirmedSendPackages[bufferIndex] == null || unconfirmedSendPackages[bufferIndex].size==-1;//todo size shou
     }
     private synchronized void markConfirmed(int partIndex) {
         int bufferIndex = partIndex - earliestUnconfirmedPartIndex;
         if(unconfirmedSendPackages[bufferIndex] != null)
-            unconfirmedSendPackages[bufferIndex].offset=-1;
+            unconfirmedSendPackages[bufferIndex].size=-1;
     }
     private void markConfirmed(int firstPartIndex, int lastPartIndex) {
         for (int partI = firstPartIndex; partI <= lastPartIndex; partI++)

@@ -1,7 +1,6 @@
 package jokrey.utilities.network.link2peer.core.stream;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader.HeaderIdentifier;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader.SenderTypeConversationIdentifier;
@@ -16,42 +15,35 @@ import java.util.concurrent.ConcurrentHashMap;
 public class StreamMessageHandler {
     private final ConcurrentHashMap<HeaderIdentifier, P2LInputStream> inputStreams = new ConcurrentHashMap<>();
     public void receivedPart(P2LMessage message) {
-        P2LInputStream stream = getInputStream(message);
-        stream.received(message);
-
-//        if(stream.isClosed())
-//            inputStreams.remove(new SenderTypeConversationIdentifier(message));
-        //todo PROBLEM: if a delayed package comes in after a request to resend a new inputStreams entry would be created
-        //   solution: same last packet received time + a stream timeout feature (then this node app could control when data is cleaned up)
-        //             additionally require that for a packet to be accepted,
-        //                 it is required that the input stream is read from currently (i.e. someone is waiting/or rather a stream was requested and is not closed) - any other packages are disregarded
+        getInputStream(message).received(message);
+        //potentially a delayed package, after a new stream of the same type and conversation id has been created (very, very unlikely in context)
     }
     private P2LInputStream getInputStream(P2LMessage m) {
-        return getInputStream(null, new SenderTypeConversationIdentifier(m),null);
+        return inputStreams.get(new SenderTypeConversationIdentifier(m));
     }
-    public P2LInputStream getInputStream(P2LNodeInternal parent, SocketAddress from, int type, int conversationId) {
-        return getInputStream(parent, new SenderTypeConversationIdentifier(from, type, conversationId), from);
+    public P2LOrderedInputStream createInputStream(P2LNodeInternal parent, SocketAddress from, int type, int conversationId) {
+        if(from == null || parent == null) throw new NullPointerException();
+        HeaderIdentifier identifier = new SenderTypeConversationIdentifier(from, type, conversationId);
+        return (P2LOrderedInputStream) inputStreams.computeIfAbsent(identifier, k -> new P2LOrderedInputStreamImplV1(parent, from, type, conversationId));
     }
-    private P2LInputStream getInputStream(P2LNodeInternal parent, SenderTypeConversationIdentifier identifier, SocketAddress from) {
-        return inputStreams.computeIfAbsent(identifier, k -> {
-            if(from == null || parent == null) throw new NullPointerException();
-            return new P2LInputStreamV1(parent, from, identifier.messageType, identifier.conversationId);
-        });
+    public P2LFragmentInputStream createFragmentInputStream(P2LNodeInternal parent, SocketAddress from, int type, int conversationId) {
+        if(from == null || parent == null) throw new NullPointerException();
+        HeaderIdentifier identifier = new SenderTypeConversationIdentifier(from, type, conversationId);
+        return (P2LFragmentInputStream) inputStreams.computeIfAbsent(identifier, k -> new P2LFragmentInputStreamImplV1(parent, from, type, conversationId));
     }
 
 
 
-    private final ConcurrentHashMap<HeaderIdentifier, P2LOutputStream> outputStreams = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<HeaderIdentifier, P2LOrderedOutputStream> outputStreams = new ConcurrentHashMap<>();
     public void receivedReceipt(P2LMessage rawReceipt) {
-        getOutputStream(null, new SenderTypeConversationIdentifier(rawReceipt),null).receivedReceipt(rawReceipt);
+        getOutputStream(rawReceipt).receivedReceipt(rawReceipt);
     }
-    public P2LOutputStream getOutputStream(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
-        return getOutputStream(parent, new SenderTypeConversationIdentifier(to, type, conversationId), to);
+    private P2LOrderedOutputStream getOutputStream(P2LMessage m) {
+        return outputStreams.get(new SenderTypeConversationIdentifier(m));
     }
-    private P2LOutputStream getOutputStream(P2LNodeInternal parent, SenderTypeConversationIdentifier identifier, SocketAddress to) {
-        return outputStreams.computeIfAbsent(identifier, k -> {
-            if(parent == null || to == null) throw new NullPointerException();
-            return new P2LOutputStreamV1(parent, to, identifier.messageType, identifier.conversationId);
-        });
+    public P2LOrderedOutputStream getOutputStream(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
+        if(parent == null || to == null) throw new NullPointerException();
+        HeaderIdentifier identifier = new SenderTypeConversationIdentifier(to, type, conversationId);
+        return outputStreams.computeIfAbsent(identifier, k -> new P2LOrderedOutputStreamImplV1(parent, to, type, conversationId));
     }
 }

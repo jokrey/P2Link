@@ -33,7 +33,7 @@ class EstablishConnectionProtocol {
             throw new IllegalArgumentException("cannot connect to private link");
         else if(to.isHiddenLink()) {
             P2Link self = parent.getSelfLink();
-            boolean relayAvailable = !to.getRelayLink().equals(self) && to.getRelayLink().getRelaySocketAddress()!=null;
+            boolean relayAvailable = !to.getRelayLink().equals(self) && to.getRelayLink().getSocketAddress()!=null;
             if(self.isPrivateLink() || self.isHiddenLink()) { //self should always be private or public, but it is possible to manually set it to a hidden link
                 //todo - this scenario could not be realisticly tested as of yet AND cannot be tested automatically
                 for(int i=0;i<attempts;i++) {

@@ -3,21 +3,24 @@ package jokrey.utilities.network.link2peer.core.stream;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
-import jokrey.utilities.network.link2peer.util.DataChunk;
+import jokrey.utilities.transparent_storage.bytes.wrapper.SubBytesStorage;
 
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.LinkedList;
 
 /**
- * TODO - should also send a response at a certain, dynamically changed interval (it should be roughly every half buffer size filled - otherwise there is always a delay at the end of the buffer size
- *
  * TODO - should itself decide when to send receipts, the current system allows an exploit where many small packages request receipts
+ *
+ * FIXME GENERAL DOWNSIDE COMPARED TO TCP:
+ *    MTP IS LIMITED by custom max raw size of a message (for each incoming udp message a buffer must be reserved - that buffer should be as small as possible)
+ *    currently this is defaulted at 8192 - tcp can set this buffer to the max ip package size...
+ *    in a distributed environment mtp is naturally limited by other factors, but localhost this is a huge performance decrease
  *
  * @author jokrey
  */
-class P2LInputStreamV2 extends P2LInputStream {
-    public P2LInputStreamV2(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
+class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
+    P2LOrderedInputStreamImplV1(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
         super(parent, to, type, conversationId);
     }
 
@@ -25,19 +28,19 @@ class P2LInputStreamV2 extends P2LInputStream {
     private int latestIndexReceived = 0;
     private boolean eofReceived =false;
     private int available = 0;
-    private LinkedList<DataChunk> unconsumedChunksQueue = new LinkedList<>();//max size is not defined todo limit to a maximum size (i.e. if no one is reading from the stream at some point it will stop receiving)
+    private LinkedList<SubBytesStorage> unconsumedChunksQueue = new LinkedList<>();//max size is not defined todo limit to a maximum size (i.e. if no one is reading from the stream at some point it will stop receiving)
 
     //idea: earliestIndexMissing is to be understood as the -1th element in this array
-    private DataChunk[] unqueuedChunks = new DataChunk[P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE];//allows up to 64 later messages to be received, before the first message is finally required to drain this buffer
+    private SubBytesStorage[] unqueuedChunks = new SubBytesStorage[P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE];//allows up to 64 later messages to be received, before the first message is finally required to drain this buffer
 
-    @Override synchronized void received(P2LMessage message) {
+    @Override public synchronized void received(P2LMessage message) {
         if(isClosed()) {
             if(message.header.requestReceipt())
                 sendReceipt(); //this is to help the output stream on the other end - it might not have gotten our receipt
             return;
         }
 
-        DataChunk unreadDataChunk = new DataChunk(message);
+        SubBytesStorage unreadDataChunk = message.payload();
 
         if(message.header.isStreamEof())
             eofReceived =true;
@@ -49,22 +52,22 @@ class P2LInputStreamV2 extends P2LInputStream {
         if(m_index_received == earliestIndexMissing) {//jackpot - this is what we have been waiting for
             if(!unreadDataChunk.isEmpty()) {
                 unconsumedChunksQueue.addLast(unreadDataChunk);
-                available += unreadDataChunk.size();
+                available += unreadDataChunk.contentSize();
             }
             earliestIndexMissing++;
 
             int index=0;
             for(;index<unqueuedChunks.length;index++) { //re-add previously received later messages
-                DataChunk chunk = unqueuedChunks[index];
+                SubBytesStorage chunk = unqueuedChunks[index];
                 if(chunk==null) break;
                 if(!chunk.isEmpty()) {
                     unconsumedChunksQueue.addLast(chunk);
-                    available += chunk.size();
+                    available += chunk.contentSize();
                 }
             }
             int shiftBy = index + 1;
             if(shiftBy>unqueuedChunks.length) shiftBy = unqueuedChunks.length; //todo this line feels weird
-            //   todo: only recopy if it is full - i.e. keep an additional internal index and use that (index+internalOff, unqueuedIndex+internalOff)
+            //   not_todo: only recopy if it is full - i.e. keep an additional internal index and use that (index+internalOff, unqueuedIndex+internalOff)
             System.arraycopy(unqueuedChunks, shiftBy, unqueuedChunks, 0, unqueuedChunks.length - shiftBy);//no rotate required, new packages always have new pointers
             for(int i=unqueuedChunks.length-shiftBy;i<unqueuedChunks.length;i++)
                 unqueuedChunks[i]=null;
@@ -87,6 +90,10 @@ class P2LInputStreamV2 extends P2LInputStream {
         } else {
             int unqueuedIndex = (m_index_received - earliestIndexMissing)-1; //min should be 0
             unqueuedChunks[unqueuedIndex] = unreadDataChunk;
+
+            if(unqueuedIndex == unqueuedChunks.length-unqueuedChunks.length/3) //if buffer 66.6% filled up, send extraordinary receipt
+//            if(unqueuedIndex == unqueuedChunks.length/2) //if buffer 50% filled up, send extraordinary receipt
+                sendReceipt();
         }
 
         if(message.header.requestReceipt()) {//has to be send after earliestIndex missing etc were updated
@@ -94,7 +101,19 @@ class P2LInputStreamV2 extends P2LInputStream {
         }
     }
 
+
+    private long lastSendReceipt = -1;
+    private int lastEarliestMissing = -1;
     private void sendReceipt() {
+        long now = System.currentTimeMillis();
+        if(lastEarliestMissing==earliestIndexMissing) {
+            if (lastSendReceipt != -1 && (now - lastSendReceipt) <= P2LHeuristics.ORDERED_STREAM_CHUNK_RECEIPT_RESEND_LIMITATION_IN_MS)
+                return;
+        }
+        lastSendReceipt = now;
+        lastEarliestMissing=earliestIndexMissing;
+
+
         boolean eof = isClosed() || eofReached();
         try {
             parent.sendInternalMessage(StreamReceipt.encode(type, conversationId, eof, latestIndexReceived, getMissingPartIndices()), to);
@@ -126,8 +145,9 @@ class P2LInputStreamV2 extends P2LInputStream {
             if(eofReached() && available==0) return -1;
             if(available==-1) throw new IOException("stream was closed using close");
 
-            DataChunk unreadDataChunk = unconsumedChunksQueue.getFirst();
-            byte singleByteOfData = unreadDataChunk.moveSingleByte();
+            SubBytesStorage unreadDataChunk = unconsumedChunksQueue.getFirst();
+            byte singleByteOfData = unreadDataChunk.getFirst();
+            unreadDataChunk.startIndexAdd(1);
             available--;
             if(unreadDataChunk.isEmpty())
                 unconsumedChunksQueue.removeFirst();
@@ -151,16 +171,17 @@ class P2LInputStreamV2 extends P2LInputStream {
             if(eofReached() && available==0) return -1;
             if(available==-1) throw new IOException("stream was closed using close");
 
-            DataChunk unreadDataChunk = unconsumedChunksQueue.getFirst();
+            SubBytesStorage unreadDataChunk = unconsumedChunksQueue.getFirst();
 
             int numRead = 0;
             while(available>0 && numRead<len) {
                 int leftToRead = len-numRead;
-                int remainingInChunk = unreadDataChunk.size();
+                int remainingInChunk = (int) unreadDataChunk.contentSize();
 
                 int numberOfBytesToCopy = Math.min(leftToRead, remainingInChunk);
 
-                unreadDataChunk.moveTo(b, off+numRead, numberOfBytesToCopy);
+                unreadDataChunk.copyInto(b, off+numRead, numberOfBytesToCopy);
+                unreadDataChunk.startIndexAdd(numberOfBytesToCopy);
                 numRead+=numberOfBytesToCopy;
                 available-=numberOfBytesToCopy;
 
@@ -193,10 +214,9 @@ class P2LInputStreamV2 extends P2LInputStream {
 
     private int[] getMissingPartIndices() {
         int count = 1;//because of earliest missing index - unless eof, the next index is always missing
-        for(int i = 0; i < unqueuedChunks.length; i++) {
+        for(int i = 0; i < unqueuedChunks.length; i++)
             if (unqueuedChunks[i] == null && (earliestIndexMissing + i + 1) <= latestIndexReceived)
                 count++;
-        }
         int[] missingParts = new int[count];
         missingParts[0] = earliestIndexMissing;
         int mi=1;

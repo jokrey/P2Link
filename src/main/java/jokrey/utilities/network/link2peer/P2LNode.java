@@ -2,8 +2,8 @@ package jokrey.utilities.network.link2peer;
 
 import jokrey.utilities.network.link2peer.core.NodeCreator;
 import jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes;
-import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
-import jokrey.utilities.network.link2peer.core.stream.P2LOutputStream;
+import jokrey.utilities.network.link2peer.core.stream.P2LOrderedInputStream;
+import jokrey.utilities.network.link2peer.core.stream.P2LOrderedOutputStream;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
@@ -176,15 +176,11 @@ public interface P2LNode {
     }
 
 
-    /**
-     * Blocking.
-     * @see jokrey.utilities.network.link2peer.core.GarnerConnectionsRecursivelyProtocol */
+    /** Blocking. */
     default List<P2Link> recursiveGarnerConnections(int newConnectionLimit, P2Link... setupLinks) {
         return recursiveGarnerConnections(newConnectionLimit, Integer.MAX_VALUE, setupLinks);
     }
-    /**
-     * Blocking.
-     * @see jokrey.utilities.network.link2peer.core.GarnerConnectionsRecursivelyProtocol */
+    /** Blocking. */
     List<P2Link> recursiveGarnerConnections(int newConnectionLimit, int newConnectionLimitPerRecursion, P2Link... setupLinks);
 
     /** Blocking. */
@@ -319,11 +315,11 @@ public interface P2LNode {
      * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
      * @param conversationId the conversation id of the message
      * @return a stream representation of the connection - with the associated guarantees
-     * @see P2LInputStream
+     * @see P2LOrderedInputStream
      */
-    P2LInputStream getInputStream(SocketAddress from, int messageType, int conversationId);
+    P2LOrderedInputStream getInputStream(SocketAddress from, int messageType, int conversationId);
     /**@see #getInputStream(SocketAddress, int, int)*/
-    default P2LInputStream getInputStream(P2Link from, int messageType, int conversationId) {
+    default P2LOrderedInputStream getInputStream(P2Link from, int messageType, int conversationId) {
         return getInputStream(from.getSocketAddress(), messageType, conversationId);
     }
 
@@ -340,11 +336,11 @@ public interface P2LNode {
      * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
      * @param conversationId the conversation id of the message
      * @return a stream representation of the connection - with the associated guarantees
-     * @see P2LOutputStream
+     * @see P2LOrderedOutputStream
      */
-    P2LOutputStream getOutputStream(SocketAddress to, int messageType, int conversationId);
+    P2LOrderedOutputStream getOutputStream(SocketAddress to, int messageType, int conversationId);
     /**@see #getOutputStream(SocketAddress, int, int)*/
-    default P2LOutputStream getOutputStream(P2Link to, int messageType, int conversationId) {
+    default P2LOrderedOutputStream getOutputStream(P2Link to, int messageType, int conversationId) {
         return getOutputStream(to.getSocketAddress(), messageType, conversationId);
     }
 

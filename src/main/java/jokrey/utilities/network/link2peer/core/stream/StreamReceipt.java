@@ -30,7 +30,7 @@ class StreamReceipt {
             BitHelper.writeInt32(raw, raw_i, missingPart); //todo - firstly missing parts length will always be AT MOST 2 bytes
             raw_i+=4;
         }
-        return new P2LMessage(header, null, raw, payloadLength, null);
+        return new P2LMessage(header, null, raw, payloadLength);
     }
     static StreamReceipt decode(P2LMessage message) {
         int latestReceived = message.nextInt();

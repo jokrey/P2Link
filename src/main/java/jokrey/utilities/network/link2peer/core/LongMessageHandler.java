@@ -54,8 +54,8 @@ class LongMessageHandler {
         //todo - this is a little dumb: the custom raw size limit is only to avoid involuntary fragmentation in layer 1+2 and keep a small buffer size when receiving
         //todo     - but now we are doing the fragmentation.. (only in java so it is much slower than in HW)
         //todo     - however if the receive buffer should generally remain small, I do not see an option
-        int numberOfRequiredParts = overLongMessage.payloadLength / maxPayloadSize + 1;
-        int lastPartSize = overLongMessage.payloadLength % maxPayloadSize;
+        int numberOfRequiredParts = overLongMessage.getPayloadLength() / maxPayloadSize + 1;
+        int lastPartSize = overLongMessage.getPayloadLength() % maxPayloadSize;
         if(lastPartSize == 0) {
             numberOfRequiredParts--;
             lastPartSize = maxPayloadSize;
@@ -95,7 +95,7 @@ class LongMessageHandler {
         synchronized void received(P2LMessage part) {
             if(parts[part.header.getPartIndex()]==null) {
                 parts[part.header.getPartIndex()] = part;
-                totalByteSize += part.payloadLength;
+                totalByteSize += part.getPayloadLength();
                 numberOfPartsReceived++;
                 lastMessageReceivedAtCtm = System.currentTimeMillis();
             }

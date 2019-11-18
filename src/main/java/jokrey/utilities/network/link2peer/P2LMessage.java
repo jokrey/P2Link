@@ -10,6 +10,9 @@ import jokrey.utilities.network.link2peer.core.message_headers.MinimalHeader;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.core.message_headers.ReceiptHeader;
 import jokrey.utilities.network.link2peer.util.Hash;
+import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
+import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
+import jokrey.utilities.transparent_storage.bytes.wrapper.SubBytesStorage;
 
 import java.net.DatagramPacket;
 import java.net.SocketAddress;
@@ -19,6 +22,7 @@ import java.util.Collection;
 import java.util.Iterator;
 
 import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.isInternalMessageId;
+import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
 
 /**
  * A message always has a sender and data. What actual data is transported is naturally arbitrary.
@@ -35,7 +39,7 @@ import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.is
  *
  * @author jokrey
  */
-public class P2LMessage {
+public class P2LMessage extends ByteArrayStorage {
     /**
      * Hard limit for the udp package size.
      * 65507 is the HARD limitation on windows, the number can be set lower by the app developer to safe memory using {@link #CUSTOM_RAW_SIZE_LIMIT}
@@ -46,7 +50,7 @@ public class P2LMessage {
      * Should be the same between all peers, as the receiver uses it to create the internal buffer and will cut up messages longer than this limit.
      * The limit is should if possible be lower than the
      */
-    public static int CUSTOM_RAW_SIZE_LIMIT = 1024;
+    public static int CUSTOM_RAW_SIZE_LIMIT = 8192; //BELOW IMPEDES STREAMS
 
     /**
      * Constant for an instant message expiration.
@@ -61,37 +65,19 @@ public class P2LMessage {
     public static short MAX_EXPIRATION_TIMEOUT = 180;
     
     public final P2LMessageHeader header;
-    
-    /**
-     * The data field used to communicate arbitrary data between peers.
-     */
-    public final byte[] raw;
-
-    /** number of bytes in the payload - not necessarily raw.length-HeaderSize, because raw can sometimes be a larger buffer */
-    public final int payloadLength;
 
     private Hash contentHash;
     /** @return a cached version of the contentHash of this message. The contentHash is 20 bytes long(sha1), usable with contentHash map and includes sender, type and data. */
     public Hash getContentHash() {
         if(contentHash == null)
-            contentHash = header.contentHashFrom(raw, payloadLength); //no need for thread safety, same value computed in worst case
+            contentHash = header.contentHashFrom(content, getPayloadLength()); //no need for thread safety, same value computed in worst case
         return contentHash;
     }
 
-    private byte[] payload;
-    /** decodes all payload bytes - the returned array is cached and will be returned when this method is called again - the returned array should NOT BE MUTATED */
-    public byte[] asBytes() {
-        if(payload == null)//no need for thread safety measures since the same value is calculated...
-            payload = Arrays.copyOfRange(raw, header.getSize(), requiredRawSize());
-        return payload;
-    }
-
     /** Create a new P2LMessage */
-    public P2LMessage(P2LMessageHeader header, Hash contentHash, byte[] raw, int payloadLength, byte[] payload) {
+    public P2LMessage(P2LMessageHeader header, Hash contentHash, byte[] raw, int payloadLength) {
+        super(true, raw, header.getSize() + payloadLength);
         this.header = header;
-        this.raw = raw;
-        this.payloadLength = payloadLength;
-        this.payload = payload;
         this.contentHash = contentHash;
 
         resetReader();
@@ -103,16 +89,16 @@ public class P2LMessage {
         int actualLength = requiredRawSize();
 
         int maxSize = getMaxPacketSize();
-        byte[] actual = raw;
-        if(raw.length > maxSize) {
+        byte[] actual = content;
+        if(actual.length > maxSize) {
             if(actualLength < maxSize) { //never gonna trigger, when message created with factory methods
                 byte[] shrunk = new byte[actualLength];
-                System.arraycopy(raw, 0, shrunk, 0, shrunk.length);
+                System.arraycopy(actual, 0, shrunk, 0, shrunk.length);
                 actual = shrunk;
             }
         }
-        if (actual.length > CUSTOM_RAW_SIZE_LIMIT) throw new IllegalArgumentException("total size of raw cannot exceed " + CUSTOM_RAW_SIZE_LIMIT + ", user set limit - size here is: " + raw.length + " - max payload size is: " + (CUSTOM_RAW_SIZE_LIMIT - header.getSize()));
-        if (actual.length > MAX_UDP_PACKET_SIZE) throw new IllegalArgumentException("total size of a udp packet cannot exceed " + MAX_UDP_PACKET_SIZE + " - size here is: " + raw.length);
+        if (actual.length > CUSTOM_RAW_SIZE_LIMIT) throw new IllegalArgumentException("total size of raw cannot exceed " + CUSTOM_RAW_SIZE_LIMIT + ", user set limit - size here is: " + actual.length + " - max payload size is: " + (CUSTOM_RAW_SIZE_LIMIT - header.getSize()));
+        if (actual.length > MAX_UDP_PACKET_SIZE) throw new IllegalArgumentException("total size of a udp packet cannot exceed " + MAX_UDP_PACKET_SIZE + " - size here is: " + actual.length);
 //        if(raw.length > 512)
 //            System.err.println("message greater than 512 bytes - this can be considered inefficient because intermediate low level protocols might break it up - size here is: "+raw.length);
         return new DatagramPacket(actual, actualLength, to);
@@ -132,7 +118,7 @@ public class P2LMessage {
             raw =  Arrays.copyOfRange(packet.getData(), 0, packet.getLength());
 
         //contentHash and payload are only calculated if required... Preferably the 'as' methods should be used to extract data.
-        return new P2LMessage(header, null, raw, packet.getLength()-header.getSize(), null);
+        return new P2LMessage(header, null, raw, packet.getLength()-header.getSize());
     }
 
     /** @return whether a single packet will suffice to send the data this message contains */
@@ -142,7 +128,14 @@ public class P2LMessage {
 
     /** @return the minimum required number of bytes to hold all data in this message */
     public int requiredRawSize() {
-        return header.getSize() + payloadLength;
+        return size;
+    }
+
+    public SubBytesStorage payload() {
+        return subStorage(header.getSize(), size);
+    }
+    public int getPayloadLength() {
+        return size-header.getSize();
     }
 
 
@@ -156,13 +149,13 @@ public class P2LMessage {
         if(header.isLongPart() || header.isStreamPart()) throw new UnsupportedOperationException("receipt cannot be created for parts - that would be like tcp ACK, but we wants receipts for many parts and this requires a difference functionality");
         //todo - use less cryptographic function - the checksum of udp is already pretty safe - so even without the hash at all it is pretty safe
         //todo     - interesting would be a hash id that allows getting two receipts for the same sender-type-conversationId simultaneously  (though we are quickly approaching overkill territory here)
-        Hash receiptHash = header.contentHashFromIgnoreSender(raw, payloadLength);
+        Hash receiptHash = header.contentHashFromIgnoreSender(content, getPayloadLength());
         P2LMessageHeader receiptHeader = new ReceiptHeader(null, header.getType(), header.getConversationId());
         return receiptHeader.generateMessage(receiptHash.raw());
     }
     public boolean validateIsReceiptFor(P2LMessage message) {
         if(!header.isReceipt()) throw new IllegalStateException("cannot validate receipt, since this is not a receipt");
-        Hash receiptHash = message.header.contentHashFromIgnoreSender(message.raw, message.payloadLength);
+        Hash receiptHash = message.header.contentHashFromIgnoreSender(message.content, message.getPayloadLength());
         return header.getType() == message.header.getType() && header.getConversationId() == message.header.getConversationId() &&
                 payloadEquals(receiptHash.raw());
     }
@@ -177,9 +170,10 @@ public class P2LMessage {
         return payloadEquals(o, 0, o.length);
     }
     public boolean payloadEquals(byte[] o_raw, int o_header_size, int o_payloadLength) {
+        int payloadLength = getPayloadLength();
         if(payloadLength != o_payloadLength) return false;
         for(int i=0;i<payloadLength;i++)
-            if(raw[header.getSize() + i] != o_raw[o_header_size + i])
+            if(content[header.getSize() + i] != o_raw[o_header_size + i])
                 return false;
         return true;
     }
@@ -188,13 +182,13 @@ public class P2LMessage {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         P2LMessage that = (P2LMessage) o;
-        return header.equals(that.header) && payloadEquals(that.raw, that.header.getSize(), that.payloadLength);
+        return header.equals(that.header) && payloadEquals(that.content, that.header.getSize(), that.getPayloadLength());
     }
     @Override public int hashCode() {
-        return header.hashCode() + 13*Arrays.hashCode(raw);
+        return header.hashCode() + 13*super.hashCode();
     }
     @Override public String toString() {
-        return "P2LMessage{header=" + header + ", contentHash=" + contentHash + ", raw(pay=["+header.getSize()+", "+(header.getSize()+payloadLength)+"])=" + Arrays.toString(Arrays.copyOfRange(raw,0, header.getSize()+Math.min(payloadLength, 12))) + '}';
+        return "P2LMessage{header=" + header + ", contentHash=" + contentHash + ", raw(pay=["+header.getSize()+", "+(size)+"])=" + Arrays.toString(Arrays.copyOfRange(content,0, header.getSize()+Math.min(getPayloadLength(), 12))) + '}';
     }
 
 
@@ -218,10 +212,14 @@ public class P2LMessage {
      * SHOULD ONLY BE USED INTERNALLY
      */
     public void mutateToRequestReceipt() {
-        header.mutateToRequestReceipt(raw);
+        header.mutateToRequestReceipt(content);
     }
     public boolean isExpired() {
         return header.isExpired();
+    }
+
+    public byte[] asBytes() {
+        return payload().getContent();
     }
 
 
@@ -280,7 +278,7 @@ public class P2LMessage {
                 System.arraycopy(payload, 0, raw, index, payload.length);
                 index+=payload.length;
             }
-            return new P2LMessage(header, null, raw, totalPayloadSize, payloads.length==1?payloads[0]:null); //sender does not need to be set on send messages - it is automatically determined by the received from the ip header of the packet
+            return new P2LMessage(header, null, raw, totalPayloadSize); //sender does not need to be set on send messages - it is automatically determined by the received from the ip header of the packet
         }
 
 
@@ -363,8 +361,8 @@ public class P2LMessage {
 
 
             byte[] raw = partHeader.generateRaw(subPayloadLength);
-            System.arraycopy(message.raw, from, raw, partHeader.getSize(), subPayloadLength);
-            return new P2LMessage(partHeader, null, raw, subPayloadLength, null);
+            System.arraycopy(message.content, from, raw, partHeader.getSize(), subPayloadLength);
+            return new P2LMessage(partHeader, null, raw, subPayloadLength);
         }
 
         public static P2LMessage reassembleFromParts(P2LMessage[] parts, int totalByteSize) {
@@ -373,10 +371,10 @@ public class P2LMessage {
             byte[] raw = reassembledHeader.generateRaw(totalByteSize);
             int raw_i = reassembledHeader.getSize();
             for(P2LMessage part:parts) {
-                System.arraycopy(part.raw, part.header.getSize(), raw, raw_i, part.payloadLength);
-                raw_i+=part.payloadLength;
+                System.arraycopy(part.content, part.header.getSize(), raw, raw_i, part.getPayloadLength());
+                raw_i+=part.getPayloadLength();
             }
-            return new P2LMessage(reassembledHeader, null, raw, totalByteSize, null);
+            return new P2LMessage(reassembledHeader, null, raw, totalByteSize);
         }
     }
 
@@ -390,55 +388,55 @@ public class P2LMessage {
 
     /** decodes the next payload byte as a boolean (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_boolean(byte[])}) */
     public boolean nextBool() {
-        return raw[pointer++] == 1;
+        return content[pointer++] == 1;
     }
     /** decodes the next payload byte as a byte (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_byte(byte[])}) */
     public byte nextByte() {
-        return raw[pointer++];
+        return content[pointer++];
     }
     /** decodes the next 2 payload bytes as an integer(32bit) (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_int(byte[])}) */
     public short nextShort() {
         int before = pointer;
         pointer+=2; //temp maybe useless if this evaluates to pointer value before...
-        return BitHelper.getInt16From(raw, before);
+        return BitHelper.getInt16From(content, before);
     }
     /** decodes the next 4 payload bytes as an integer(32bit) (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_int(byte[])}) */
     public int nextInt() {
         int before = pointer;
         pointer+=4; //temp maybe useless if this evaluates to pointer value before...
-        return BitHelper.getInt32From(raw, before);
+        return BitHelper.getInt32From(content, before);
     }
     /** decodes the next 8 payload bytes as an integer(64bit) (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_long(byte[])}) */
     public long nextLong() {
         int before = pointer;
         pointer+=8; //temp maybe useless if this evaluates to pointer value before...
-        return BitHelper.getIntFromNBytes(raw, before, 8);
+        return BitHelper.getIntFromNBytes(content, before, 8);
     }
     /** decodes the next 4 payload bytes as a floating point number(32 bit) (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_float(byte[])} (byte[])}) */
     public float nextFloat() {
         int before = pointer;
         pointer+=4; //temp maybe useless if this evaluates to pointer value before...
-        return BitHelper.getFloat32From(raw, before);
+        return BitHelper.getFloat32From(content, before);
     }
     /** decodes the next 8 payload bytes as a floating point number(64 bit) (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_double(byte[])} (byte[])}) */
     public double nextDouble() {
         int before = pointer;
         pointer+=8; //temp maybe useless if this evaluates to pointer value before...
-        return BitHelper.getFloat64From(raw, before);
+        return BitHelper.getFloat64From(content, before);
     }
     /** decodes the next n payload bytes as bytes - uses length indicator functionality to determine n (same as, but more context efficient {@link LIbae#decode(LIPosition)}) */
     public byte[] nextVariable() {
-        long[] li_bounds = LIbae.get_next_li_bounds(raw, pointer, pointer, requiredRawSize() - 1);
+        long[] li_bounds = LIbae.get_next_li_bounds(content, pointer, pointer, requiredRawSize() - 1);
         if(li_bounds == null) return null;
         pointer = (int) li_bounds[1];
-        return Arrays.copyOfRange(raw, (int) li_bounds[0], (int) li_bounds[1]);
+        return Arrays.copyOfRange(content, (int) li_bounds[0], (int) li_bounds[1]);
     }
     /** decodes the next n payload bytes as a utf8 string - uses length indicator functionality to determine n (same as, but more context efficient {@link LIbae#decode(LIPosition)}) */
     public String nextVariableString() {
-        long[] li_bounds = LIbae.get_next_li_bounds(raw, pointer, pointer, requiredRawSize() - 1);
+        long[] li_bounds = LIbae.get_next_li_bounds(content, pointer, pointer, requiredRawSize() - 1);
         if(li_bounds == null) return null;
         pointer = (int) li_bounds[1];
-        return new String(raw, (int) li_bounds[0], (int) (li_bounds[1]-li_bounds[0]), StandardCharsets.UTF_8);
+        return new String(content, (int) li_bounds[0], (int) (li_bounds[1]-li_bounds[0]), StandardCharsets.UTF_8);
     }
     /**
      * Used to generate a length indicator for a variable payload part. Has to be added to the payload as a payload part before the variable payload part.
@@ -451,6 +449,6 @@ public class P2LMessage {
 
     /** decodes all payload bytes as a utf8 string */
     public String asString() {
-        return new String(raw, header.getSize(), payloadLength, StandardCharsets.UTF_8);
+        return new String(content, header.getSize(), getPayloadLength(), StandardCharsets.UTF_8);
     }
 }

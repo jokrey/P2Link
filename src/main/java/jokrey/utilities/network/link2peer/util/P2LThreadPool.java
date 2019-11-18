@@ -3,7 +3,11 @@ package jokrey.utilities.network.link2peer.util;
 import java.util.*;
 
 /**
- * todo WAY TOO MUCH SYNCHRONIZED (everything is locked
+ * todo WAY TOO MUCH SYNCHRONIZED (everything is locked)
+ *
+ *
+ * TODO : cool would be to allow tasks waiting on futures to be re-added to queued tasks if other tasks are waiting... Go-style green threads
+ *      todo - that would be really cool, but it is not possible, right? Because we would need to store the stack and exec pointer (which is not possible in plain java, right?)
  *
  * @author jokrey
  */

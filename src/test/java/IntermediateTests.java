@@ -8,8 +8,8 @@ import jokrey.utilities.network.link2peer.core.NodeCreator;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.core.message_headers.StreamPartHeader;
-import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
-import jokrey.utilities.network.link2peer.core.stream.P2LOutputStream;
+import jokrey.utilities.network.link2peer.core.stream.P2LOrderedInputStream;
+import jokrey.utilities.network.link2peer.core.stream.P2LOrderedOutputStream;
 import jokrey.utilities.network.link2peer.util.*;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
@@ -19,8 +19,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
@@ -474,7 +473,7 @@ class IntermediateTests {
         P2LNode node1 = P2LNode.create(P2Link.createPublicLink("localhost", p1)); //creates server thread
         P2LNode node2 = P2LNode.create(P2Link.createPublicLink("localhost", p2)); //creates server thread
 
-        byte[] toSend_1To2 = new byte[(P2LMessage.CUSTOM_RAW_SIZE_LIMIT - 13) * 2];
+        byte[] toSend_1To2 = new byte[(P2LMessage.CUSTOM_RAW_SIZE_LIMIT - 15) * 2];
         byte[] toSend_2To1 = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT * 2];
         ThreadLocalRandom.current().nextBytes(toSend_1To2);
         ThreadLocalRandom.current().nextBytes(toSend_2To1);
@@ -829,7 +828,7 @@ class IntermediateTests {
 
 
     @Test void streamTest_orderGuaranteed() throws IOException {
-        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=4;
+        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
         P2LNode[] nodes = generateNodes(2, 62820);
 
         InputStream stream = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
@@ -839,7 +838,7 @@ class IntermediateTests {
         new Thread(() -> {
             try {
 
-                int packetCount = P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE-1;
+                int packetCount = P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE -1;
                 List<P2LMessage> randomlySplit = toBytesAndSplitRandomly(toSend, packetCount);
 
                 for(P2LMessage m:randomlySplit) {
@@ -855,12 +854,12 @@ class IntermediateTests {
         streamSplitAssertions(stream, toSend, false);
 
         close(nodes);
-        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=128;
+        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =128;
     }
 
 
     @Test void streamTest_orderNotGuaranteed_guaranteedFewerThanBufferPacketsSend_noDrops() throws IOException {
-        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=128;
+        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =128;
         P2LNode[] nodes = generateNodes(2, 62830);
 
         InputStream stream = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
@@ -868,7 +867,7 @@ class IntermediateTests {
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
         new Thread(() -> {
             try {
-                int packetCount = P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE-1;
+                int packetCount = P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE -1;
                 List<P2LMessage> randomlySplit = toBytesAndSplitRandomly(toSend, packetCount);
                 Collections.shuffle(randomlySplit);
 
@@ -885,7 +884,7 @@ class IntermediateTests {
         streamSplitAssertions(stream, toSend, false);
 
         close(nodes);
-        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=128;
+        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =128;
     }
 
     @Test void streamTest_sendOrderReverse_guaranteedFewerThanBufferPacketsSend_noDrops() throws IOException {
@@ -896,7 +895,7 @@ class IntermediateTests {
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
         new Thread(() -> {
             try {
-                int packetCount = P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE-1;
+                int packetCount = P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE -1;
                 List<P2LMessage> randomlySplit = toBytesAndSplitRandomly(toSend, packetCount);
                 Collections.reverse(randomlySplit);
 
@@ -916,7 +915,7 @@ class IntermediateTests {
     }
 
     @Test void streamTest_orderGuaranteed_twiceThanBufferSizePacketsSend_noDrops() throws IOException {
-        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=4;
+        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
 
         P2LNode[] nodes = generateNodes(2, 62850);
 
@@ -925,7 +924,7 @@ class IntermediateTests {
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
         new Thread(() -> {
             try {
-                int packetCount = P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE*3;
+                int packetCount = P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE *3;
                 List<P2LMessage> randomlySplit = toBytesAndSplitRandomly(toSend, packetCount);
 //                Collections.reverse(randomlySplit);
 
@@ -943,11 +942,11 @@ class IntermediateTests {
 
         close(nodes);
 
-        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=128;
+        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =128;
     }
 
     @Test void streamTest_orderGuaranteedUpUntilBufferSize_twiceThanBufferSizePacketsSend_noDrops() throws IOException {
-        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=4;
+        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
         P2LNode[] nodes = generateNodes(2, 62860);
 
         InputStream stream = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
@@ -956,18 +955,18 @@ class IntermediateTests {
         new Thread(() -> {
             try {
                 int partsCount = 3;
-                int packetCount = P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE*partsCount;
+                int packetCount = P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE *partsCount;
                 List<P2LMessage> randomlySplit = toBytesAndSplitRandomly(toSend, packetCount);
                 List<List<P2LMessage>> parts = new ArrayList<>();
                 for(int i=0;i<partsCount;i++)
-                    parts.add(new ArrayList<>(P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE));
+                    parts.add(new ArrayList<>(P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE));
 
                 int messagesSend = 0;
                 int inPart = 0;
                 for(P2LMessage m:randomlySplit) {
                     parts.get(inPart).add(m);
                     messagesSend++;
-                    if(messagesSend%(P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE)==0) {
+                    if(messagesSend%(P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE)==0) {
                         Collections.shuffle(parts.get(inPart));
                         inPart++;
                     }
@@ -987,11 +986,11 @@ class IntermediateTests {
         streamSplitAssertions(stream, toSend, false);
 
         close(nodes);
-        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=128;
+        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =128;
     }
 
     @Test @Disabled void streamTest_orderNotGuaranteed_twiceThanBufferSizePacketsSend_noDrops() throws IOException {
-        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=4;
+        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
         P2LNode[] nodes = generateNodes(2, 62870);
 
         InputStream stream = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
@@ -1000,7 +999,7 @@ class IntermediateTests {
         new Thread(() -> {
             try {
 
-                int packetCount = P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE*3;
+                int packetCount = P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE *3;
                 List<P2LMessage> randomlySplit = toBytesAndSplitRandomly(toSend, packetCount);
                 Collections.shuffle(randomlySplit);
 //                Collections.reverse(randomlySplit);
@@ -1023,7 +1022,7 @@ class IntermediateTests {
         streamSplitAssertions(stream, toSend, false);
 
         close(nodes);
-        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=128;
+        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =128;
     }
 
     @Test void streamTest_inOut_belowBufferSize() throws IOException {
@@ -1062,7 +1061,7 @@ class IntermediateTests {
         NUMBER_OF_STREAM_PARTS_RECEIVED = 5119
      */
     @Test void streamTest_inOut_twiceBufferSize() throws IOException {
-        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=4;
+        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
         P2LNode[] nodes = generateNodes(2, 62880);
 
         InputStream in = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
@@ -1089,7 +1088,7 @@ class IntermediateTests {
         System.out.println("after send");
 
         close(nodes);
-        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=128;
+        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =128;
 
         System.out.println("NUMBER_OF_STREAM_RECEIPTS_RECEIVED = " + NUMBER_OF_STREAM_RECEIPTS_RECEIVED);
         System.out.println("NUMBER_OF_STREAM_PARTS_RECEIVED = " + NUMBER_OF_STREAM_PARTS_RECEIVED);
@@ -1097,15 +1096,18 @@ class IntermediateTests {
 
 
     @Test void streamTest_inOut_largeArray_usageAsIntended() throws IOException {
-//        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=4;
+//        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4096;
         int oldLimit = P2LMessage.CUSTOM_RAW_SIZE_LIMIT;
-        P2LMessage.CUSTOM_RAW_SIZE_LIMIT = P2LMessage.MAX_UDP_PACKET_SIZE;
+//        P2LMessage.CUSTOM_RAW_SIZE_LIMIT = P2LMessage.MAX_UDP_PACKET_SIZE;
+//        P2LMessage.CUSTOM_RAW_SIZE_LIMIT = 8192*2;
+//        P2LMessage.CUSTOM_RAW_SIZE_LIMIT = 8192;
+//        P2LMessage.CUSTOM_RAW_SIZE_LIMIT = 4096;
         P2LNode[] nodes = generateNodes(2, 62880);
 
-        InputStream in = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
-        OutputStream out = nodes[1].getOutputStream(nodes[0].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        InputStream in = nodes[0].getInputStream(nodes[1].getSelfLink(), 5, P2LNode.NO_CONVERSATION_ID);
+        OutputStream out = nodes[1].getOutputStream(nodes[0].getSelfLink(), 5, P2LNode.NO_CONVERSATION_ID);
 
-        byte[] toSend = new byte[10_000_000];//10mb
+        byte[] toSend = new byte[100_000_000];//10mb
         ThreadLocalRandom.current().nextBytes(toSend);
 
         P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
@@ -1129,8 +1131,8 @@ class IntermediateTests {
     @Test void streamTest_closingOutFirst() throws IOException {
         P2LNode[] nodes = generateNodes(2, 62880);
 
-        P2LInputStream in = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
-        P2LOutputStream out = nodes[1].getOutputStream(nodes[0].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        P2LOrderedInputStream in = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        P2LOrderedOutputStream out = nodes[1].getOutputStream(nodes[0].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
 
         P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
             out.write(new byte[] {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16});
@@ -1161,8 +1163,8 @@ class IntermediateTests {
     @Test void streamTest_closingInFirst() throws IOException {
         P2LNode[] nodes = generateNodes(2, 62880);
 
-        P2LInputStream in = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
-        P2LOutputStream out = nodes[1].getOutputStream(nodes[0].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        P2LOrderedInputStream in = nodes[0].getInputStream(nodes[1].getSelfLink(), 3, P2LNode.NO_CONVERSATION_ID);
+        P2LOrderedOutputStream out = nodes[1].getOutputStream(nodes[0].getSelfLink(), 3, P2LNode.NO_CONVERSATION_ID);
 
         P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
             out.write(new byte[] {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16});
@@ -1204,7 +1206,7 @@ class IntermediateTests {
         InputStream in = serversConnectionToClient.getInputStream();
         OutputStream out = client.getOutputStream();
 
-        byte[] toSend = new byte[10_000_000];//10mb
+        byte[] toSend = new byte[100_000_000];//10mb
         ThreadLocalRandom.current().nextBytes(toSend);
 
         P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
@@ -1228,6 +1230,26 @@ class IntermediateTests {
     @Test @Disabled void streamWithDroppedPackagesTest() {
         //todo - though currently congestion control is so terrible that many packages are dropped either way
     }
+
+
+    @Test void testDatagramBehaviour() throws IOException {
+        DatagramSocket send_socket = new DatagramSocket(1025);
+        DatagramSocket recv_socket = new DatagramSocket(1026);
+
+        byte[] send_buf = new byte[10];
+        ThreadLocalRandom.current().nextBytes(send_buf);
+        DatagramPacket send_packet = new DatagramPacket(send_buf, send_buf.length, new InetSocketAddress("localhost", 1026));
+        send_socket.send(send_packet);
+
+        byte[] recv_buf = new byte[5];
+        DatagramPacket recv_packet = new DatagramPacket(recv_buf, recv_buf.length);
+        recv_socket.receive(recv_packet);
+
+        System.out.println("recv_packet.getData() = " + Arrays.toString(recv_packet.getData()));
+        System.out.println("recv_packet.getOffset() = " + recv_packet.getOffset());
+        System.out.println("recv_packet.getLength() = " + recv_packet.getLength());
+    }
+
 
 
     @Test void testTestableConnectionCombinations() throws IOException {
@@ -1270,7 +1292,6 @@ class IntermediateTests {
             List<P2Link> linksQueriedFromRelayNode = pubNode1.queryKnownLinksOf(pubRelayNode3.getSelfLink());
             System.out.println("linksQueriedFromRelayNode(pubHid) = " + linksQueriedFromRelayNode);
             assertEquals(1, linksQueriedFromRelayNode.size()); //NOTE: only equal to 1, because the requesting link is obviously filtered from queried list
-            //todo currently operates very wrongly internally..
             P2LFuture<Boolean> pubHidConFut = pubNode1.establishConnection(linksQueriedFromRelayNode.get(0));//automatically establishes a connection - through a reverse connection from hid to pub
             assertTrue(pubHidConFut.get(2500));
 

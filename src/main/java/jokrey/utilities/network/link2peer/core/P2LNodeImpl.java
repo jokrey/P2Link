@@ -3,8 +3,8 @@ package jokrey.utilities.network.link2peer.core;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
-import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
-import jokrey.utilities.network.link2peer.core.stream.P2LOutputStream;
+import jokrey.utilities.network.link2peer.core.stream.P2LOrderedInputStream;
+import jokrey.utilities.network.link2peer.core.stream.P2LOrderedOutputStream;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
@@ -143,10 +143,12 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         //todo - is it really desirable to have packages be broken up THIS automatically???
         //todo    - like it is cool that breaking up packages does not make a difference, but... like it is so transparent it could lead to inefficiencies
         if(message.canBeSentInSinglePacket()) {
-            System.out.println(getSelfLink()+" - P2LNodeImpl_sendInternalMessage - to = [" + to + "], message = [" + message + "]");
+            System.out.println("sendInternalMessage - message = " + message + ", to = " + to);
             incomingHandler.serverSocket.send(message.toPacket(to)); //since the server socket is bound to a port, said port will be included in the udp packet
-        } else
+        } else {
+            System.out.println("sendLong(being broken up) - message = " + message + ", to = " + to);
             incomingHandler.longMessageHandler.send(this, message, to);
+        }
     }
     @Override public void sendMessage(SocketAddress to, P2LMessage message) throws IOException {
         validateMsgIdNotInternal(message.header.getType());
@@ -208,11 +210,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
 //        validateMsgIdNotInternal(messageType);
 //        return incomingHandler.userBrdMessageQueue.futureFor(from, messageType);
 //    }
-    @Override public P2LInputStream getInputStream(SocketAddress from, int messageType, int conversationId) {
+    @Override public P2LOrderedInputStream getInputStream(SocketAddress from, int messageType, int conversationId) {
         validateMsgIdNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.getInputStream(this, from, messageType, conversationId);
+        return incomingHandler.streamMessageHandler.createInputStream(this, from, messageType, conversationId);
     }
-    @Override public P2LOutputStream getOutputStream(SocketAddress to, int messageType, int conversationId) {
+    @Override public P2LOrderedOutputStream getOutputStream(SocketAddress to, int messageType, int conversationId) {
         validateMsgIdNotInternal(messageType);
         return incomingHandler.streamMessageHandler.getOutputStream(this, to, messageType, conversationId);
     }

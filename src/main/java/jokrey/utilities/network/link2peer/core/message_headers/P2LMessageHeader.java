@@ -123,7 +123,7 @@ public interface P2LMessageHeader {
 
 
     default P2LMessage generateMessage(byte[] payload) {
-        return new P2LMessage(this, null, generateRaw(payload), payload.length, payload);
+        return new P2LMessage(this, null, generateRaw(payload), payload.length);
     }
     default byte[] generateRaw(byte[] payload) {
         byte[] raw = generateRaw(payload.length);
