@@ -8,10 +8,13 @@ import jokrey.utilities.network.link2peer.core.NodeCreator;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.core.message_headers.StreamPartHeader;
+import jokrey.utilities.network.link2peer.core.stream.P2LFragmentInputStream;
+import jokrey.utilities.network.link2peer.core.stream.P2LFragmentOutputStream;
 import jokrey.utilities.network.link2peer.core.stream.P2LOrderedInputStream;
 import jokrey.utilities.network.link2peer.core.stream.P2LOrderedOutputStream;
 import jokrey.utilities.network.link2peer.util.*;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
+import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -831,7 +834,7 @@ class IntermediateTests {
         P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
         P2LNode[] nodes = generateNodes(2, 62820);
 
-        InputStream stream = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        InputStream stream = nodes[0].createInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
 
@@ -862,7 +865,7 @@ class IntermediateTests {
         P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =128;
         P2LNode[] nodes = generateNodes(2, 62830);
 
-        InputStream stream = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        InputStream stream = nodes[0].createInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
         new Thread(() -> {
@@ -890,7 +893,7 @@ class IntermediateTests {
     @Test void streamTest_sendOrderReverse_guaranteedFewerThanBufferPacketsSend_noDrops() throws IOException {
         P2LNode[] nodes = generateNodes(2, 62840);
 
-        InputStream stream = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        InputStream stream = nodes[0].createInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
         new Thread(() -> {
@@ -919,7 +922,7 @@ class IntermediateTests {
 
         P2LNode[] nodes = generateNodes(2, 62850);
 
-        InputStream stream = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        InputStream stream = nodes[0].createInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
         new Thread(() -> {
@@ -949,7 +952,7 @@ class IntermediateTests {
         P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
         P2LNode[] nodes = generateNodes(2, 62860);
 
-        InputStream stream = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        InputStream stream = nodes[0].createInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
         new Thread(() -> {
@@ -993,7 +996,7 @@ class IntermediateTests {
         P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
         P2LNode[] nodes = generateNodes(2, 62870);
 
-        InputStream stream = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        InputStream stream = nodes[0].createInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
         new Thread(() -> {
@@ -1028,8 +1031,8 @@ class IntermediateTests {
     @Test void streamTest_inOut_belowBufferSize() throws IOException {
         P2LNode[] nodes = generateNodes(2, 62880);
 
-        InputStream in = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
-        OutputStream out = nodes[1].getOutputStream(nodes[0].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        InputStream in = nodes[0].createInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        OutputStream out = nodes[1].createOutputStream(nodes[0].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
 
@@ -1064,8 +1067,8 @@ class IntermediateTests {
         P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
         P2LNode[] nodes = generateNodes(2, 62880);
 
-        InputStream in = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
-        OutputStream out = nodes[1].getOutputStream(nodes[0].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        InputStream in = nodes[0].createInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        OutputStream out = nodes[1].createOutputStream(nodes[0].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
 
@@ -1104,10 +1107,10 @@ class IntermediateTests {
 //        P2LMessage.CUSTOM_RAW_SIZE_LIMIT = 4096;
         P2LNode[] nodes = generateNodes(2, 62880);
 
-        InputStream in = nodes[0].getInputStream(nodes[1].getSelfLink(), 5, P2LNode.NO_CONVERSATION_ID);
-        OutputStream out = nodes[1].getOutputStream(nodes[0].getSelfLink(), 5, P2LNode.NO_CONVERSATION_ID);
+        InputStream in = nodes[0].createInputStream(nodes[1].getSelfLink(), 5, P2LNode.NO_CONVERSATION_ID);
+        OutputStream out = nodes[1].createOutputStream(nodes[0].getSelfLink(), 5, P2LNode.NO_CONVERSATION_ID);
 
-        byte[] toSend = new byte[100_000_000];//10mb
+        byte[] toSend = new byte[100_000_000];//100mb
         ThreadLocalRandom.current().nextBytes(toSend);
 
         P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
@@ -1131,8 +1134,8 @@ class IntermediateTests {
     @Test void streamTest_closingOutFirst() throws IOException {
         P2LNode[] nodes = generateNodes(2, 62880);
 
-        P2LOrderedInputStream in = nodes[0].getInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
-        P2LOrderedOutputStream out = nodes[1].getOutputStream(nodes[0].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        P2LOrderedInputStream in = nodes[0].createInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        P2LOrderedOutputStream out = nodes[1].createOutputStream(nodes[0].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
 
         P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
             out.write(new byte[] {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16});
@@ -1163,8 +1166,8 @@ class IntermediateTests {
     @Test void streamTest_closingInFirst() throws IOException {
         P2LNode[] nodes = generateNodes(2, 62880);
 
-        P2LOrderedInputStream in = nodes[0].getInputStream(nodes[1].getSelfLink(), 3, P2LNode.NO_CONVERSATION_ID);
-        P2LOrderedOutputStream out = nodes[1].getOutputStream(nodes[0].getSelfLink(), 3, P2LNode.NO_CONVERSATION_ID);
+        P2LOrderedInputStream in = nodes[0].createInputStream(nodes[1].getSelfLink(), 3, P2LNode.NO_CONVERSATION_ID);
+        P2LOrderedOutputStream out = nodes[1].createOutputStream(nodes[0].getSelfLink(), 3, P2LNode.NO_CONVERSATION_ID);
 
         P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
             out.write(new byte[] {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16});
@@ -1317,6 +1320,84 @@ class IntermediateTests {
         }
     }
 
+
+    @Test void testFragmentStreamWithoutDrops() throws IOException, InterruptedException {
+        IncomingHandler.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 10;
+        int bufferSize = 10_000;
+        P2LNode[] nodes = generateNodes(2, 62890);
+
+        nodes[0].establishConnection(nodes[1].getSelfLink()).waitForIt(10000);
+
+        byte[] toSend = new byte[bufferSize];
+        ThreadLocalRandom.current().nextBytes(toSend);
+
+        TimeDiffMarker.setMark_d();
+        TransparentBytesStorage source = new ByteArrayStorage(toSend);
+        P2LFragmentInputStream in = nodes[0].createFragmentInputStream(nodes[1].getSelfLink(), null, 555, P2LNode.NO_CONVERSATION_ID);
+        P2LFragmentOutputStream out = nodes[1].createFragmentOutputStream(nodes[0].getSelfLink(), source, 555, P2LNode.NO_CONVERSATION_ID);
+
+
+        TransparentBytesStorage target = new ByteArrayStorage(toSend.length);
+        in.addFragmentReceivedListener((fragmentOffset, receivedRaw, dataOff, dataLen) -> {
+            System.out.println("fragmentOffset = " + fragmentOffset);
+            System.out.println("receivedRaw = " + Arrays.toString(receivedRaw));
+            System.out.println("dataOff = " + dataOff);
+            System.out.println("dataLen = " + dataLen);
+        });
+        in.writeResultsTo(target);
+
+        out.sendSource();
+        TimeDiffMarker.println_d();
+
+        sleep(1000);//send source does not yet ensure receival
+
+        assertArrayEquals(source.getContent(), target.getContent());
+
+        close(nodes);
+        IncomingHandler.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
+    }
+
+    @Test void testFragmentStreamCompareSpeedWithAndWithoutEstablishedConnection() throws IOException, InterruptedException {
+        int bufferSize = 10_00_000;//1000kb=1mb
+        {
+            P2LNode[] nodes = generateNodes(2, 62890);
+
+            nodes[0].establishConnection(nodes[1].getSelfLink()).waitForIt(1000);
+
+            byte[] toSend = new byte[bufferSize];
+            ThreadLocalRandom.current().nextBytes(toSend);
+
+            TimeDiffMarker.setMark_d();
+            TransparentBytesStorage source = new ByteArrayStorage(toSend);
+            P2LFragmentInputStream in = nodes[0].createFragmentInputStream(nodes[1].getSelfLink(), null, 555, P2LNode.NO_CONVERSATION_ID);
+            P2LFragmentOutputStream out = nodes[1].createFragmentOutputStream(nodes[0].getSelfLink(), source, 555, P2LNode.NO_CONVERSATION_ID);
+
+            out.sendSource();
+            TimeDiffMarker.println_d("took: ");
+            close(nodes);
+        }
+
+        {
+            P2LNode[] nodes = generateNodes(2, 62890);
+
+//            nodes[0].establishConnection(nodes[1].getSelfLink()).waitForIt(1000);
+
+            byte[] toSend = new byte[bufferSize];
+            ThreadLocalRandom.current().nextBytes(toSend);
+
+            TimeDiffMarker.setMark_d();
+            TransparentBytesStorage source = new ByteArrayStorage(toSend);
+            P2LFragmentInputStream in = nodes[0].createFragmentInputStream(nodes[1].getSelfLink(), null, 555, P2LNode.NO_CONVERSATION_ID);
+            P2LFragmentOutputStream out = nodes[1].createFragmentOutputStream(nodes[0].getSelfLink(), source, 555, P2LNode.NO_CONVERSATION_ID);
+
+            out.sendSource();
+            TimeDiffMarker.println_d("took: ");
+            close(nodes);
+        }
+
+
+
+    }
 
     private void streamSplitAssertions(InputStream stream, String toSend, boolean forceClose) {
         int index = 0;

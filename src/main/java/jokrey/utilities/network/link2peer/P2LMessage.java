@@ -88,20 +88,21 @@ public class P2LMessage extends ByteArrayStorage {
     public DatagramPacket toPacket(SocketAddress to) {
         int actualLength = requiredRawSize();
 
-        int maxSize = getMaxPacketSize();
-        byte[] actual = content;
-        if(actual.length > maxSize) {
-            if(actualLength < maxSize) { //never gonna trigger, when message created with factory methods
-                byte[] shrunk = new byte[actualLength];
-                System.arraycopy(actual, 0, shrunk, 0, shrunk.length);
-                actual = shrunk;
-            }
-        }
-        if (actual.length > CUSTOM_RAW_SIZE_LIMIT) throw new IllegalArgumentException("total size of raw cannot exceed " + CUSTOM_RAW_SIZE_LIMIT + ", user set limit - size here is: " + actual.length + " - max payload size is: " + (CUSTOM_RAW_SIZE_LIMIT - header.getSize()));
-        if (actual.length > MAX_UDP_PACKET_SIZE) throw new IllegalArgumentException("total size of a udp packet cannot exceed " + MAX_UDP_PACKET_SIZE + " - size here is: " + actual.length);
+        //todo: the following is automatically done by new Datagram packet(kind of)
+//        int maxSize = getMaxPacketSize();
+//        byte[] actual = content;
+//        if(actual.length > maxSize) {
+//            if(actualLength < maxSize) { //never gonna trigger, when message created with factory methods
+//                byte[] shrunk = new byte[actualLength];
+//                System.arraycopy(actual, 0, shrunk, 0, shrunk.length);
+//                actual = shrunk;
+//            }
+//        }
+        if (actualLength > CUSTOM_RAW_SIZE_LIMIT) throw new IllegalArgumentException("total size of raw cannot exceed " + CUSTOM_RAW_SIZE_LIMIT + ", user set limit - size here is: " + actualLength + " - max payload size is: " + (CUSTOM_RAW_SIZE_LIMIT - header.getSize()));
+        if (actualLength > MAX_UDP_PACKET_SIZE) throw new IllegalArgumentException("total size of a udp packet cannot exceed " + MAX_UDP_PACKET_SIZE + " - size here is: " + actualLength);
 //        if(raw.length > 512)
 //            System.err.println("message greater than 512 bytes - this can be considered inefficient because intermediate low level protocols might break it up - size here is: "+raw.length);
-        return new DatagramPacket(actual, actualLength, to);
+        return new DatagramPacket(content, actualLength, to);
     }
 
     private static int getMaxPacketSize() {

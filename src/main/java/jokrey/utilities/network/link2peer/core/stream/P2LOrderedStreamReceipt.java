@@ -7,11 +7,11 @@ import jokrey.utilities.network.link2peer.core.message_headers.StreamReceiptHead
 /**
  * @author jokrey
  */
-class StreamReceipt {
+class P2LOrderedStreamReceipt {
     final int latestReceived;
     final boolean eof;
     final int[] missingParts;
-    private StreamReceipt(int latestReceived, boolean eof, int[] missingParts) {
+    private P2LOrderedStreamReceipt(int latestReceived, boolean eof, int[] missingParts) {
         this.latestReceived = latestReceived;
         this.eof = eof;
         this.missingParts = missingParts;
@@ -32,12 +32,12 @@ class StreamReceipt {
         }
         return new P2LMessage(header, null, raw, payloadLength);
     }
-    static StreamReceipt decode(P2LMessage message) {
+    static P2LOrderedStreamReceipt decode(P2LMessage message) {
         int latestReceived = message.nextInt();
         int numberOfMissingParts = message.nextInt();
         int[] missingParts = new int[numberOfMissingParts];
         for(int i=0;i<missingParts.length;i++)
             missingParts[i] = message.nextInt();
-        return new StreamReceipt(latestReceived, message.header.isStreamEof(), missingParts);
+        return new P2LOrderedStreamReceipt(latestReceived, message.header.isStreamEof(), missingParts);
     }
 }

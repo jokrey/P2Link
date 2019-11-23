@@ -116,7 +116,7 @@ class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
 
         boolean eof = isClosed() || eofReached();
         try {
-            parent.sendInternalMessage(StreamReceipt.encode(type, conversationId, eof, latestIndexReceived, getMissingPartIndices()), to);
+            parent.sendInternalMessage(P2LOrderedStreamReceipt.encode(type, conversationId, eof, latestIndexReceived, getMissingPartIndices()), to);
         } catch (IOException e) {
             e.printStackTrace();
         }

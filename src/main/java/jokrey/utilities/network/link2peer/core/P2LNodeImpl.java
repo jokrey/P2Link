@@ -3,10 +3,13 @@ package jokrey.utilities.network.link2peer.core;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
+import jokrey.utilities.network.link2peer.core.stream.P2LFragmentInputStream;
+import jokrey.utilities.network.link2peer.core.stream.P2LFragmentOutputStream;
 import jokrey.utilities.network.link2peer.core.stream.P2LOrderedInputStream;
 import jokrey.utilities.network.link2peer.core.stream.P2LOrderedOutputStream;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
+import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -210,13 +213,24 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
 //        validateMsgIdNotInternal(messageType);
 //        return incomingHandler.userBrdMessageQueue.futureFor(from, messageType);
 //    }
-    @Override public P2LOrderedInputStream getInputStream(SocketAddress from, int messageType, int conversationId) {
+    @Override public P2LOrderedInputStream createInputStream(SocketAddress from, int messageType, int conversationId) {
         validateMsgIdNotInternal(messageType);
         return incomingHandler.streamMessageHandler.createInputStream(this, from, messageType, conversationId);
     }
-    @Override public P2LOrderedOutputStream getOutputStream(SocketAddress to, int messageType, int conversationId) {
+    @Override public P2LOrderedOutputStream createOutputStream(SocketAddress to, int messageType, int conversationId) {
         validateMsgIdNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.getOutputStream(this, to, messageType, conversationId);
+        return incomingHandler.streamMessageHandler.createOutputStream(this, to, establishedConnections.get(to), messageType, conversationId);
+    }
+    @Override public P2LFragmentInputStream createFragmentInputStream(SocketAddress from, TransparentBytesStorage target, int messageType, int conversationId) {
+        validateMsgIdNotInternal(messageType);
+        return incomingHandler.streamMessageHandler.createFragmentInputStream(this, from, target, messageType, conversationId);
+    }
+    @Override public P2LFragmentOutputStream createFragmentOutputStream(SocketAddress to, TransparentBytesStorage source, int messageType, int conversationId) {
+        validateMsgIdNotInternal(messageType);
+        System.out.println("to = " + to);
+        System.out.println("establishedConnections = " + establishedConnections);
+        System.out.println("establishedConnections.get(to) = " + establishedConnections.get(to));
+        return incomingHandler.streamMessageHandler.createFragmentOutputStream(this, to, establishedConnections.get(to), source, messageType, conversationId);
     }
 
 
@@ -261,21 +275,21 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     @Override public int remainingNumberOfAllowedPeerConnections() {
         return connectionLimit - establishedConnections.size();
     }
-    @Override public void graduateToEstablishedConnection(P2Link address, int conversationId) {
+    @Override public void graduateToEstablishedConnection(P2LConnection peer, int conversationId) {
+        if(peer == null)return; //used if client is already connected
         //PROBLEM: if the initiator of a connection tells the other side its public ip(which differs from package.getAddress() - because we are in the same, non public NAT)
         //   if they lie about who they are, then we will attempt a connection to the public ip - and DDOS it inadvertently
-
-        boolean previouslyConnected = establishedConnections.put(address.getSocketAddress(), new P2LConnection(address)) != null;
-        historicConnections.remove(address.getSocketAddress());
+        boolean previouslyConnected = establishedConnections.put(peer.link.getSocketAddress(), peer) != null;
+        historicConnections.remove(peer.link.getSocketAddress());
         if(!previouslyConnected)
-            notifyConnectionEstablished(address, conversationId);
+            notifyConnectionEstablished(peer.link, conversationId);
     }
     @Override public void markBrokenConnection(P2Link address, boolean retry) {
         P2LConnection wasRemoved = establishedConnections.remove(address.getSocketAddress());
         if(wasRemoved==null) {
             System.err.println(address+" is not an established connection - could not mark as broken (already marked??)");
         } else {
-            historicConnections.put(address.getSocketAddress(), new HistoricConnection(address));
+            historicConnections.put(address.getSocketAddress(), new HistoricConnection(address, wasRemoved.remoteBufferSize, wasRemoved.avRTT));
             notifyConnectionDisconnected(address);
         }
     }
@@ -287,7 +301,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         } else {
             HistoricConnection reEstablished = historicConnections.remove(from);
             if(reEstablished != null/* && retryStateOfHistoricConnection.r>0*/) //actively retrying IS NOT REQUIRED, the connection should be reestablished nonetheless
-                graduateToEstablishedConnection(reEstablished.link, -1);//cool: auto remembering of correct(hopefully), link
+                graduateToEstablishedConnection(new P2LConnection(reEstablished.link, reEstablished.remoteBufferSize, reEstablished.avRTT), -1);//cool: auto remembering of correct(hopefully), link and buffer size...
         }
     }
     private List<P2Link> getDormantEstablishedConnections(long now) {
@@ -375,87 +389,5 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         System.out.println("connectionDisconnectedListeners = " + connectionDisconnectedListeners);
         System.out.println("runningConversationId = " + runningConversationId.get());
         System.out.println("-END- DEBUG INFORMATION -END-");
-    }
-
-
-
-    static class P2LConnection {
-        P2Link link;
-        public P2LConnection(P2Link link) {this.link=link;}
-        long lastPacketReceived = System.currentTimeMillis();
-        boolean isDormant(long now) {
-            return (now - lastPacketReceived) > P2LHeuristics.ESTABLISHED_CONNECTION_IS_DORMANT_THRESHOLD_MS;
-        }
-        void notifyActivity() {lastPacketReceived = System.currentTimeMillis();}
-
-        @Override
-        public String toString() {
-            return "P2LConnection{" +
-                    "link=" + link +
-                    ", lastPacketReceived=" + lastPacketReceived +
-                    '}';
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            P2LConnection that = (P2LConnection) o;
-            return lastPacketReceived == that.lastPacketReceived &&
-                    Objects.equals(link, that.link);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(link, lastPacketReceived);
-        }
-    }
-    static class HistoricConnection {
-        P2Link link;
-        public HistoricConnection(P2Link link) {
-            this.link=link;
-            if(link.getSocketAddress()==null)
-                throw new NullPointerException("otherwise we would have a problem on retry");
-        }
-        long nextAttemptAt = System.currentTimeMillis();
-        int numberOfAttemptsMade;
-
-        boolean retryNow(long now) {
-            if(nextAttemptAt <= now) {
-                long newTime = (long) (nextAttemptAt + P2LHeuristics.ORIGINAL_RETRY_HISTORIC_TIMEOUT_MS * Math.pow(2, numberOfAttemptsMade));
-                if (newTime < nextAttemptAt) {
-                    nextAttemptAt = Long.MAX_VALUE;
-                } else {
-                    nextAttemptAt = newTime;
-                    numberOfAttemptsMade++;
-                }
-                return true;
-            }
-            return false;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            HistoricConnection that = (HistoricConnection) o;
-            return nextAttemptAt == that.nextAttemptAt &&
-                    numberOfAttemptsMade == that.numberOfAttemptsMade &&
-                    Objects.equals(link, that.link);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(link, nextAttemptAt, numberOfAttemptsMade);
-        }
-
-        @Override
-        public String toString() {
-            return "HistoricConnection{" +
-                    "link=" + link +
-                    ", nextAttemptAt=" + nextAttemptAt +
-                    ", numberOfAttemptsMade=" + numberOfAttemptsMade +
-                    '}';
-        }
     }
 }

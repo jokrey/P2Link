@@ -1,5 +1,6 @@
 package jokrey.utilities.network.link2peer.core;
 
+import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
@@ -8,6 +9,8 @@ import jokrey.utilities.simple.data_structure.pairs.Pair;
 import java.net.SocketAddress;
 import java.security.SecureRandom;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.*;
@@ -19,6 +22,8 @@ import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.*;
  *
  * Types of connection establishing:
  * direct - the answerer node has a public link and can be directly accessed
+ *
+ * todo - retrying from the base is dumb... just retry from the latest spot...
  */
 class EstablishConnectionProtocol {
     private static final SecureRandom secureRandom = new SecureRandom();
@@ -100,21 +105,32 @@ class EstablishConnectionProtocol {
     private static boolean asInitiatorDirect(P2LNodeInternal parent, P2Link to, Supplier<Integer> conversationIdSupplier, int attempts, int initialTimeout) {
         if(parent.connectionLimitReached()) return false;
 
-        Pair<P2Link, Integer> idWhichWon = parent.tryReceiveOrNull(attempts, initialTimeout, () -> {
+        AtomicLong startAt = new AtomicLong();
+        Pair<P2LConnection, Integer> idWhichWon = parent.tryReceiveOrNull(attempts, initialTimeout, () -> {
             Integer conversationId = conversationIdSupplier.get();
-            if (parent.isConnectedTo(to)) return new P2LFuture<>(new Pair<>(to, conversationId));
+            if (parent.isConnectedTo(to)) return new P2LFuture<>(new Pair<>(null, conversationId));
             return P2LFuture.before(
-                    () -> parent.sendInternalMessage(selfLinkToMessage(parent, SL_DIRECT_CONNECTION_REQUEST, conversationId), to.getSocketAddress()),
+                    () -> {
+                        parent.sendInternalMessage(selfLinkToMessage(parent, SL_DIRECT_CONNECTION_REQUEST, conversationId), to.getSocketAddress());
+                        startAt.set(System.currentTimeMillis());
+                    },
                     parent.expectInternalMessage(to.getSocketAddress(), R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId))
                     .andThen(message -> {
+                        int response1Took = Math.toIntExact(System.currentTimeMillis() - startAt.get());
                         byte[] verifyNonce = message.asBytes();
-                        if (verifyNonce.length == 0)
-                            return new P2LFuture<>(new Pair<>(to, conversationId)); //indicates 'already connected' todo problem is 'to' equal to actual link or not? Does it matter
+                        if (verifyNonce.length == 4)
+                            return new P2LFuture<>(new Pair<>(new P2LConnection(to, BitHelper.getInt32From(verifyNonce), response1Took), conversationId)); //indicates 'already connected' todo problem is 'to' equal to actual link or not? Does it matter
                         try {
                             return P2LFuture.before(
-                                    () -> parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_ANSWER, conversationId, verifyNonce), to.getSocketAddress()),
+                                    () -> {
+                                        parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_ANSWER, conversationId, verifyNonce), to.getSocketAddress());
+                                        startAt.set(System.currentTimeMillis());
+                                    },
                                     parent.expectInternalMessage(to.getSocketAddress(), R_DIRECT_CONNECTION_ESTABLISHED, conversationId)
-                                        .toType(m -> new Pair<>(fromMessage(parent, m), conversationId)));
+                                        .toType(m -> {
+                                            int response2Took = Math.toIntExact(System.currentTimeMillis() - startAt.get());
+                                            return new Pair<>(fromMessage(parent, m, (response1Took+response2Took)/2), conversationId);
+                                        }));
                         } catch (Throwable e) {
                             e.printStackTrace();
                             return new P2LFuture<>(null);//causes retry!!
@@ -133,15 +149,15 @@ class EstablishConnectionProtocol {
     }
 
     static void asAnswererDirect(P2LNodeInternal parent, SocketAddress from, P2LMessage initialRequestMessage) throws Throwable {
-        P2Link peerLink = fromMessage(parent, initialRequestMessage);
+        P2LConnection peer = fromMessage(parent, initialRequestMessage, 500);
 
         int conversationId = initialRequestMessage.header.getConversationId();
         if (parent.connectionLimitReached()) {
-            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId), from); //do not retry refusal
+            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId, BitHelper.getBytes(P2LMessage.CUSTOM_RAW_SIZE_LIMIT)), from); //do not retry refusal
             return;
         }
-        if (parent.isConnectedTo(peerLink)) {
-            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId, new byte[1]), from); //do not retry refusal
+        if (parent.isConnectedTo(peer.link)) {
+            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId, BitHelper.getBytes(P2LMessage.CUSTOM_RAW_SIZE_LIMIT)), from); //do not retry refusal
             return;
         }
 
@@ -149,33 +165,38 @@ class EstablishConnectionProtocol {
         // send a nonce to other peer
         //   if they are receiving correctly on their port they should read the nonce and be able to send it back
         //   (if they are not able to do this, then they may have spoofed their sender address and tried to fill this nodes peer list - or they are )
-        byte[] nonce = new byte[16];
+        byte[] nonce = new byte[16]; //must be != 4
         secureRandom.nextBytes(nonce);
         //next line blocking, due to the following problem: if the packet is lost, the initiator will retry the connection:
         //     sending a new connection-request + receiving a verify nonce request WITH A DIFFERENT NONCE - however, since this came first, we will receive the nonce here...
 
+        long startAt = System.currentTimeMillis();
         byte[] verifyNonce = P2LFuture.before(() ->
                 parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId, nonce), from),
                 parent.expectInternalMessage(from, R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_ANSWER, conversationId))
                 .get(P2LHeuristics.DEFAULT_PROTOCOL_ANSWER_RECEIVE_TIMEOUT).asBytes();
+        peer.avRTT = Math.toIntExact(System.currentTimeMillis() - startAt);
         if (Arrays.equals(nonce, verifyNonce)) {
-            parent.graduateToEstablishedConnection(peerLink, initialRequestMessage.header.getConversationId());
+            parent.graduateToEstablishedConnection(peer, initialRequestMessage.header.getConversationId());
             parent.sendInternalMessage(selfLinkToMessage(parent, R_DIRECT_CONNECTION_ESTABLISHED, conversationId), from);
         }
     }
 
     private static P2LMessage selfLinkToMessage(P2LNodeInternal parent, int type, int conversationId) {
         P2Link selfLink = parent.getSelfLink();
-        if(selfLink.isPublicLink())
-            return P2LMessage.Factory.createSendMessage(type, conversationId, selfLink.getBytesRepresentation());
-        return P2LMessage.Factory.createSendMessage(type, conversationId, new byte[0]);
+        if(selfLink.isPublicLink()) {
+            byte[] selfLinkByteRepresentation = selfLink.getBytesRepresentation();
+            return P2LMessage.Factory.createSendMessageFrom(type, conversationId,
+                    P2LMessage.CUSTOM_RAW_SIZE_LIMIT, P2LMessage.makeVariableIndicatorFor(selfLinkByteRepresentation.length), selfLinkByteRepresentation);
+        }
+        return P2LMessage.Factory.createSendMessageFrom(type, conversationId, P2LMessage.CUSTOM_RAW_SIZE_LIMIT, P2LMessage.makeVariableIndicatorFor(0));
     }
-    private static P2Link fromMessage(P2LNodeInternal parent, P2LMessage m) {
-        byte[] selfProclaimedLinkOfInitiatorRaw = m.asBytes();
-        System.out.println("selfProclaimedLinkOfInitiatorRaw = " + Arrays.toString(selfProclaimedLinkOfInitiatorRaw));
+    private static P2LConnection fromMessage(P2LNodeInternal parent, P2LMessage m, int avRTT) {
+        int remoteBufferSize = m.nextInt();
+        byte[] selfProclaimedLinkOfInitiatorRaw = m.nextVariable();
         if(selfProclaimedLinkOfInitiatorRaw.length == 0)
-            return P2Link.createHiddenLink(parent.getSelfLink(), m.header.getSender().getSocketAddress());
+            return new P2LConnection(P2Link.createHiddenLink(parent.getSelfLink(), m.header.getSender().getSocketAddress()), remoteBufferSize, avRTT);
         else
-            return P2Link.fromBytes(selfProclaimedLinkOfInitiatorRaw);
+            return new P2LConnection(P2Link.fromBytes(selfProclaimedLinkOfInitiatorRaw), remoteBufferSize, avRTT);
     }
 }

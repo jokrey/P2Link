@@ -1,6 +1,8 @@
 package jokrey.utilities.network.link2peer.core.stream;
 
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
+import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
+
 import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.List;
@@ -91,10 +93,14 @@ public abstract class P2LFragmentInputStream implements P2LInputStream {
     public void removeFragmentReceivedListener(FragmentReceivedListener listener) {
         listeners.remove(listener);
     }
+    public void writeResultsTo(TransparentBytesStorage storage) {
+        addFragmentReceivedListener(storage::set);
+    }
+
     protected void fireReceived(long fragmentOffset, byte[] receivedRaw, int dataOff, int dataLen) {
         for(FragmentReceivedListener listener:listeners) listener.received(fragmentOffset, receivedRaw, dataOff, dataLen);
     }
-    interface FragmentReceivedListener {
+    public interface FragmentReceivedListener {
         /**
          *
          * @param fragmentOffset

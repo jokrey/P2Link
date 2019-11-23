@@ -10,7 +10,7 @@ import java.io.IOException;
 import java.net.SocketAddress;
 
 public interface P2LNodeInternal extends P2LNode {
-    void graduateToEstablishedConnection(P2Link address, int conversationId);
+    void graduateToEstablishedConnection(P2LConnection peer, int conversationId);
     void markBrokenConnection(P2Link address, boolean retry);
     int remainingNumberOfAllowedPeerConnections();
 

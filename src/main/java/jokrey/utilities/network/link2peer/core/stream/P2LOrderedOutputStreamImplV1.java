@@ -2,13 +2,11 @@ package jokrey.utilities.network.link2peer.core.stream;
 
 import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.P2Link;
+import jokrey.utilities.network.link2peer.core.P2LConnection;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
-import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.core.message_headers.StreamPartHeader;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
-import jokrey.utilities.transparent_storage.bytes.wrapper.SubBytesStorage;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -52,11 +50,11 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
     private int earliestUnconfirmedPartIndex = 0;
     private int latestAttemptedIndex = -1;
 
-    public P2LOrderedOutputStreamImplV1(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
-        super(parent, to, type, conversationId);
+    public P2LOrderedOutputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId) {
+        super(parent, to, con, type, conversationId);
 
         headerSize = new StreamPartHeader(null, type, conversationId, 0, false, false).getSize();
-        unsendBuffer = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT - headerSize];
+        unsendBuffer = new byte[con.remoteBufferSize - headerSize];
     }
 
     @Override public synchronized void write(int b) throws IOException {
@@ -204,13 +202,13 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
     }
 
 
-    @Override void receivedReceipt(P2LMessage rawReceipt) {
-        StreamReceipt missingParts = StreamReceipt.decode(rawReceipt);
+    @Override public void receivedReceipt(P2LMessage rawReceipt) {
+        P2LOrderedStreamReceipt missingParts = P2LOrderedStreamReceipt.decode(rawReceipt);
         handleReceipt(missingParts);//blocking
     }
 
     private final ByteArrayStorage[] shiftCache = new ByteArrayStorage[unconfirmedSendPackages.length/2];
-    private synchronized void handleReceipt(StreamReceipt receipt) {
+    private synchronized void handleReceipt(P2LOrderedStreamReceipt receipt) {
         int latestIndexReceivedByPeer = receipt.latestReceived;
         int[] missingParts = receipt.missingParts;
         if(receipt.eof) {

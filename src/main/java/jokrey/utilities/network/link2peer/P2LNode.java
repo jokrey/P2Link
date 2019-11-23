@@ -2,9 +2,12 @@ package jokrey.utilities.network.link2peer;
 
 import jokrey.utilities.network.link2peer.core.NodeCreator;
 import jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes;
+import jokrey.utilities.network.link2peer.core.stream.P2LFragmentInputStream;
+import jokrey.utilities.network.link2peer.core.stream.P2LFragmentOutputStream;
 import jokrey.utilities.network.link2peer.core.stream.P2LOrderedInputStream;
 import jokrey.utilities.network.link2peer.core.stream.P2LOrderedOutputStream;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
+import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -317,20 +320,20 @@ public interface P2LNode {
      * @return a stream representation of the connection - with the associated guarantees
      * @see P2LOrderedInputStream
      */
-    P2LOrderedInputStream getInputStream(SocketAddress from, int messageType, int conversationId);
-    /**@see #getInputStream(SocketAddress, int, int)*/
-    default P2LOrderedInputStream getInputStream(P2Link from, int messageType, int conversationId) {
-        return getInputStream(from.getSocketAddress(), messageType, conversationId);
+    P2LOrderedInputStream createInputStream(SocketAddress from, int messageType, int conversationId);
+    /**@see #createInputStream(SocketAddress, int, int)*/
+    default P2LOrderedInputStream createInputStream(P2Link from, int messageType, int conversationId) {
+        return createInputStream(from.getSocketAddress(), messageType, conversationId);
     }
 
     /**
      * Returns the stream for the given identifier. It is possible to have up to (2^31-1) * (2^31-1) streams from a single source (todo this is absolutely idiotic - who would EVER need THAT many different streams)
      * The multiple streams can be used for comfortable parallel upload or communication without establishing multiple, 'real' connections.
      *
-     * Note: Before a peer can receive data {@link #getInputStream(SocketAddress, int, int)} has to be called with the same typ-conversationId combination on the peer side.
+     * Note: Before a peer can receive data {@link #createInputStream(SocketAddress, int, int)} has to be called with the same typ-conversationId combination on the peer side.
      * Before that has occurred it is useless to send data. Appropriate synchronization remains the responsibility of the application.
      *
-     * Tcp-like, most simple synchronization would be to call both {@link #getInputStream(SocketAddress, int, int)} and {@link #getOutputStream(SocketAddress, int, int)} when the connection is established (using {@link #addConnectionEstablishedListener(BiConsumer)}).
+     * Tcp-like, most simple synchronization would be to call both {@link #createInputStream(SocketAddress, int, int)} and {@link #createOutputStream(SocketAddress, int, int)} when the connection is established (using {@link #addConnectionEstablishedListener(BiConsumer)}).
      *
      * @param to the intended receiver of the stream - does not currently have to be an established connection but might have to be in the future
      * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
@@ -338,12 +341,24 @@ public interface P2LNode {
      * @return a stream representation of the connection - with the associated guarantees
      * @see P2LOrderedOutputStream
      */
-    P2LOrderedOutputStream getOutputStream(SocketAddress to, int messageType, int conversationId);
-    /**@see #getOutputStream(SocketAddress, int, int)*/
-    default P2LOrderedOutputStream getOutputStream(P2Link to, int messageType, int conversationId) {
-        return getOutputStream(to.getSocketAddress(), messageType, conversationId);
+    P2LOrderedOutputStream createOutputStream(SocketAddress to, int messageType, int conversationId);
+    /**@see #createOutputStream(SocketAddress, int, int)*/
+    default P2LOrderedOutputStream createOutputStream(P2Link to, int messageType, int conversationId) {
+        return createOutputStream(to.getSocketAddress(), messageType, conversationId);
     }
 
+    /**@see #createInputStream(SocketAddress, int, int)*/
+    P2LFragmentInputStream createFragmentInputStream(SocketAddress from, TransparentBytesStorage target, int messageType, int conversationId);
+    /**@see #createInputStream(SocketAddress, int, int)*/
+    default P2LFragmentInputStream createFragmentInputStream(P2Link from, TransparentBytesStorage target, int messageType, int conversationId) {
+        return createFragmentInputStream(from.getSocketAddress(), target, messageType, conversationId);
+    }
+    /**@see #createOutputStream(SocketAddress, int, int)*/
+    P2LFragmentOutputStream createFragmentOutputStream(SocketAddress to, TransparentBytesStorage source, int messageType, int conversationId);
+    /**@see #createOutputStream(SocketAddress, int, int)*/
+    default P2LFragmentOutputStream createFragmentOutputStream(P2Link to, TransparentBytesStorage source, int messageType, int conversationId) {
+        return createFragmentOutputStream(to.getSocketAddress(), source, messageType, conversationId);
+    }
 
     /**
      * Retry feature for more complex conversations.
