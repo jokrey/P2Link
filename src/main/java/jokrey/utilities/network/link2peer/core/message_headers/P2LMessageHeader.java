@@ -136,6 +136,11 @@ public interface P2LMessageHeader {
         writeTo(raw);
         return raw;
     }
+    default byte[] generateRaw(int payloadLength, int maxRawSize) {
+        byte[] raw = new byte[Math.min(maxRawSize, getSize() + payloadLength)];
+        writeTo(raw);
+        return raw;
+    }
     default void writeTo(byte[] raw) {
         BitHelper.writeInt32(raw, HEADER_BYTES_OFFSET_TYPE, getType());
         int conversationIdFieldOffset = getConversationIdFieldOffset();

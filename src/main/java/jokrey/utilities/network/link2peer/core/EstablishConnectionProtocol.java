@@ -194,7 +194,7 @@ class EstablishConnectionProtocol {
     private static P2LConnection fromMessage(P2LNodeInternal parent, P2LMessage m, int avRTT) {
         int remoteBufferSize = m.nextInt();
         byte[] selfProclaimedLinkOfInitiatorRaw = m.nextVariable();
-        if(selfProclaimedLinkOfInitiatorRaw.length == 0)
+        if(selfProclaimedLinkOfInitiatorRaw==null || selfProclaimedLinkOfInitiatorRaw.length == 0)
             return new P2LConnection(P2Link.createHiddenLink(parent.getSelfLink(), m.header.getSender().getSocketAddress()), remoteBufferSize, avRTT);
         else
             return new P2LConnection(P2Link.fromBytes(selfProclaimedLinkOfInitiatorRaw), remoteBufferSize, avRTT);

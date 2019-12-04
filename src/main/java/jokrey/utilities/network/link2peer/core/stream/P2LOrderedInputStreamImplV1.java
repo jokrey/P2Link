@@ -3,6 +3,8 @@ package jokrey.utilities.network.link2peer.core.stream;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
+import jokrey.utilities.network.link2peer.util.SyncHelp;
+import jokrey.utilities.network.link2peer.util.TimeoutException;
 import jokrey.utilities.transparent_storage.bytes.wrapper.SubBytesStorage;
 
 import java.io.IOException;
@@ -134,14 +136,8 @@ class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
 
     @Override public synchronized int read(int timeout_ms) throws IOException {
         try {
-            long startCtm = System.currentTimeMillis();
-            long elapsed = 0;
-            while(available==0 && !eofReached()) {
-                wait(timeout_ms==0?0:timeout_ms-elapsed);
-                if(timeout_ms > 0 && elapsed >= timeout_ms) throw new IOException("timeout after "+elapsed);
-                elapsed = System.currentTimeMillis() - startCtm;
-//                if(available==0 && !eofReached()) sendReceipt(); //todo this would be insane - what if the other side is just not sending data?
-            }
+            boolean success = SyncHelp.waitUntil(this, () -> available!=0 || eofReached(), timeout_ms);
+            if(!success) throw new IOException("timeout");
             if(eofReached() && available==0) return -1;
             if(available==-1) throw new IOException("stream was closed using close");
 
@@ -160,14 +156,8 @@ class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
         if(b == null) throw new NullPointerException("b == null");
         if(off<0 || off+len>b.length || len < 0) throw new ArrayIndexOutOfBoundsException();
         try {
-            long startCtm = System.currentTimeMillis();
-            long elapsed = 0;
-            while(available==0 && !eofReached()) {
-                wait(timeout_ms==0?0:timeout_ms-elapsed);
-                if(timeout_ms > 0 && elapsed >= timeout_ms) throw new IOException("timeout after "+elapsed);
-                elapsed = System.currentTimeMillis() - startCtm;
-//                if(available==0 && !eofReached()) sendReceipt(); //todo this would be insane - what if the other side is just not sending data?
-            }
+            boolean success = SyncHelp.waitUntil(this, () -> available!=0 || eofReached(), timeout_ms);
+            if(!success) throw new IOException("timeout");
             if(eofReached() && available==0) return -1;
             if(available==-1) throw new IOException("stream was closed using close");
 

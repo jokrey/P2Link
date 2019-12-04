@@ -27,6 +27,7 @@ public class IncomingHandler {
     public static int INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
     public static AtomicInteger NUMBER_OF_STREAM_RECEIPTS_RECEIVED = new AtomicInteger(0);
     public static AtomicInteger NUMBER_OF_STREAM_PARTS_RECEIVED = new AtomicInteger(0);
+    public static AtomicInteger NUMBER_OF_INTENTIONALLY_DROPPED_PACKAGES = new AtomicInteger(0);
 
     DatagramSocket serverSocket;
     private P2LNodeInternal parent;
@@ -49,16 +50,22 @@ public class IncomingHandler {
         if(INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE>0) {
             boolean dropped = ThreadLocalRandom.current().nextInt(0, 100) < INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE;
             if (dropped) {
-                System.out.print(" - DROPPED - ");
-                System.out.println(parent.getSelfLink() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
+                System.out.println(" - DROPPED - "+parent.getSelfLink() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
+                NUMBER_OF_INTENTIONALLY_DROPPED_PACKAGES.getAndIncrement();
                 return;
             }
         }
-        System.out.println(parent.getSelfLink() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
+//        System.out.println(parent.getSelfLink() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
 
         parent.notifyPacketReceivedFrom(from);
 
-        //todo:?: allow streams and long messages only from established connections? - why tho? - mtu knowledge + some more ddos protection maybe
+        //todo: is this TOO transparent??? - allows unknowingly splitting up stream messages
+        if(message.header.isLongPart()) {
+            message = longMessageHandler.received(message);
+            if(message == null) return; //not yet entire message received
+        }
+
+        //todo:?: allow streams and long messages ONLY from established connections? - why tho? - mtu knowledge + some more ddos protection maybe
         if(message.header.isStreamPart()) {
             if(message.header.isReceipt()) {
                 streamMessageHandler.receivedReceipt(message);
@@ -68,9 +75,6 @@ public class IncomingHandler {
                 NUMBER_OF_STREAM_PARTS_RECEIVED.getAndIncrement();
             }
             return;
-        } else if(message.header.isLongPart()) {
-            message = longMessageHandler.received(message);
-            if(message == null) return; //not yet entire message received
         }
 
         if (message.header.requestReceipt()) {

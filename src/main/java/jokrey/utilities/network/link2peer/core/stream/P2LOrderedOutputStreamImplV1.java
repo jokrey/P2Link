@@ -6,6 +6,7 @@ import jokrey.utilities.network.link2peer.core.P2LConnection;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.core.message_headers.StreamPartHeader;
+import jokrey.utilities.network.link2peer.util.SyncHelp;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 
 import java.io.IOException;
@@ -54,7 +55,7 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
         super(parent, to, con, type, conversationId);
 
         headerSize = new StreamPartHeader(null, type, conversationId, 0, false, false).getSize();
-        unsendBuffer = new byte[con.remoteBufferSize - headerSize];
+        unsendBuffer = new byte[(con==null?P2LMessage.CUSTOM_RAW_SIZE_LIMIT:con.remoteBufferSize) - headerSize];
     }
 
     @Override public synchronized void write(int b) throws IOException {
@@ -108,17 +109,7 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
         try {
             sendExtraordinaryReceiptRequest();
 
-            long startCtm = System.currentTimeMillis();
-            long elapsed = 0;
-            while(hasUnconfirmedParts()) {
-//                System.out.println("P2LOutputStreamV1.waitForConfirmationOnAll - earliestUnconfirmedPartIndex("+earliestUnconfirmedPartIndex+"), latestAttemptedIndex("+latestAttemptedIndex+")");
-                wait(timeout_ms ==0? P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS:Math.min(timeout_ms-elapsed, P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS));
-                elapsed = System.currentTimeMillis() - startCtm;
-                if(timeout_ms != 0 && elapsed >= timeout_ms) return false;
-
-                if(hasUnconfirmedParts())
-                    sendExtraordinaryReceiptRequest();
-            }
+            SyncHelp.waitUntilOrThrowIO(this, () -> !hasUnconfirmedParts(), timeout_ms, this::sendExtraordinaryReceiptRequest, P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS);
             return true;
         } catch (InterruptedException e) {
             throw new IOException(e);
@@ -145,16 +136,7 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
     private synchronized void waitForBufferCapacities(int timeout_ms) throws IOException {
         try {
             sendExtraordinaryReceiptRequest();
-            long startCtm = System.currentTimeMillis();
-            long elapsed = 0;
-            while(!hasBufferCapacities()) {
-                wait(timeout_ms ==0? P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS:Math.min(timeout_ms-elapsed, P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS));
-                elapsed = System.currentTimeMillis() - startCtm;
-                if(timeout_ms != 0 && elapsed >= timeout_ms) throw new IOException("waiting for confirmation timed out after "+elapsed+"ms");
-
-                if(!hasBufferCapacities())
-                    sendExtraordinaryReceiptRequest();
-            }
+            SyncHelp.waitUntilOrThrowIO(this, this::hasBufferCapacities, timeout_ms, this::sendExtraordinaryReceiptRequest, P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS);
         } catch (InterruptedException e) {
             throw new IOException(e);
         }

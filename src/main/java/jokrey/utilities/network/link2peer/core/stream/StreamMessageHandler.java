@@ -17,7 +17,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public class StreamMessageHandler {
     private final ConcurrentHashMap<HeaderIdentifier, P2LInputStream> inputStreams = new ConcurrentHashMap<>();
     public void receivedPart(P2LMessage message) {
-        getInputStream(message).received(message);
+        P2LInputStream stream = getInputStream(message);
+        if(stream != null)
+            stream.received(message);
+        else
+            System.out.println("received message for unknown in stream"); //todo - default handling?
         //potentially a delayed package, after a new stream of the same type and conversation id has been created (very, very unlikely in context)
     }
     private P2LInputStream getInputStream(P2LMessage m) {
@@ -28,17 +32,21 @@ public class StreamMessageHandler {
         HeaderIdentifier identifier = new SenderTypeConversationIdentifier(from, type, conversationId);
         return (P2LOrderedInputStream) inputStreams.computeIfAbsent(identifier, k -> new P2LOrderedInputStreamImplV1(parent, from, type, conversationId));
     }
-    public P2LFragmentInputStream createFragmentInputStream(P2LNodeInternal parent, SocketAddress from, TransparentBytesStorage target, int type, int conversationId) {
+    public P2LFragmentInputStream createFragmentInputStream(P2LNodeInternal parent, SocketAddress from, P2LConnection con, TransparentBytesStorage target, int type, int conversationId) {
         if(from == null || parent == null) throw new NullPointerException();
         HeaderIdentifier identifier = new SenderTypeConversationIdentifier(from, type, conversationId);
-        return (P2LFragmentInputStream) inputStreams.computeIfAbsent(identifier, k -> new P2LFragmentInputStreamImplV1(parent, from, type, conversationId, target));
+        return (P2LFragmentInputStream) inputStreams.computeIfAbsent(identifier, k -> new P2LFragmentInputStreamImplV1(parent, from, con, type, conversationId, target));
     }
 
 
 
     private final ConcurrentHashMap<HeaderIdentifier, P2LOutputStream> outputStreams = new ConcurrentHashMap<>();
     public void receivedReceipt(P2LMessage rawReceipt) {
-        getOutputStream(rawReceipt).receivedReceipt(rawReceipt);
+        P2LOutputStream stream = getOutputStream(rawReceipt);
+        if(stream != null)
+            stream.receivedReceipt(rawReceipt);
+        else
+            System.out.println("received receipt message for unknown out stream"); //todo - default handling?
     }
     private P2LOutputStream getOutputStream(P2LMessage m) {
         return outputStreams.get(new SenderTypeConversationIdentifier(m));

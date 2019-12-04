@@ -11,6 +11,7 @@ public class P2LConnection {
     public final P2Link link;
     public final int remoteBufferSize;
     public int avRTT;
+    public int fragmentStreamVar = -1;
 
     public P2LConnection(P2Link link, int remoteBufferSize, int avRTT) {
         this.link=link;

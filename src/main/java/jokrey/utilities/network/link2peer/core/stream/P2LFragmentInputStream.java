@@ -1,5 +1,6 @@
 package jokrey.utilities.network.link2peer.core.stream;
 
+import jokrey.utilities.network.link2peer.core.P2LConnection;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
 import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 
@@ -48,10 +49,12 @@ import java.util.List;
 public abstract class P2LFragmentInputStream implements P2LInputStream {
     protected final P2LNodeInternal parent;
     protected final SocketAddress to;
+    protected final P2LConnection con;
     protected final int type, conversationId;
-    protected P2LFragmentInputStream(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
+    protected P2LFragmentInputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId) {
         this.parent = parent;
         this.to = to;
+        this.con = con;
         this.type = type;
         this.conversationId = conversationId;
     }
@@ -85,6 +88,8 @@ public abstract class P2LFragmentInputStream implements P2LInputStream {
 //        return new int[0];
 //    }
 
+    public abstract boolean isFullyReceived();
+    public abstract boolean waitForFullyReceived(int timeout_ms);
 
     private final List<FragmentReceivedListener> listeners = new ArrayList<>();
     public void addFragmentReceivedListener(FragmentReceivedListener listener) {

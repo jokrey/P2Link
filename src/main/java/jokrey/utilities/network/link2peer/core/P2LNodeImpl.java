@@ -143,14 +143,15 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     @Override public void sendInternalMessage(P2LMessage message, SocketAddress to) throws IOException {
         if(message.header.getSender() != null) throw new IllegalArgumentException("sender of message has to be this null and will be automatically set by the sender");
 
-        //todo - is it really desirable to have packages be broken up THIS automatically???
-        //todo    - like it is cool that breaking up packages does not make a difference, but... like it is so transparent it could lead to inefficiencies
         if(message.canBeSentInSinglePacket()) {
-            System.out.println("sendInternalMessage - message = " + message + ", to = " + to);
+//            System.out.println("sendInternalMessage - message = " + message + ", to = " + to);
             incomingHandler.serverSocket.send(message.toPacket(to)); //since the server socket is bound to a port, said port will be included in the udp packet
         } else {
-            System.out.println("sendLong(being broken up) - message = " + message + ", to = " + to);
-            incomingHandler.longMessageHandler.send(this, message, to);
+            //todo - is it really desirable to have packages be broken up THIS automatically???
+            //todo    - like it is cool that breaking up packages does not make a difference, but... like it is so transparent it could lead to inefficiencies
+            throw new IllegalStateException(message.size+"");
+//            System.out.println("sendLong(being broken up) - message = " + message + ", to = " + to);
+//            incomingHandler.longMessageHandler.send(this, message, to);
         }
     }
     @Override public void sendMessage(SocketAddress to, P2LMessage message) throws IOException {
@@ -223,13 +224,10 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
     @Override public P2LFragmentInputStream createFragmentInputStream(SocketAddress from, TransparentBytesStorage target, int messageType, int conversationId) {
         validateMsgIdNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.createFragmentInputStream(this, from, target, messageType, conversationId);
+        return incomingHandler.streamMessageHandler.createFragmentInputStream(this, from, establishedConnections.get(from), target, messageType, conversationId);
     }
     @Override public P2LFragmentOutputStream createFragmentOutputStream(SocketAddress to, TransparentBytesStorage source, int messageType, int conversationId) {
         validateMsgIdNotInternal(messageType);
-        System.out.println("to = " + to);
-        System.out.println("establishedConnections = " + establishedConnections);
-        System.out.println("establishedConnections.get(to) = " + establishedConnections.get(to));
         return incomingHandler.streamMessageHandler.createFragmentOutputStream(this, to, establishedConnections.get(to), source, messageType, conversationId);
     }
 

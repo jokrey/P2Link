@@ -8,10 +8,7 @@ import jokrey.utilities.network.link2peer.core.NodeCreator;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.core.message_headers.StreamPartHeader;
-import jokrey.utilities.network.link2peer.core.stream.P2LFragmentInputStream;
-import jokrey.utilities.network.link2peer.core.stream.P2LFragmentOutputStream;
-import jokrey.utilities.network.link2peer.core.stream.P2LOrderedInputStream;
-import jokrey.utilities.network.link2peer.core.stream.P2LOrderedOutputStream;
+import jokrey.utilities.network.link2peer.core.stream.*;
 import jokrey.utilities.network.link2peer.util.*;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
 import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
@@ -31,245 +28,16 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static jokrey.utilities.network.link2peer.P2LMessage.MAX_EXPIRATION_TIMEOUT;
-import static jokrey.utilities.network.link2peer.core.IncomingHandler.NUMBER_OF_STREAM_PARTS_RECEIVED;
-import static jokrey.utilities.network.link2peer.core.IncomingHandler.NUMBER_OF_STREAM_RECEIPTS_RECEIVED;
+import static jokrey.utilities.network.link2peer.P2LMessage.MAX_UDP_PACKET_SIZE;
+import static jokrey.utilities.network.link2peer.core.IncomingHandler.*;
+import static jokrey.utilities.network.link2peer.core.stream.P2LFragmentInputStreamImplV1.doubleReceived;
+import static jokrey.utilities.network.link2peer.core.stream.P2LFragmentInputStreamImplV1.validReceived;
+import static jokrey.utilities.network.link2peer.core.stream.P2LFragmentOutputStreamImplV1.numResend;
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.rand;
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
 import static org.junit.jupiter.api.Assertions.*;
 
 class IntermediateTests {
-    @Test void p2lFutureTest_get() {
-        System.out.println("t1("+System.currentTimeMillis()+") init");
-
-        P2LFuture<Integer> p2lF = new P2LFuture<>();
-        new Thread(() -> {
-            System.out.println("t2("+System.currentTimeMillis()+") init/waiting");
-            sleep(100);
-            p2lF.setCompleted(123);
-            System.out.println("t2("+System.currentTimeMillis()+") completed");
-        }).start();
-        int x = p2lF.get(500);
-        System.out.println("t1("+System.currentTimeMillis()+") - x = "+x);
-        assertEquals(123, x);
-    }
-    @Test void p2lFutureTest_MULTIPLE_GET() {
-        System.out.println("t1("+System.currentTimeMillis()+") init");
-
-        P2LFuture<Integer> p2lF = new P2LFuture<>();
-        p2lF.callMeBack(x -> System.out.println("t1 callback: x="+x));
-        new Thread(() -> {
-            System.out.println("t2("+System.currentTimeMillis()+") init/waiting");
-            int x = p2lF.get(100);
-            assertEquals(123, x);
-            System.out.println("t2("+System.currentTimeMillis()+") completed - x="+x);
-        }).start();
-        new Thread(() -> {
-            System.out.println("t3("+System.currentTimeMillis()+") init/waiting");
-            int x = p2lF.get(100);
-            assertEquals(123, x);
-            System.out.println("t3("+System.currentTimeMillis()+") completed - x="+x);
-        }).start();
-        new Thread(() -> {
-            System.out.println("t4("+System.currentTimeMillis()+") init/waiting");
-            int x = p2lF.get(100);
-            assertEquals(123, x);
-            System.out.println("t4("+System.currentTimeMillis()+") completed - x="+x);
-        }).start();
-        new Thread(() -> {
-            System.out.println("t5("+System.currentTimeMillis()+") init/waiting");
-            p2lF.callMeBack(x -> System.out.println("t5 callback: x="+x));
-            System.out.println("t5("+System.currentTimeMillis()+") completed");
-        }).start();
-        new Thread(() -> {
-            System.out.println("t6("+System.currentTimeMillis()+") init/waiting");
-            p2lF.callMeBack(x -> System.out.println("t6 callback: x="+x));
-            System.out.println("t6("+System.currentTimeMillis()+") completed");
-        }).start();
-
-        p2lF.setCompleted(123);
-        int x = p2lF.get(1);
-        assertEquals(123, x);
-        System.out.println("t1("+System.currentTimeMillis()+") - x = "+x);
-        sleep(1000);
-    }
-    @Test void p2lFutureTest_callMeBack() {
-        System.out.println("t1("+System.currentTimeMillis()+") init");
-
-        P2LFuture<Integer> p2lF = new P2LFuture<>();
-        new Thread(() -> {
-            System.out.println("t2("+System.currentTimeMillis()+") init/waiting");
-            sleep(100);
-            p2lF.setCompleted(123);
-            System.out.println("t2("+System.currentTimeMillis()+") completed");
-        }).start();
-
-        p2lF.callMeBack(x -> System.out.println("t1("+System.currentTimeMillis()+") - x = "+x));
-
-        sleep(250); // without this the thread is killed automatically when this method returns
-        System.out.println("t1 completed");
-    }
-    @Test void p2lFutureTest_timeout() {
-        System.out.println("t1("+System.currentTimeMillis()+") init");
-
-        P2LFuture<Integer> p2lF = new P2LFuture<>();
-        new Thread(() -> {
-            System.out.println("t2("+System.currentTimeMillis()+") init/waiting");
-            sleep(1000);
-            p2lF.setCompleted(123);
-            System.out.println("t2("+System.currentTimeMillis()+") completed");
-        }).start();
-
-        System.out.println("t1("+System.currentTimeMillis()+") starting wait");
-        assertThrows(TimeoutException.class, () -> p2lF.get(100));
-        System.out.println("t1("+System.currentTimeMillis()+") completed");
-    }
-    @Test void p2lFutureTest_combine() {
-        P2LFuture<Integer> p2lF1 = new P2LFuture<>();
-        P2LFuture<Integer> p2lF2 = new P2LFuture<>();
-        P2LFuture<Integer> combine = p2lF1.combine(p2lF2, P2LFuture.PLUS);
-        new Thread(() -> {
-            p2lF1.setCompleted(1);
-            sleep(1000);
-            p2lF2.setCompleted(3);
-        }).start();
-
-        assertThrows(TimeoutException.class, () -> combine.get(100));
-        assertEquals(new Integer(1), p2lF1.get(500));
-        assertEquals(new Integer(3), p2lF2.get(1500));
-        assertEquals(new Integer(4), combine.get(1500));
-    }
-    @Test void p2lFutureTest_cancelCombine() {
-        P2LFuture<Integer> p2lF1 = new P2LFuture<>();
-        P2LFuture<Integer> p2lF2 = new P2LFuture<>();
-        P2LFuture<Integer> combine = p2lF1.combine(p2lF2, P2LFuture.PLUS);
-        new Thread(() -> {
-            p2lF1.setCompleted(1);
-            sleep(1000);
-            p2lF2.setCompleted(3);
-        }).start();
-
-        assertThrows(TimeoutException.class, () -> combine.get(100));
-        assertEquals(new Integer(1), p2lF1.get(500));
-        assertThrows(AlreadyCompletedException.class, p2lF1::cancel);
-        p2lF2.cancel();
-        assertThrows(CanceledException.class, combine::get);
-        assertThrows(CanceledException.class, p2lF2::get);
-    }
-    @Test void p2lFutureTest_cannotCompleteTwice() {
-        P2LFuture<Integer> p2lF = new P2LFuture<>();
-        new Thread(() -> p2lF.setCompleted(1)).start();
-        sleep(500);
-
-        assertEquals(new Integer(1), p2lF.get(500));
-        assertThrows(AlreadyCompletedException.class, () -> p2lF.setCompleted(3));
-        assertEquals(new Integer(1), p2lF.get(500));
-    }
-    @Test void p2lFutureTest_reducePerformanceComparison() {
-        int iterations = 1000000;
-
-        reduceUsingCombine(iterations);
-        reduceUsingWhenCompleted(iterations);
-
-        for(int repeatCounter=0;repeatCounter<33;repeatCounter++) {
-            AverageCallTimeMarker.mark_call_start("reduce using combine");
-            reduceUsingCombine(iterations);
-            AverageCallTimeMarker.mark_call_end("reduce using combine");
-
-            AverageCallTimeMarker.mark_call_start("reduce using when completed");
-            reduceUsingWhenCompleted(iterations);
-            AverageCallTimeMarker.mark_call_end("reduce using when completed");
-        }
-        AverageCallTimeMarker.print_all();
-        AverageCallTimeMarker.clear();
-    }
-    private static void reduceUsingCombine(int iterations) {
-        List<P2LFuture<Integer>> list = new ArrayList<>(iterations);
-        for (int i = 0; i < iterations; i++)
-            list.add(new P2LFuture<>(new Integer(1)));
-
-        P2LFuture<Integer> reduced = P2LFuture.reduce(list, P2LFuture.PLUS);
-        assertEquals(iterations, reduced.get().intValue());
-    }
-    private static void reduceUsingWhenCompleted(int iterations) {
-        List<P2LFuture<Integer>> list = new ArrayList<>(iterations);
-        for (int i = 0; i < iterations; i++)
-            list.add(new P2LFuture<>(new Integer(1)));
-
-        P2LFuture<Integer> reduced = P2LFuture.reduceWhenCompleted(list, P2LFuture.PLUS);
-        assertEquals(iterations, reduced.get().intValue());
-    }
-
-
-    @Test void p2lThreadPoolTest() {
-        TimeDiffMarker.setMark(5331);
-        {
-            ArrayList<P2LFuture<Boolean>> allFs = new ArrayList<>(100);
-            P2LThreadPool pool = new P2LThreadPool(2, 32);
-            AtomicInteger counter = new AtomicInteger(0);
-            for (int i = 0; i < 100; i++)
-                allFs.add(pool.execute(() -> {
-                    sleep(100);
-                    counter.getAndIncrement();
-                }));
-            System.out.println("x1");
-            assertTrue(P2LFuture.reduce(allFs, P2LFuture.AND).get());
-            System.out.println("x2");
-            assertEquals(counter.get(), 100);
-            pool.shutdown();
-        }
-        TimeDiffMarker.println(5331, "custom 1 took: ");
-
-
-        TimeDiffMarker.setMark(5331);
-        {
-            P2LThreadPool pool = new P2LThreadPool(2, 32);
-            AtomicInteger counter = new AtomicInteger(0);
-            for (int i = 0; i < 100; i++)
-                pool.execute(() -> {
-                    sleep(100);
-                    counter.getAndIncrement();
-                });
-            while (counter.get() < 100) sleep(10);
-            assertEquals(counter.get(), 100);
-            pool.shutdown();
-        }
-        TimeDiffMarker.println(5331, "custom 2 took: ");
-
-        TimeDiffMarker.setMark(5331);
-        {
-            ThreadPoolExecutor pool = new ThreadPoolExecutor(2, 32, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(100));
-            AtomicInteger counter = new AtomicInteger(0);
-            for (int i = 0; i < 100; i++)
-                pool.execute(() -> {
-                    sleep(100);
-                    counter.getAndIncrement();
-                });
-            while (counter.get() < 100) sleep(10);
-            assertEquals(counter.get(), 100);
-        }
-        TimeDiffMarker.println(5331, "custom took: ");
-    }
-    @Test void p2lThreadPoolTest_capacity() {
-        P2LThreadPool pool = new P2LThreadPool(1, 1, 1);
-        AtomicInteger counter = new AtomicInteger(1);
-        pool.execute(() -> {
-            sleep(200);
-            counter.getAndIncrement();
-        });
-        pool.execute(() -> {
-            sleep(200);
-            counter.getAndIncrement();
-        });
-        assertThrows(CapacityReachedException.class, () -> pool.execute(() -> {
-            sleep(200);
-            counter.getAndIncrement();
-        }));
-        while (counter.get() < 2) sleep(10);
-        assertEquals(counter.get(), 2);
-    }
-
-
-
     @Test void establishConnectionProtocolTest() throws IOException {
         P2LNode node1 = P2LNode.create(P2Link.createPublicLink("localhost", 53189)); //creates server thread
         P2LNode node2 = P2LNode.create(P2Link.createPublicLink("localhost", 53188)); //creates server thread
@@ -1053,16 +821,6 @@ class IntermediateTests {
 
 
 
-    /*
-    STREAM_CHUNK_BUFFER_ARRAY_SIZE=4 - 555runs
-    =>(11.3s)
-        NUMBER_OF_STREAM_RECEIPTS_RECEIVED = 1747
-        NUMBER_OF_STREAM_PARTS_RECEIVED = 5250
-    STREAM_CHUNK_BUFFER_ARRAY_SIZE=128 - 555runs
-    => (5.6s)
-        NUMBER_OF_STREAM_RECEIPTS_RECEIVED = 673
-        NUMBER_OF_STREAM_PARTS_RECEIVED = 5119
-     */
     @Test void streamTest_inOut_twiceBufferSize() throws IOException {
         P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
         P2LNode[] nodes = generateNodes(2, 62880);
@@ -1134,17 +892,20 @@ class IntermediateTests {
     @Test void streamTest_closingOutFirst() throws IOException {
         P2LNode[] nodes = generateNodes(2, 62880);
 
-        P2LOrderedInputStream in = nodes[0].createInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
-        P2LOrderedOutputStream out = nodes[1].createOutputStream(nodes[0].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+        P2LOrderedInputStream in = nodes[0].createInputStream(nodes[1].getSelfLink(), 2, P2LNode.NO_CONVERSATION_ID);
+        P2LOrderedOutputStream out = nodes[1].createOutputStream(nodes[0].getSelfLink(), 2, P2LNode.NO_CONVERSATION_ID);
 
         P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
             out.write(new byte[] {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16});
             out.close();
         });
 
+        System.out.println(1);
         byte[] read = new byte[5];
         int numRead = in.read(read);
         sendTask.waitForIt(); //data still available to read after out closed...
+
+        System.out.println(2);
 
         assertEquals(5, numRead);
         assertArrayEquals(new byte[] {1,2,3,4,5}, read);
@@ -1209,7 +970,8 @@ class IntermediateTests {
         InputStream in = serversConnectionToClient.getInputStream();
         OutputStream out = client.getOutputStream();
 
-        byte[] toSend = new byte[100_000_000];//10mb
+        byte[] toSend = new byte[10_000];//10kb
+//        byte[] toSend = new byte[100_000_000];//10mb
         ThreadLocalRandom.current().nextBytes(toSend);
 
         P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
@@ -1321,43 +1083,64 @@ class IntermediateTests {
     }
 
 
-    @Test void testFragmentStreamWithoutDrops() throws IOException, InterruptedException {
-        IncomingHandler.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 10;
-        int bufferSize = 10_000;
+    @Test void testFragmentStreamWithDrops() throws IOException, InterruptedException {
+//        P2LMessage.CUSTOM_RAW_SIZE_LIMIT = MAX_UDP_PACKET_SIZE;
+//        IncomingHandler.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 25;
+        IncomingHandler.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
+        numResend=0;
+        doubleReceived = 0;
+        validReceived = 0;
+        NUMBER_OF_INTENTIONALLY_DROPPED_PACKAGES.set(0);
+
+//        P2LMessage.CUSTOM_RAW_SIZE_LIMIT = 10000+9;
+//        P2LFragmentOutputStreamImplV1.INITIAL_BATCH_SIZE = 1000;
+//        int bufferSize = P2LFragmentOutputStreamImplV1.INITIAL_BATCH_SIZE * P2LMessage.CUSTOM_RAW_SIZE_LIMIT * 5;
+        int bufferSize = 100_000_000;
         P2LNode[] nodes = generateNodes(2, 62890);
 
-        nodes[0].establishConnection(nodes[1].getSelfLink()).waitForIt(10000);
+        P2LFuture<Boolean> connectionEstablished = nodes[0].establishConnection(nodes[1].getSelfLink());
+        assertTrue(connectionEstablished.get(10000));
+
 
         byte[] toSend = new byte[bufferSize];
         ThreadLocalRandom.current().nextBytes(toSend);
 
-        TimeDiffMarker.setMark_d();
         TransparentBytesStorage source = new ByteArrayStorage(toSend);
         P2LFragmentInputStream in = nodes[0].createFragmentInputStream(nodes[1].getSelfLink(), null, 555, P2LNode.NO_CONVERSATION_ID);
         P2LFragmentOutputStream out = nodes[1].createFragmentOutputStream(nodes[0].getSelfLink(), source, 555, P2LNode.NO_CONVERSATION_ID);
 
 
+        TimeDiffMarker.setMark(1);
         TransparentBytesStorage target = new ByteArrayStorage(toSend.length);
-        in.addFragmentReceivedListener((fragmentOffset, receivedRaw, dataOff, dataLen) -> {
-            System.out.println("fragmentOffset = " + fragmentOffset);
-            System.out.println("receivedRaw = " + Arrays.toString(receivedRaw));
-            System.out.println("dataOff = " + dataOff);
-            System.out.println("dataLen = " + dataLen);
-        });
         in.writeResultsTo(target);
+//        in.addFragmentReceivedListener((fragmentOffset, receivedRaw, dataOff, dataLen) -> {
+//            System.out.println("fragmentOffset = " + fragmentOffset);
+//            System.out.println("receivedRaw = " + Arrays.toString(receivedRaw));
+//            System.out.println("dataOff = " + dataOff);
+//            System.out.println("dataLen = " + dataLen);
+//        });
 
         out.sendSource();
-        TimeDiffMarker.println_d();
+        TimeDiffMarker.println(1);
 
-        sleep(1000);//send source does not yet ensure receival
+        assertTrue(in.isFullyReceived());
+
+//        sleep(50);//send source does not yet ensure receival
+
+        System.out.println("checking equals");
+        System.out.println("numResend = " + numResend);
+        System.out.println("NUMBER_OF_INTENTIONALLY_DROPPED_PACKAGES = " + NUMBER_OF_INTENTIONALLY_DROPPED_PACKAGES);
+        System.out.println("doubleReceived = " + doubleReceived);
+        System.out.println("validReceived = " + validReceived);
 
         assertArrayEquals(source.getContent(), target.getContent());
 
         close(nodes);
         IncomingHandler.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
+
     }
 
-    @Test void testFragmentStreamCompareSpeedWithAndWithoutEstablishedConnection() throws IOException, InterruptedException {
+    @Test @Disabled void testFragmentStreamCompareSpeedWithAndWithoutEstablishedConnection() throws IOException, InterruptedException {
         int bufferSize = 10_00_000;//1000kb=1mb
         {
             P2LNode[] nodes = generateNodes(2, 62890);
