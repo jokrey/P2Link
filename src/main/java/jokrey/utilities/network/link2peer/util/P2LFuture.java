@@ -220,10 +220,6 @@ public class P2LFuture<T> {
                 timeout();
                 return null;
             }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-            cancel();
-            return null;
         } finally {
             isGetWaiting = false;
         }

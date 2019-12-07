@@ -61,5 +61,11 @@ public abstract class P2LOrderedOutputStream extends OutputStream implements P2L
     public abstract void flush() throws IOException;
 
     //MUST BE REIMPLEMENTED HERE; BECAUSE THE DEFAULT IMPLEMENTATION IS OVERRIDEN BY THE NO-OP DEFINITION IN OUTPUTSTREAM - THIS IS BULLSHIT
-    public void close() throws IOException { close(0); }
+    public void close() throws IOException {
+        try {
+            close(0);
+        } catch (InterruptedException e) {
+            throw new IOException(e);
+        }
+    }
 }

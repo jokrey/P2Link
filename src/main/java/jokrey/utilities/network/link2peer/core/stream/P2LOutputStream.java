@@ -20,7 +20,7 @@ public interface P2LOutputStream extends AutoCloseable {
      * @throws IOException if the underlying socket has an error
      * @return whether confirmation has been received within the given timeout
      */
-     boolean waitForConfirmationOnAll(int timeout_ms) throws IOException;
+     boolean waitForConfirmationOnAll(int timeout_ms) throws IOException, InterruptedException;
 
     /**
      * Closes the stream and cleans internal data structures.
@@ -28,7 +28,7 @@ public interface P2LOutputStream extends AutoCloseable {
      * In other words this method is blocking, potentially forever.
      * @throws IOException if flush fails
      */
-    default void close() throws IOException { close(0); }
+    default void close() throws IOException, InterruptedException { close(0); }
     /**
      * Closes the stream and cleans internal data structures.
      * Before this is done however, close completes the current write(for example using flush) and waits until all send messages have been received using {@link #waitForConfirmationOnAll(int)}.
@@ -40,7 +40,7 @@ public interface P2LOutputStream extends AutoCloseable {
      * @return whether confirmation was received before the
      * @throws IOException if flush fails
      */
-     boolean close(int timeout_ms) throws IOException;
+     boolean close(int timeout_ms) throws IOException, InterruptedException;
 
     /**
      * @return whether {@link #close()} was ever called, or the receiving input stream informed us that they have closed the stream on their side.

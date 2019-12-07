@@ -23,7 +23,7 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
 
     private int receiptPackageMaxSize;
     long receipt_delay_ms;
-    protected P2LFragmentInputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId, TransparentBytesStorage target) {
+    protected P2LFragmentInputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId) {
         super(parent, to, con, type, conversationId);
         int headerSize = new StreamReceiptHeader(null, type, conversationId,false).getSize();
         receiptPackageMaxSize = con==null?1024:con.remoteBufferSize - headerSize;
@@ -35,14 +35,17 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
     private long highestEndReceived = 0;
     private long eofAt = -1;
 
+    public long getEarliestMissingIndex() {
+        return missingRanges==null||missingRanges.isEmpty()?highestEndReceived : missingRanges.get0(0);
+    }
+
 
     long lastReceiptSendAt = System.currentTimeMillis();
     int numPackagesReceivedInLastBatch = 0;
 
+    private int receiptID = 0;
     //todo - synchronization might be bad, and not strictly required
     //    however there is a race condition where fireReceived does not complete, but the output stream already receives a receipt that it has completed - that might not matter in reality, but can screw up a check
-
-    private int receiptID = 0;
     @Override public synchronized void received(P2LMessage message) {
         try {
             if(forceClosedByThis) {
@@ -90,12 +93,7 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
         return eofAt != -1 && highestEndReceived == eofAt && missingRanges.isEmpty();
     }
     @Override public boolean waitForFullyReceived(int timeout_ms) {
-        try {
-            return SyncHelp.waitUntil(this, this::isFullyReceived, timeout_ms);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-            return false;
-        }
+        return SyncHelp.waitUntil(this, this::isFullyReceived, timeout_ms);
     }
 
     private boolean forceClosedByThis = false;
@@ -116,6 +114,7 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
 
 
     private synchronized boolean markReceived(long start, long end) {
+        if(start == end) return true;
 //        System.err.println("markReceived - start = " + start + ", " + end);
 //        System.err.println("missingRanges before = " + missingRanges);
 //        try {
@@ -158,15 +157,18 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
 
                         if (end >= innerRangeStart && end <= innerRangeEnd) {
                             //end in, but start out of range
-                            if (end < innerRangeEnd) {
+                            if (end == innerRangeEnd) {
+                                missingRanges.fastRemoveIndex(i);
+                            } else if(end == innerRangeStart) {
+
+                            } else if(end < innerRangeEnd) {
                                 if(removeIndexOfStartTuple==-1)
                                     missingRanges.add(i, end, innerRangeEnd);
                                 else {
                                     removeIndexOfStartTuple=-1;
                                     missingRanges.set(i, rangeStart, start);
                                 }
-                            } else
-                                missingRanges.fastRemoveIndex(i);
+                            }
                             break;
                         } else {
                             missingRanges.fastRemoveIndex(i); //remove all intermediate ranges (because they are between start and end)

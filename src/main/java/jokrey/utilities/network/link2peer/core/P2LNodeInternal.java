@@ -3,6 +3,7 @@ package jokrey.utilities.network.link2peer.core;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
+import jokrey.utilities.network.link2peer.core.stream.P2LOutputStream;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 

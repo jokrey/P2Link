@@ -21,59 +21,74 @@ public class SyncHelp {
      * @return false if a timeout occurred, true if the condition holds (note: on returned false the condition may now hold[race condition])
      * @throws InterruptedException
      */
-    public static boolean waitUntil(Object monitor, Supplier<Boolean> condition, long timeout_ms) throws InterruptedException {
-        long waitingSince = System.currentTimeMillis();
-        long elapsed_ms = 0;
-        synchronized (monitor) {
-            while (! condition.get()) {
-                monitor.wait(timeout_ms == ENDLESS_WAIT ? ENDLESS_WAIT : timeout_ms - elapsed_ms);
-                elapsed_ms = System.currentTimeMillis() - waitingSince;
-                if (timeout_ms != ENDLESS_WAIT && elapsed_ms >= timeout_ms) { //waiting for timeout without rechecking whether it has actually timed out is not possible - wait(timeout) is not guaranteed to sleep until timeout
-                    return false;
+    public static boolean waitUntil(Object monitor, Supplier<Boolean> condition, long timeout_ms) {
+        if(condition.get()) return true;
+        try {
+            long waitingSince = System.currentTimeMillis();
+            long elapsed_ms = 0;
+            synchronized (monitor) {
+                while (!condition.get()) {
+                    monitor.wait(timeout_ms == ENDLESS_WAIT ? ENDLESS_WAIT : timeout_ms - elapsed_ms);
+                    elapsed_ms = System.currentTimeMillis() - waitingSince;
+                    if (timeout_ms != ENDLESS_WAIT && elapsed_ms >= timeout_ms) { //waiting for timeout without rechecking whether it has actually timed out is not possible - wait(timeout) is not guaranteed to sleep until timeout
+                        return false;
+                    }
                 }
             }
+            return true;
+        } catch (InterruptedException e) {
+            return false;
         }
-        return true;
     }
-    public static boolean waitUntil(Object monitor, Supplier<Boolean> condition, long timeout_ms, Runnable intermediateAction, long intermediateEvery) throws InterruptedException {
-        long waitingSince = System.currentTimeMillis();
-        long elapsed_ms = 0;
-        synchronized (monitor) {
-            boolean conditionResult = condition.get();
-            while (! conditionResult) {
-                monitor.wait(timeout_ms == ENDLESS_WAIT ? intermediateEvery : Math.min(timeout_ms-elapsed_ms, intermediateEvery));
-                elapsed_ms = System.currentTimeMillis() - waitingSince;
-                if (timeout_ms != ENDLESS_WAIT && elapsed_ms >= timeout_ms)  //waiting for timeout without rechecking whether it has actually timed out is not possible - wait(timeout) is not guaranteed to sleep until timeout
-                    return false;
+    public static boolean waitUntil(Object monitor, Supplier<Boolean> condition, long timeout_ms, Runnable intermediateAction, long intermediateEvery) {
+        if(condition.get()) return true;
+        try {
+            long waitingSince = System.currentTimeMillis();
+            long elapsed_ms = 0;
+            synchronized (monitor) {
+                boolean conditionResult = condition.get();
+                while (! conditionResult) {
+                    monitor.wait(timeout_ms == ENDLESS_WAIT ? intermediateEvery : Math.min(timeout_ms-elapsed_ms, intermediateEvery));
+                    elapsed_ms = System.currentTimeMillis() - waitingSince;
+                    if (timeout_ms != ENDLESS_WAIT && elapsed_ms >= timeout_ms)  //waiting for timeout without rechecking whether it has actually timed out is not possible - wait(timeout) is not guaranteed to sleep until timeout
+                        return false;
 
-                conditionResult = condition.get();
-                if(conditionResult)
-                    return true;
-                intermediateAction.run();
+                    conditionResult = condition.get();
+                    if(conditionResult)
+                        return true;
+                    intermediateAction.run();
+                }
             }
+            return true;
+        } catch (InterruptedException e) {
+            return false;
         }
-        return true;
     }
-    public static boolean waitUntilOrThrowIO(Object monitor, Supplier<Boolean> condition, long timeout_ms, IOAction intermediateAction, long intermediateEvery) throws IOException, InterruptedException {
-        if(intermediateEvery<=0) throw new IllegalArgumentException();
+    public static boolean waitUntilOrThrowIO(Object monitor, Supplier<Boolean> condition, long timeout_ms, IOAction intermediateAction, long intermediateEvery) throws IOException {
+        if(condition.get()) return true;
+        try {
+            if(intermediateEvery<=0) throw new IllegalArgumentException();
 
-        long waitingSince = System.currentTimeMillis();
-        long elapsed_ms = 0;
-        synchronized (monitor) {
-            boolean conditionResult = condition.get();
-            while (! conditionResult) {
-                monitor.wait(timeout_ms == ENDLESS_WAIT ? intermediateEvery : Math.min(timeout_ms-elapsed_ms, intermediateEvery));
-                elapsed_ms = System.currentTimeMillis() - waitingSince;
-                if (timeout_ms != ENDLESS_WAIT && elapsed_ms >= timeout_ms)  //waiting for timeout without rechecking whether it has actually timed out is not possible - wait(timeout) is not guaranteed to sleep until timeout
-                    return false;
+            long waitingSince = System.currentTimeMillis();
+            long elapsed_ms = 0;
+            synchronized (monitor) {
+                boolean conditionResult = condition.get();
+                while (! conditionResult) {
+                    monitor.wait(timeout_ms == ENDLESS_WAIT ? intermediateEvery : Math.min(timeout_ms-elapsed_ms, intermediateEvery));
+                    elapsed_ms = System.currentTimeMillis() - waitingSince;
+                    if (timeout_ms != ENDLESS_WAIT && elapsed_ms >= timeout_ms)  //waiting for timeout without rechecking whether it has actually timed out is not possible - wait(timeout) is not guaranteed to sleep until timeout
+                        return false;
 
-                conditionResult = condition.get();
-                if(conditionResult)
-                    return true;
-                intermediateAction.run();
+                    conditionResult = condition.get();
+                    if(conditionResult)
+                        return true;
+                    intermediateAction.run();
+                }
             }
+            return true;
+        } catch (InterruptedException e) {
+            return false;
         }
-        return true;
     }
     public interface IOAction {
         void run() throws IOException;

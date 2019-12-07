@@ -14,7 +14,7 @@ import java.net.SocketAddress;
  *
  * @author jokrey
  */
-interface P2LInputStream extends AutoCloseable {
+public interface P2LInputStream extends AutoCloseable {
     /** Internally used to propagate appropriate raw messages to the stream */
     void received(P2LMessage message);
 

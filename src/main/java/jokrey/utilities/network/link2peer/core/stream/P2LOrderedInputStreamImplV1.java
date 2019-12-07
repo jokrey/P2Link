@@ -17,12 +17,12 @@ import java.util.LinkedList;
  * FIXME GENERAL DOWNSIDE COMPARED TO TCP:
  *    MTP IS LIMITED by custom max raw size of a message (for each incoming udp message a buffer must be reserved - that buffer should be as small as possible)
  *    currently this is defaulted at 8192 - tcp can set this buffer to the max ip package size...
- *    in a distributed environment mtp is naturally limited by other factors, but localhost this is a huge performance decrease
+ *    in a distributed environment mtp is naturally limited by other factors, but localhost this is a huge performance decrease 'out of the box'
  *
  * @author jokrey
  */
-class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
-    P2LOrderedInputStreamImplV1(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
+public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
+    public P2LOrderedInputStreamImplV1(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
         super(parent, to, type, conversationId);
     }
 
@@ -135,58 +135,50 @@ class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
     }
 
     @Override public synchronized int read(int timeout_ms) throws IOException {
-        try {
-            boolean success = SyncHelp.waitUntil(this, () -> available!=0 || eofReached(), timeout_ms);
-            if(!success) throw new IOException("timeout");
-            if(eofReached() && available==0) return -1;
-            if(available==-1) throw new IOException("stream was closed using close");
+        boolean success = SyncHelp.waitUntil(this, () -> available!=0 || eofReached(), timeout_ms);
+        if(!success) throw new IOException("timeout");
+        if(eofReached() && available==0) return -1;
+        if(available==-1) throw new IOException("stream was closed using close");
 
-            SubBytesStorage unreadDataChunk = unconsumedChunksQueue.getFirst();
-            byte singleByteOfData = unreadDataChunk.getFirst();
-            unreadDataChunk.startIndexAdd(1);
-            available--;
-            if(unreadDataChunk.isEmpty())
-                unconsumedChunksQueue.removeFirst();
-            return singleByteOfData & 0xff; // & 0xff for conversion to 0-255 byte as int
-        } catch (InterruptedException e) {
-            throw new IOException("internal wait interrupted");
-        }
+        SubBytesStorage unreadDataChunk = unconsumedChunksQueue.getFirst();
+        byte singleByteOfData = unreadDataChunk.getFirst();
+        unreadDataChunk.startIndexAdd(1);
+        available--;
+        if(unreadDataChunk.isEmpty())
+            unconsumedChunksQueue.removeFirst();
+        return singleByteOfData & 0xff; // & 0xff for conversion to 0-255 byte as int
     }
     @Override public synchronized int read(byte[] b, int off, int len, int timeout_ms) throws IOException {
         if(b == null) throw new NullPointerException("b == null");
         if(off<0 || off+len>b.length || len < 0) throw new ArrayIndexOutOfBoundsException();
-        try {
-            boolean success = SyncHelp.waitUntil(this, () -> available!=0 || eofReached(), timeout_ms);
-            if(!success) throw new IOException("timeout");
-            if(eofReached() && available==0) return -1;
-            if(available==-1) throw new IOException("stream was closed using close");
+        boolean success = SyncHelp.waitUntil(this, () -> available!=0 || eofReached(), timeout_ms);
+        if(!success) throw new IOException("timeout");
+        if(eofReached() && available==0) return -1;
+        if(available==-1) throw new IOException("stream was closed using close");
 
-            SubBytesStorage unreadDataChunk = unconsumedChunksQueue.getFirst();
+        SubBytesStorage unreadDataChunk = unconsumedChunksQueue.getFirst();
 
-            int numRead = 0;
-            while(available>0 && numRead<len) {
-                int leftToRead = len-numRead;
-                int remainingInChunk = (int) unreadDataChunk.contentSize();
+        int numRead = 0;
+        while(available>0 && numRead<len) {
+            int leftToRead = len-numRead;
+            int remainingInChunk = (int) unreadDataChunk.contentSize();
 
-                int numberOfBytesToCopy = Math.min(leftToRead, remainingInChunk);
+            int numberOfBytesToCopy = Math.min(leftToRead, remainingInChunk);
 
-                unreadDataChunk.copyInto(b, off+numRead, numberOfBytesToCopy);
-                unreadDataChunk.startIndexAdd(numberOfBytesToCopy);
-                numRead+=numberOfBytesToCopy;
-                available-=numberOfBytesToCopy;
+            unreadDataChunk.copyInto(b, off+numRead, numberOfBytesToCopy);
+            unreadDataChunk.startIndexAdd(numberOfBytesToCopy);
+            numRead+=numberOfBytesToCopy;
+            available-=numberOfBytesToCopy;
 
-                if(unreadDataChunk.isEmpty()) {
-                    unconsumedChunksQueue.removeFirst();
-                    unreadDataChunk = unconsumedChunksQueue.peekFirst();
-                    //NO NEED TO CHECK IF UNREAD DATA CHUNK IS NULL AND BREAK ACCORDINGLY - available SHOULD BE EXACTLY 0 THEN - OTHERWISE WE HAVE A LARGER ISSUE
-                }
+            if(unreadDataChunk.isEmpty()) {
+                unconsumedChunksQueue.removeFirst();
+                unreadDataChunk = unconsumedChunksQueue.peekFirst();
+                //NO NEED TO CHECK IF UNREAD DATA CHUNK IS NULL AND BREAK ACCORDINGLY - available SHOULD BE EXACTLY 0 THEN - OTHERWISE WE HAVE A LARGER ISSUE
             }
-            if(available<0) throw new IllegalStateException("available cannot go under 0 without a bug");
-
-            return numRead; // & 0xff for conversion to 0-255 byte as int
-        } catch (InterruptedException e) {
-            throw new IOException("internal wait interrupted");
         }
+        if(available<0) throw new IllegalStateException("available cannot go under 0 without a bug");
+
+        return numRead; // & 0xff for conversion to 0-255 byte as int
     }
     @Override public long skip(long n) throws IOException {
         System.err.println("todo optimized skip in which unreceived intermediate packages are ignored and not waited upon");

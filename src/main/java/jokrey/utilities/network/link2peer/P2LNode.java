@@ -2,12 +2,8 @@ package jokrey.utilities.network.link2peer;
 
 import jokrey.utilities.network.link2peer.core.NodeCreator;
 import jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes;
-import jokrey.utilities.network.link2peer.core.stream.P2LFragmentInputStream;
-import jokrey.utilities.network.link2peer.core.stream.P2LFragmentOutputStream;
-import jokrey.utilities.network.link2peer.core.stream.P2LOrderedInputStream;
-import jokrey.utilities.network.link2peer.core.stream.P2LOrderedOutputStream;
+import jokrey.utilities.network.link2peer.core.stream.*;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
-import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -325,6 +321,8 @@ public interface P2LNode {
     default P2LOrderedInputStream createInputStream(P2Link from, int messageType, int conversationId) {
         return createInputStream(from.getSocketAddress(), messageType, conversationId);
     }
+    boolean registerCustomInputStream(SocketAddress from, int messageType, int conversationId, P2LInputStream inputStream);
+    boolean registerCustomOutputStream(SocketAddress to, int messageType, int conversationId, P2LOutputStream outputStream);
 
     /**
      * Returns the stream for the given identifier. It is possible to have up to (2^31-1) * (2^31-1) streams from a single source (todo this is absolutely idiotic - who would EVER need THAT many different streams)
@@ -348,16 +346,16 @@ public interface P2LNode {
     }
 
     /**@see #createInputStream(SocketAddress, int, int)*/
-    P2LFragmentInputStream createFragmentInputStream(SocketAddress from, TransparentBytesStorage target, int messageType, int conversationId);
+    P2LFragmentInputStream createFragmentInputStream(SocketAddress from, int messageType, int conversationId);
     /**@see #createInputStream(SocketAddress, int, int)*/
-    default P2LFragmentInputStream createFragmentInputStream(P2Link from, TransparentBytesStorage target, int messageType, int conversationId) {
-        return createFragmentInputStream(from.getSocketAddress(), target, messageType, conversationId);
+    default P2LFragmentInputStream createFragmentInputStream(P2Link from, int messageType, int conversationId) {
+        return createFragmentInputStream(from.getSocketAddress(), messageType, conversationId);
     }
     /**@see #createOutputStream(SocketAddress, int, int)*/
-    P2LFragmentOutputStream createFragmentOutputStream(SocketAddress to, TransparentBytesStorage source, int messageType, int conversationId);
+    P2LFragmentOutputStream createFragmentOutputStream(SocketAddress to, int messageType, int conversationId);
     /**@see #createOutputStream(SocketAddress, int, int)*/
-    default P2LFragmentOutputStream createFragmentOutputStream(P2Link to, TransparentBytesStorage source, int messageType, int conversationId) {
-        return createFragmentOutputStream(to.getSocketAddress(), source, messageType, conversationId);
+    default P2LFragmentOutputStream createFragmentOutputStream(P2Link to, int messageType, int conversationId) {
+        return createFragmentOutputStream(to.getSocketAddress(), messageType, conversationId);
     }
 
     /**

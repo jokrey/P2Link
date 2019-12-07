@@ -106,14 +106,9 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
     }
 
     @Override public synchronized boolean waitForConfirmationOnAll(int timeout_ms) throws IOException {
-        try {
-            sendExtraordinaryReceiptRequest();
+        sendExtraordinaryReceiptRequest();
 
-            SyncHelp.waitUntilOrThrowIO(this, () -> !hasUnconfirmedParts(), timeout_ms, this::sendExtraordinaryReceiptRequest, P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS);
-            return true;
-        } catch (InterruptedException e) {
-            throw new IOException(e);
-        }
+        return SyncHelp.waitUntilOrThrowIO(this, () -> !hasUnconfirmedParts(), timeout_ms, this::sendExtraordinaryReceiptRequest, P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS);
     }
     private long lastReceiptRequest = 0;
     private boolean requestRecentlyMade() {
@@ -134,12 +129,8 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
         return latestAttemptedIndex+1 < earliestUnconfirmedPartIndex+unconfirmedSendPackages.length;
     }
     private synchronized void waitForBufferCapacities(int timeout_ms) throws IOException {
-        try {
-            sendExtraordinaryReceiptRequest();
-            SyncHelp.waitUntilOrThrowIO(this, this::hasBufferCapacities, timeout_ms, this::sendExtraordinaryReceiptRequest, P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS);
-        } catch (InterruptedException e) {
-            throw new IOException(e);
-        }
+        sendExtraordinaryReceiptRequest();
+        SyncHelp.waitUntilOrThrowIO(this, this::hasBufferCapacities, timeout_ms, this::sendExtraordinaryReceiptRequest, P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS);
     }
 
     private synchronized void packAndSend(boolean forceRequestReceipt) throws IOException {

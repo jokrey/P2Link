@@ -13,7 +13,7 @@ public class BatchSizeCalculator_DynamicBMS extends BatchSizeCalculator {
     private int bs_last = bs;
     public BatchSizeCalculator_DynamicBMS(P2LConnection connection, int initialBs) {
         super(connection);
-        bs = Math.max(connection.fragmentStreamVar, initialBs);
+        bs = Math.max(connection==null?16:connection.fragmentStreamVar, initialBs);
         bs = initialBs;
     }
 

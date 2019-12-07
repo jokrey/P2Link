@@ -16,7 +16,7 @@ public class BatchSizeCalculator_StrikeDown extends BatchSizeCalculator {
     private int lastBsWithoutLoss;
     public BatchSizeCalculator_StrikeDown(P2LConnection connection, int initialBs, int min_bs, int step_length) {
         super(connection);
-        if(connection.fragmentStreamVar < min_bs)
+        if(connection==null || connection.fragmentStreamVar < min_bs)
             bs = initialBs;
         else
             bs = connection.fragmentStreamVar;
@@ -32,7 +32,7 @@ public class BatchSizeCalculator_StrikeDown extends BatchSizeCalculator {
     @Override public void adjustBatchSize(LossResult lossResult) {
         switch (lossResult) {
             case NO_LOSS:
-                connection.fragmentStreamVar = bs;
+                if(connection!=null) connection.fragmentStreamVar = bs;
                 lastBsWithoutLoss = bs;
                 bs += step_length;
                 break;

@@ -1,6 +1,5 @@
 package jokrey.utilities.network.link2peer.core.stream;
 
-import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
 
 import java.io.IOException;
