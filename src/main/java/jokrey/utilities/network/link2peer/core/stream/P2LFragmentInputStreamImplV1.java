@@ -1,12 +1,12 @@
 package jokrey.utilities.network.link2peer.core.stream;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.core.DebugStats;
 import jokrey.utilities.network.link2peer.core.P2LConnection;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.core.message_headers.StreamReceiptHeader;
 import jokrey.utilities.network.link2peer.util.LongTupleList;
 import jokrey.utilities.network.link2peer.util.SyncHelp;
-import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -18,9 +18,6 @@ import static jokrey.utilities.network.link2peer.core.stream.P2LFragmentOutputSt
  * @author jokrey
  */
 public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
-    public static int doubleReceived = 0;
-    public static int validReceived = 0;
-
     private int receiptPackageMaxSize;
     long receipt_delay_ms;
     protected P2LFragmentInputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId) {
@@ -46,6 +43,7 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
     private int receiptID = 0;
     //todo - synchronization might be bad, and not strictly required
     //    however there is a race condition where fireReceived does not complete, but the output stream already receives a receipt that it has completed - that might not matter in reality, but can screw up a check
+    //    this does entail that if fireReceived takes a long time to complete(like 10-100ms), the entire performance will drop very significantly, since many packages can only be handled late since they all wait at the sync barrier (and the algorithm is largely based on time)
     @Override public synchronized void received(P2LMessage message) {
         try {
             if(forceClosedByThis) {
@@ -53,33 +51,41 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
                 return;
             }
 
+            boolean thisMessageWasTheOneThatToldUsItWasFinallyOver = message.header.isStreamEof() && eofAt==-1;
+
             long startOffset = message.header.getPartIndex();
             long endOffset = startOffset + message.getPayloadLength();
 
             boolean wasMissing = markReceived(startOffset, endOffset);
             if (wasMissing) {
-                fireReceived(message.header.getPartIndex(), message.content, message.header.getSize(), message.getPayloadLength());
-                validReceived++;
+                if(thisMessageWasTheOneThatToldUsItWasFinallyOver) {
+                    fireReceived(message.header.getPartIndex(), message.content, message.header.getSize(), message.getPayloadLength(), true);
+                    eofAt = endOffset;
+                } else
+                    fireReceived(message.header.getPartIndex(), message.content, message.header.getSize(), message.getPayloadLength(), false);
+                DebugStats.fragmentStream1_validReceived.getAndIncrement();
             } else {
-                doubleReceived++;
+                DebugStats.fragmentStream1_doubleReceived.getAndIncrement();
             }
-    //        System.err.println("wasMissing = " + wasMissing);
+//            System.err.println("wasMissing = " + wasMissing);
 
-            if(message.header.isStreamEof())
+            if(thisMessageWasTheOneThatToldUsItWasFinallyOver) {
                 eofAt = endOffset;
+                fireReceived(endOffset, new byte[0], 0, 0, true);
+            }
+//            System.err.println("eof = " + eofAt);
             if(isFullyReceived())
                 SyncHelp.notify(this);
 
             numPackagesReceivedInLastBatch++;
 
             long elapsedSinceLastReceipt = System.currentTimeMillis() - lastReceiptSendAt;
-    //        System.out.println("isFullyReceived() = " + isFullyReceived());
-    //        System.out.println("received = [" + startOffset+", "+endOffset+"]");
-    //        System.out.println("missingRanges = " + missingRanges);
+//            System.out.println("isFullyReceived() = " + isFullyReceived());
+//            System.out.println("received = [" + startOffset+", "+endOffset+"]");
             if(elapsedSinceLastReceipt > receipt_delay_ms ||
                 ((isFullyReceived() || message.header.isStreamEof()) && wasMissing) ||
-                message.header.requestReceipt()) {
-                System.out.println("SEND RECEIPT("+receiptPackageMaxSize+", "+P2LMessage.CUSTOM_RAW_SIZE_LIMIT+") receipt.latestReceived = " + highestEndReceived+", receipt.missingRanges("+missingRanges.size()+") = " + missingRanges);
+                message.header.requestReceipt() ||
+                thisMessageWasTheOneThatToldUsItWasFinallyOver) {
                 sendReceipt(receiptPackageMaxSize);
                 lastReceiptSendAt = System.currentTimeMillis();
                 numPackagesReceivedInLastBatch=0;
@@ -98,13 +104,17 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
 
     private boolean forceClosedByThis = false;
     @Override public void close() throws IOException {
-//        waitForAllReceived(0);
-        forceClosedByThis =true;
-        sendReceipt(1024);//curtsy
+        if(!isClosed()) {
+            forceClosedByThis=true;
+            sendReceipt(1024);//curtsy
+        } else
+            forceClosedByThis=true;
+        parent.unregister(this);
     }
 
-    private void sendReceipt(int receiptPackageMaxSize) throws IOException {
-        parent.sendInternalMessage(P2LFragmentStreamReceipt.encode(type, conversationId, isClosed(), (int) highestEndReceived, missingRanges, receiptID++, receiptPackageMaxSize), to);
+    private synchronized void sendReceipt(int receiptPackageMaxSize) throws IOException {
+        System.out.println("SEND RECEIPT("+receiptPackageMaxSize+", "+P2LMessage.CUSTOM_RAW_SIZE_LIMIT+") receipt.latestReceived = " + highestEndReceived+", receipt.missingRanges("+missingRanges.size()+") = " + missingRanges);
+        parent.sendInternalMessage(P2LFragmentStreamReceipt.encode(type, conversationId, isClosed(), (int) highestEndReceived, missingRanges, receiptID++, receiptPackageMaxSize), from);
     }
 
     @Override public boolean isClosed() {
@@ -114,78 +124,15 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
 
 
     private synchronized boolean markReceived(long start, long end) {
-        if(start == end) return true;
-//        System.err.println("markReceived - start = " + start + ", " + end);
-//        System.err.println("missingRanges before = " + missingRanges);
+//        System.err.println("B - missingRanges(highRecv:"+highestEndReceived+") before("+start + ", " + end+") = " + missingRanges);
 //        try {
-        if (start >= highestEndReceived) {
-            if (start > highestEndReceived)
-                missingRanges.add(highestEndReceived, start);
-            highestEndReceived = end;
+            long newHighestEndReceived = markReceived(highestEndReceived, missingRanges, start, end);
+            if(newHighestEndReceived == -1)
+                return false;
+            highestEndReceived = newHighestEndReceived;
             return true;
-        } else if (end >= highestEndReceived) {
-            highestEndReceived = end;
-            return true;
-        } else {
-            for (int i=0; i < missingRanges.size(); i++) {
-                long rangeStart = missingRanges.get0(i);
-                long rangeEnd = missingRanges.get1(i);
-                if (start >= rangeStart && end <= rangeEnd) {
-                    if(start == rangeStart && end == rangeEnd)
-                        missingRanges.fastRemoveIndex(i);
-                    else if (start > rangeStart && end < rangeEnd) {//the following is done to preserve order, to make the algorithm in the else-if simple
-                        missingRanges.set(i, end, rangeEnd);
-                        missingRanges.add(i, rangeStart, start);
-                    } else if (start > rangeStart)
-                        missingRanges.set(i, rangeStart, start);
-                    else if (end < rangeEnd)
-                        missingRanges.set(i, end, rangeEnd);
-                    return true;
-                } else if (start >= rangeStart && start < rangeEnd) {
-                    //start in, but end out of range
-
-                    int removeIndexOfStartTuple = -1;
-                    if (start > rangeStart)
-                        missingRanges.set(i, rangeStart, start);
-                    else
-                        removeIndexOfStartTuple=i;
-
-                    i++;
-                    for (; i < missingRanges.size();i++) {
-                        long innerRangeStart = missingRanges.get0(i);
-                        long innerRangeEnd = missingRanges.get1(i);
-
-                        if (end >= innerRangeStart && end <= innerRangeEnd) {
-                            //end in, but start out of range
-                            if (end == innerRangeEnd) {
-                                missingRanges.fastRemoveIndex(i);
-                            } else if(end == innerRangeStart) {
-
-                            } else if(end < innerRangeEnd) {
-                                if(removeIndexOfStartTuple==-1)
-                                    missingRanges.add(i, end, innerRangeEnd);
-                                else {
-                                    removeIndexOfStartTuple=-1;
-                                    missingRanges.set(i, rangeStart, start);
-                                }
-                            }
-                            break;
-                        } else {
-                            missingRanges.fastRemoveIndex(i); //remove all intermediate ranges (because they are between start and end)
-                        }
-                    }
-
-                    if(removeIndexOfStartTuple!=-1)
-                        missingRanges.fastRemoveIndex(removeIndexOfStartTuple);
-
-                    return true;
-                }
-            }
-            return false;
-        }
 //        } finally {
-//            System.err.println("missingRanges after = " + missingRanges);
-//            System.err.println("highestEndReceived: "+highestEndReceived);
+//            System.err.println("A - missingRanges(highRecv:"+highestEndReceived+") after("+start + ", " + end+") = " + missingRanges);
 //            long lastEnd = 0;
 //            for (int i=0; i < missingRanges.size(); i++) {
 //                long rangeStart = missingRanges.get0(i);
@@ -195,5 +142,71 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
 //                lastEnd = rangeEnd;
 //            }
 //        }
+    }
+
+
+
+
+
+    public static long markReceived(long highestEndReceived, LongTupleList missingRanges, long start, long end) {
+        if(start == end) {
+            System.err.println("FUCK! start == end == "+start);
+            return -1;
+        }
+        if (start >= highestEndReceived) {
+            if (start > highestEndReceived)
+                missingRanges.add(highestEndReceived, start);
+            return end;
+//        } else if (end >= highestEndReceived) {
+//            return end;
+        } else {
+            boolean anyMissingFound = false;
+            for (int i=0; i < missingRanges.size(); i++) {
+                long rangeStart = missingRanges.get0(i);
+                long rangeEnd = missingRanges.get1(i);
+                if(rangeStart < start && rangeEnd < start)
+                    break;//because missing ranges have a guaranteed order...
+                else if((rangeStart > end && rangeEnd > end))
+                    continue; //ranges do not touch
+                else {
+                    if (start == rangeStart && end == rangeEnd) {
+                        //received is exactly the missing range...
+                        missingRanges.fastRemoveIndex(i);
+                        return highestEndReceived; //no further ranges can possibly touch the received range
+                    } else if (start >= rangeStart && end <= rangeEnd) {
+                        //received is entirely contained
+                        if(end != rangeEnd && rangeStart != start) {
+                            missingRanges.set(i, end, rangeEnd); //done to preserve order
+                            missingRanges.add(i, rangeStart, start); //done to preserve order
+                        } else if(end != rangeEnd)
+                            missingRanges.set(i, end, rangeEnd); //done to preserve order
+                        else if (rangeStart != start)
+                            missingRanges.set(i, rangeStart, start); //done to preserve order
+                        return highestEndReceived; //no further ranges can possibly touch the received range
+                    } else if (start >= rangeStart && start < rangeEnd && end > rangeEnd) {
+                        //missing range contains start, but not end
+                        if (start == rangeStart)
+                            missingRanges.fastRemoveIndex(i --);
+                        else if (start > rangeStart)
+                            missingRanges.set(i, rangeStart, start);
+                        anyMissingFound=true;
+                    } else if (start < rangeStart && end > rangeEnd) {
+                        //entire missing range is contained
+                        missingRanges.fastRemoveIndex(i --);
+                        anyMissingFound=true;
+                    } else if (start <= rangeStart && end > rangeStart) {
+                        //newly received contains range start, but not range end
+                        missingRanges.set(i, end, rangeEnd);
+                        anyMissingFound=true;
+                    } else {
+                        throw new UnsupportedOperationException("missing handling for: missing:{"+rangeStart+", "+rangeEnd+"} - new:{"+start+", "+end+"}");
+                    }
+                }
+            }
+
+            if(end > highestEndReceived) return end;
+            else if(anyMissingFound) return highestEndReceived;
+            else return -1;
+        }
     }
 }

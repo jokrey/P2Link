@@ -10,7 +10,6 @@ import jokrey.utilities.network.link2peer.core.message_headers.MinimalHeader;
 import jokrey.utilities.network.link2peer.core.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.core.message_headers.ReceiptHeader;
 import jokrey.utilities.network.link2peer.util.Hash;
-import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 import jokrey.utilities.transparent_storage.bytes.wrapper.SubBytesStorage;
 
@@ -22,7 +21,6 @@ import java.util.Collection;
 import java.util.Iterator;
 
 import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.isInternalMessageId;
-import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
 
 /**
  * A message always has a sender and data. What actual data is transported is naturally arbitrary.

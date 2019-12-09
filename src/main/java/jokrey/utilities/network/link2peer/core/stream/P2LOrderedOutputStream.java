@@ -28,6 +28,9 @@ public abstract class P2LOrderedOutputStream extends OutputStream implements P2L
         this.type = type;
         this.conversationId = conversationId;
     }
+    @Override public SocketAddress getRawFrom() { return to; }
+    @Override public int getType() { return type; }
+    @Override public int getConversationId() { return conversationId; }
 
     /**
      * Writes a single byte of data. This method is non blocking.

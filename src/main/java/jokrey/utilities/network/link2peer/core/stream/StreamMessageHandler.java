@@ -72,4 +72,12 @@ public class StreamMessageHandler {
         HeaderIdentifier identifier = new SenderTypeConversationIdentifier(from, type, conversationId);
         return outputStreams.putIfAbsent(identifier, outputStream) == null;
     }
+
+    public void unregister(P2LOutputStream stream) {
+        outputStreams.remove(new SenderTypeConversationIdentifier(stream.getRawFrom(), stream.getType(), stream.getConversationId()));
+    }
+    /** TODO -  Problem: if unregister is instantly called on close - if the close receipt fails the output stream may never know it had success. */
+    public void unregister(P2LInputStream stream) {
+        inputStreams.remove(new SenderTypeConversationIdentifier(stream.getRawFrom(), stream.getType(), stream.getConversationId()));
+    }
 }

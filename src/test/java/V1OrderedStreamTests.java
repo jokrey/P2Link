@@ -1,9 +1,14 @@
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
+import jokrey.utilities.network.link2peer.core.DebugStats;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
 import jokrey.utilities.network.link2peer.core.stream.P2LOrderedInputStreamImplV1;
+import jokrey.utilities.network.link2peer.core.stream.P2LOrderedOutputStreamImplV1;
+import jokrey.utilities.network.link2peer.util.P2LFuture;
+import jokrey.utilities.network.link2peer.util.P2LThreadPool;
+import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
@@ -12,13 +17,65 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
+import static jokrey.utilities.network.link2peer.P2LMessage.MAX_UDP_PACKET_SIZE;
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * @author jokrey
  */
 public class V1OrderedStreamTests {
+    @Test void streamTest_inOut_largeArray_usageAsIntended() throws IOException {
+        DebugStats.reset();
+
+//        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4096;
+        int oldLimit = P2LMessage.CUSTOM_RAW_SIZE_LIMIT;
+        P2LMessage.CUSTOM_RAW_SIZE_LIMIT = MAX_UDP_PACKET_SIZE;
+//        P2LMessage.CUSTOM_RAW_SIZE_LIMIT = 8192*2;
+//        P2LMessage.CUSTOM_RAW_SIZE_LIMIT = 8192;
+//        P2LMessage.CUSTOM_RAW_SIZE_LIMIT = 4096;
+        P2LNode[] nodes = IntermediateTests.generateNodes(2, 62880);
+
+        boolean successConnect = nodes[0].establishConnection(nodes[1].getSelfLink()).get(1000); //TODO TOO SLOW FOR SOME VERY COMPLEX REASON
+        assertTrue(successConnect);
+
+        P2LOrderedInputStreamImplV1 in = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().getSocketAddress(), 5, 0);
+        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().getSocketAddress(), 5, P2LNode.NO_CONVERSATION_ID, in);
+        P2LOrderedOutputStreamImplV1 out = new P2LOrderedOutputStreamImplV1((P2LNodeInternal) nodes[1], nodes[0].getSelfLink().getSocketAddress(), P2LMessage.CUSTOM_RAW_SIZE_LIMIT, 5, 0);
+        nodes[1].registerCustomOutputStream(nodes[0].getSelfLink().getSocketAddress(), 5, P2LNode.NO_CONVERSATION_ID, out);
+
+//        byte[] toSend = new byte[10_000];//10kb
+        byte[] toSend = new byte[100_000_000];//100mb
+        ThreadLocalRandom.current().nextBytes(toSend);
+
+        P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
+            out.write(toSend);
+            out.close();
+            System.out.println("end send task");
+        });
+        System.out.println("1");
+
+        ByteArrayStorage store = new ByteArrayStorage();
+        System.out.println("2");
+        store.set(0, in, toSend.length);
+        System.out.println("3");
+
+        assertArrayEquals(toSend, store.getContent());
+
+        System.out.println("before send task");
+        sendTask.waitForIt();
+        System.out.println("after send task");
+
+        IntermediateTests.close(nodes);
+
+        P2LMessage.CUSTOM_RAW_SIZE_LIMIT = oldLimit;
+//        P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE=128;
+
+        DebugStats.printAndReset();
+    }
 
     @Test void streamTest_orderGuaranteed() throws IOException {
         P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;

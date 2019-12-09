@@ -1,10 +1,10 @@
 package jokrey.utilities.network.link2peer.core.stream;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.core.DebugStats;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.util.SyncHelp;
-import jokrey.utilities.network.link2peer.util.TimeoutException;
 import jokrey.utilities.transparent_storage.bytes.wrapper.SubBytesStorage;
 
 import java.io.IOException;
@@ -52,6 +52,8 @@ public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
         latestIndexReceived = Math.max(latestIndexReceived, m_index_received);
 
         if(m_index_received == earliestIndexMissing) {//jackpot - this is what we have been waiting for
+            DebugStats.orderedStream1_validReceived.getAndIncrement();
+
             if(!unreadDataChunk.isEmpty()) {
                 unconsumedChunksQueue.addLast(unreadDataChunk);
                 available += unreadDataChunk.contentSize();
@@ -70,7 +72,7 @@ public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
             int shiftBy = index + 1;
             if(shiftBy>unqueuedChunks.length) shiftBy = unqueuedChunks.length; //todo this line feels weird
             //   not_todo: only recopy if it is full - i.e. keep an additional internal index and use that (index+internalOff, unqueuedIndex+internalOff)
-            System.arraycopy(unqueuedChunks, shiftBy, unqueuedChunks, 0, unqueuedChunks.length - shiftBy);//no rotate required, new packages always have new pointers
+            System.arraycopy(unqueuedChunks, shiftBy, unqueuedChunks, 0, unqueuedChunks.length - shiftBy);//no rotate required, new packages always have new pointer
             for(int i=unqueuedChunks.length-shiftBy;i<unqueuedChunks.length;i++)
                 unqueuedChunks[i]=null;
 
@@ -84,6 +86,7 @@ public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
             if(!message.header.requestReceipt())//first things first, when the sender requests a receipt - that means that the sender buffer is full - we should send them a receipt of what we have and do not have immediately
                 throw new IllegalStateException("message had negative index, but was not requesting receipt");
         } else if(m_index_received < earliestIndexMissing) {
+            DebugStats.orderedStream1_doubleReceived.getAndIncrement();
             //delayed package RE-received... ignore it - data is already available
         } else if(m_index_received >= earliestIndexMissing+1 + unqueuedChunks.length) {
             //sender is sending more packages than can be handled by this buffer - send a receipt that indicates the earliest missing package, so that the sender can resend it
@@ -91,6 +94,10 @@ public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
             sendReceipt();
         } else {
             int unqueuedIndex = (m_index_received - earliestIndexMissing)-1; //min should be 0
+            if(unqueuedChunks[unqueuedIndex] != null)
+                DebugStats.orderedStream1_doubleReceived.getAndIncrement();
+            else
+                DebugStats.orderedStream1_validReceived.getAndIncrement();
             unqueuedChunks[unqueuedIndex] = unreadDataChunk;
 
             if(unqueuedIndex == unqueuedChunks.length-unqueuedChunks.length/3) //if buffer 66.6% filled up, send extraordinary receipt
@@ -118,7 +125,7 @@ public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
 
         boolean eof = isClosed() || eofReached();
         try {
-            parent.sendInternalMessage(P2LOrderedStreamReceipt.encode(type, conversationId, eof, latestIndexReceived, getMissingPartIndices()), to);
+            parent.sendInternalMessage(P2LOrderedStreamReceipt.encode(type, conversationId, eof, latestIndexReceived, getMissingPartIndices()), from);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -185,11 +192,13 @@ public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
         return super.skip(n);  //todo highly optimized skip, potentially with informing the other stream of the intention, by sending a receipt with a sufficiently high confirmation id (though bytes are not transferable to parts....)
     }
     @Override public synchronized void close() {
+        if(isClosed()) return;
         if(unconsumedChunksQueue !=null) unconsumedChunksQueue.clear();
         unconsumedChunksQueue = null;
         available = -1;
-        notify();
         sendReceipt();
+        notify();
+        parent.unregister(this);
         //todo remove this object from the stream message handler - do not remove if it is closed from the other side tho - force close for resource destruction
     }
 

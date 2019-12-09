@@ -3,6 +3,7 @@ package jokrey.utilities.network.link2peer.core;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
+import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
 import jokrey.utilities.network.link2peer.core.stream.P2LOutputStream;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
@@ -29,4 +30,7 @@ public interface P2LNodeInternal extends P2LNode {
     void notifyUserMessageReceived(P2LMessage message);
 
     P2Link toEstablished(SocketAddress address);
+
+    void unregister(P2LInputStream stream);
+    void unregister(P2LOutputStream stream);
 }

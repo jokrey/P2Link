@@ -11,7 +11,6 @@ import java.net.DatagramSocket;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.*;
 
@@ -24,11 +23,6 @@ import static jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes.*;
  * @author jokrey
  */
 public class IncomingHandler {
-    public static int INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
-    public static AtomicInteger NUMBER_OF_STREAM_RECEIPTS_RECEIVED = new AtomicInteger(0);
-    public static AtomicInteger NUMBER_OF_STREAM_PARTS_RECEIVED = new AtomicInteger(0);
-    public static AtomicInteger NUMBER_OF_INTENTIONALLY_DROPPED_PACKAGES = new AtomicInteger(0);
-
     DatagramSocket serverSocket;
     private P2LNodeInternal parent;
 
@@ -47,11 +41,11 @@ public class IncomingHandler {
     private void handleReceivedMessage(DatagramPacket receivedPacket) throws Throwable {
         SocketAddress from = receivedPacket.getSocketAddress();
         P2LMessage message = P2LMessage.fromPacket(P2Link.raw(receivedPacket.getSocketAddress()), receivedPacket);
-        if(INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE>0) {
-            boolean dropped = ThreadLocalRandom.current().nextInt(0, 100) < INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE;
+        if(DebugStats.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE>0) {
+            boolean dropped = ThreadLocalRandom.current().nextInt(0, 100) < DebugStats.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE;
             if (dropped) {
                 System.out.println(" - DROPPED - "+parent.getSelfLink() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
-                NUMBER_OF_INTENTIONALLY_DROPPED_PACKAGES.getAndIncrement();
+                DebugStats.incomingHandler_numIntentionallyDropped.getAndIncrement();
                 return;
             }
         }
@@ -69,10 +63,10 @@ public class IncomingHandler {
         if(message.header.isStreamPart()) {
             if(message.header.isReceipt()) {
                 streamMessageHandler.receivedReceipt(message);
-                NUMBER_OF_STREAM_RECEIPTS_RECEIVED.getAndIncrement();
+                DebugStats.incomingHandler_numStreamReceipts.getAndIncrement();
             } else {
                 streamMessageHandler.receivedPart(message);
-                NUMBER_OF_STREAM_PARTS_RECEIVED.getAndIncrement();
+                DebugStats.incomingHandler_numStreamParts.getAndIncrement();
             }
             return;
         }

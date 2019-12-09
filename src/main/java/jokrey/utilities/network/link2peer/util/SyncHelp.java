@@ -1,13 +1,9 @@
 package jokrey.utilities.network.link2peer.util;
 
-import jokrey.utilities.network.link2peer.core.P2LHeuristics;
-import jokrey.utilities.network.link2peer.core.stream.P2LFragmentOutputStreamImplV1;
-
 import java.io.IOException;
 import java.util.function.Supplier;
 
 import static jokrey.utilities.network.link2peer.util.P2LFuture.ENDLESS_WAIT;
-import static jokrey.utilities.network.link2peer.util.P2LThreadPool.*;
 
 /**
  * @author jokrey
@@ -42,13 +38,21 @@ public class SyncHelp {
     }
     public static boolean waitUntil(Object monitor, Supplier<Boolean> condition, long timeout_ms, Runnable intermediateAction, long intermediateEvery) {
         if(condition.get()) return true;
+        if(intermediateEvery<=0) throw new IllegalArgumentException("intermediate delay cannot be endless (<=0)");
         try {
             long waitingSince = System.currentTimeMillis();
             long elapsed_ms = 0;
             synchronized (monitor) {
                 boolean conditionResult = condition.get();
                 while (! conditionResult) {
-                    monitor.wait(timeout_ms == ENDLESS_WAIT ? intermediateEvery : Math.min(timeout_ms-elapsed_ms, intermediateEvery));
+                    long leftToWait = timeout_ms-elapsed_ms; //never <= 0, unless timeout_ms == 0
+//                    System.out.println("leftToWait = " + leftToWait);
+//                    System.out.println("timeout_ms = " + timeout_ms);
+//                    System.out.println("elapsed_ms = " + elapsed_ms);
+//                    System.out.println("intermediateEvery = " + intermediateEvery);
+                    long waitTime = timeout_ms == ENDLESS_WAIT ? intermediateEvery : Math.min(leftToWait, intermediateEvery);
+//                    System.out.println("waitTime = " + waitTime);
+                    monitor.wait(waitTime);
                     elapsed_ms = System.currentTimeMillis() - waitingSince;
                     if (timeout_ms != ENDLESS_WAIT && elapsed_ms >= timeout_ms)  //waiting for timeout without rechecking whether it has actually timed out is not possible - wait(timeout) is not guaranteed to sleep until timeout
                         return false;

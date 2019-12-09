@@ -6,31 +6,43 @@ import jokrey.utilities.network.link2peer.core.P2LConnection;
  * @author jokrey
  */
 public class BatchSizeCalculator_DynamicBMS extends BatchSizeCalculator {
-    public static BatchSizeCalculatorCreator DEFAULT_CREATOR = c -> new BatchSizeCalculator_DynamicBMS(c, 256);
-
-    private float bsm = 2;
+    private final float min_bsm;
+    private final float bsm_summand_no_loss;
+    private final float bsm_summand_little_loss;
+    private float bsm;
     private int bs;
     private int bs_last = bs;
-    public BatchSizeCalculator_DynamicBMS(P2LConnection connection, int initialBs) {
+    public BatchSizeCalculator_DynamicBMS(int initialBs, float initialBsm, float min_bsm, float bsm_summand_no_loss, float bsm_summand_little_loss) {
+        this(null, initialBs, initialBsm, min_bsm, bsm_summand_no_loss, bsm_summand_little_loss);
+    }
+    public BatchSizeCalculator_DynamicBMS(P2LConnection connection, int initialBs, float initialBsm, float min_bsm, float bsm_summand_no_loss, float bsm_summand_little_loss) {
         super(connection);
-        bs = Math.max(connection==null?16:connection.fragmentStreamVar, initialBs);
-        bs = initialBs;
+        if(connection==null) bs = initialBs;
+        else if(connection.fragmentStreamVar < 16) bs = initialBs;
+        else bs = connection.fragmentStreamVar;
+        bsm = initialBsm;
+        this.min_bsm = min_bsm;
+        this.bsm_summand_no_loss = bsm_summand_no_loss;
+        this.bsm_summand_little_loss = bsm_summand_little_loss;
+    }
+
+    @Override public BatchSizeCalculatorCreator creator() {
+        return c -> new BatchSizeCalculator_DynamicBMS(c, bs, bsm, min_bsm, bsm_summand_no_loss, bsm_summand_little_loss);
     }
 
     @Override public int getBatchSize() {
         return bs;
     }
-
     @Override public void adjustBatchSize(LossResult lossResult) {
         switch (lossResult) {
             case NO_LOSS:
                 connection.fragmentStreamVar = bs;
                 bs*=bsm;
-                bsm+=0.01;
+                bsm+=bsm_summand_no_loss;
                 break;
             case ACCEPTABLE_LOSS:
                 bs*=bsm / 2;
-                bsm+=0.005;
+                bsm+=bsm_summand_little_loss;
                 break;
             case UNACCEPTABLE_LOSS:
             case EXCESSIVE_LOSS:
@@ -38,7 +50,7 @@ public class BatchSizeCalculator_DynamicBMS extends BatchSizeCalculator {
                     bs /= 2;
                 else
                     bs = bs_last;
-                bsm=1.01f;
+                bsm=min_bsm;
                 break;
         }
         bs_last = bs;

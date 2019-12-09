@@ -1,6 +1,7 @@
 package jokrey.utilities.network.link2peer.core.stream;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.core.DebugStats;
 import jokrey.utilities.network.link2peer.core.P2LConnection;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.core.message_headers.StreamPartHeader;
@@ -8,11 +9,9 @@ import jokrey.utilities.network.link2peer.core.stream.fragment.*;
 import jokrey.utilities.network.link2peer.util.LongTupleList;
 import jokrey.utilities.network.link2peer.util.SyncHelp;
 import jokrey.utilities.simple.data_structure.pairs.Pair;
-import jokrey.utilities.transparent_storage.bytes.wrapper.SubBytesStorage;
 
 import java.io.IOException;
 import java.net.SocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.ListIterator;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -28,7 +27,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  */
 public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
     public static LossAcceptabilityCalculator lossConverter = new LossAcceptabilityCalculator_Packages(4);
-    public static BatchSizeCalculatorCreator batchSizeCalculatorCreator = BatchSizeCalculator_StrikeDown.DEFAULT_CREATOR;
+    public static BatchSizeCalculatorCreator batchSizeCalculatorCreator = new BatchSizeCalculator_StrikeDown(256, 32, 8).creator();
 
     public static final long DEFAULT_BATCH_DELAY = 333;
     public static final int RECEIPT_DELAY_MULTIPLIER = 3;
@@ -94,6 +93,7 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
         receiptID=receipt.receiptID;
 
         latestConfirmedIndex = receipt.missingRanges.isEmpty()?receipt.latestReceived:receipt.missingRanges.get0(0) - 1;
+        source.adviceEarliestRequiredIndex(latestConfirmedIndex+1);
 
         System.out.println("receivedReceipt - receipt.eof = " + receipt.eof+", receipt.latestReceived = " + receipt.latestReceived+", receipt.missingRanges = " + receipt.missingRanges);
         if(receipt.eof) {
@@ -166,34 +166,32 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
 //        return allSend || highestOffsetSentInLastBatch<0 || rangeE < highestOffsetSentInLastBatch-((batchSizeCalculator.getBatchSize())*packageSize);
 //    }
 
-    public static int numResend = 0;
     private void enqueueRange(long start, long end) throws InterruptedException {
         long curStart = start;
         while(curStart < end) {
-            numResend++;
+            DebugStats.fragmentStream1_numResend.getAndIncrement();
             System.out.println("resend("+packageSize+"): ["+curStart+", "+Math.min(end, curStart+packageSize)+"]");
             addFirstInBatch(source.sub(curStart, Math.min(end, curStart+=packageSize)));
-            //todo - add feature that prohibits an explosion in buffer size..
         }
         sendBatch();
     }
 
-    private ConcurrentLinkedDeque<SubBytesStorage> batch = new ConcurrentLinkedDeque<>();
+    private ConcurrentLinkedDeque<Fragment> batch = new ConcurrentLinkedDeque<>();
 
-    private void addFirstInBatch(SubBytesStorage toSend) {
-        if(toSend.start == toSend.end()) return;
+    private void addFirstInBatch(Fragment toSend) {
+        if(toSend.isEmpty()) return;
         waitForBatchCapacity();
-//        System.out.println("addFirstInBatch - toSend[" + toSend.start+", "+toSend.end()+"]");
-        if(!batch.contains(toSend)) //todo maybe slower than it needs to
+//        System.out.println("addFirstInBatch - toSend[" + toSend.realStartIndex+", "+toSend.realEndIndex+"]");
+        if(!batch.contains(toSend)) //todo maybe slower than it needs to be
             batch.addFirst(toSend);
         if(batch.size() >= batchSizeCalculator.getBatchSize())
             sendBatch();
     }
-    private void addLastInBatch(SubBytesStorage toSend) {
-        if(toSend.start == toSend.end()) return;
-//        System.out.println("addLastInBatch - toSend[" + toSend.start+", "+toSend.end()+"]");
+    private void addLastInBatch(Fragment toSend) {
+        if(toSend.isEmpty()) return;
+//        System.out.println("addLastInBatch - toSend[" + toSend.realStartIndex+", "+toSend.realEndIndex+"]");
         waitForBatchCapacity();
-        if(!batch.contains(toSend)) //todo maybe slower than it needs to
+        if(!batch.contains(toSend)) //todo maybe slower than it needs to be
             batch.addLast(toSend);
         if(batch.size() >= batchSizeCalculator.getBatchSize())
             sendBatch();
@@ -211,25 +209,25 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
 
             filterBatchOfAlreadyReceivedPackages();
 
-            SubBytesStorage packageContent;
+            Fragment packageContent;
             while(canSendPackagesInCurrentBatch() && (packageContent = batch.pollFirst()) != null) {
                 P2LMessage message = buildP2LMessage(packageContent);
                 numPackagesSentInBatch++;
-                highestOffsetSentInLastBatch = Math.max(highestOffsetSentInLastBatch, packageContent.end());
-                latestSentIndex = Math.max(latestSentIndex, packageContent.end());
+                highestOffsetSentInLastBatch = Math.max(highestOffsetSentInLastBatch, packageContent.realEndIndex);
+                latestSentIndex = Math.max(latestSentIndex, packageContent.realEndIndex);
                 parent.sendInternalMessage(message, to);
 
                 LongTupleList current = sendSinceLastReceipt.get(0).r;
                 for (int i = current.size() - 1; i >= 0; i--) {
-                    if(current.get1(i) == packageContent.start) {
-                        current.set1(i, packageContent.end());
+                    if(current.get1(i) == packageContent.realStartIndex) {
+                        current.set1(i, packageContent.realEndIndex);
                         current=null;
                         break;
                     }
                 }
                 if(current != null)
-                    current.add(packageContent.start, packageContent.end());
-//                System.out.println("packageContent ["+packageContent.start+", "+packageContent.end()+"]");
+                    current.add(packageContent.realStartIndex, packageContent.realEndIndex);
+//                System.out.println("packageContent ["+packageContent.realStartIndex+", "+packageContent.realEndIndex+"]");
                 delaySendAppropriately();
                 endPackageIfPossible();
             }
@@ -243,12 +241,12 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
 
     private void filterBatchOfAlreadyReceivedPackages() {
         batch.removeIf(p -> {
-            if(p.end >= remoteLatestReceivedDataOffset)
+            if(p.realEndIndex >= remoteLatestReceivedDataOffset)
                 return false;
             for(int i = 0; i<latestMissingRanges.size(); i++) {
                 long rangeS = latestMissingRanges.get0(i);
                 long rangeE = latestMissingRanges.get1(i);
-                if(p.start >= rangeS && p.end <= rangeE)
+                if(p.realStartIndex >= rangeS && p.realEndIndex <= rangeE)
                     return false;
             }
             return true;
@@ -270,13 +268,13 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
             sendSinceLastReceipt.add(0, new Pair<>(lastBatchSentAt, new LongTupleList(batchSizeCalculator.getBatchSize())));
     }
 
-    private P2LMessage buildP2LMessage(SubBytesStorage packageContent) {
-        boolean lastPackage = packageContent.end() == source.totalNumBytes();
+    private P2LMessage buildP2LMessage(Fragment packageContent) {
+        boolean lastPackage = packageContent.realEndIndex == source.totalNumBytes();
 //        System.out.println("lastPackage = " + lastPackage);
 //        System.out.println("packageContent.asString() = " + new String(packageContent.getContent(), StandardCharsets.UTF_8));
-        StreamPartHeader header = new StreamPartHeader(null, type, conversationId, (int) packageContent.start, false, lastPackage);
-        byte[] content = header.generateRaw(packageContent.getContent());
-        return new P2LMessage(header, null, content, (int) packageContent.contentSize());
+        StreamPartHeader header = new StreamPartHeader(null, type, conversationId, (int) (packageContent.realStartIndex), false, lastPackage);
+//        System.out.println("content.length = " + content.length);
+        return header.generateMessage(packageContent.content());
     }
 
     private void waitForBatchCapacity() {
@@ -284,7 +282,7 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
             long elapsedInBatchWindow = System.currentTimeMillis() - lastBatchSentAt;
             long msLeftInCurrentBatchWindow = batch_delay_ms - elapsedInBatchWindow;
             try {
-                if(msLeftInCurrentBatchWindow>1)
+                if(msLeftInCurrentBatchWindow>0)
                     Thread.sleep(msLeftInCurrentBatchWindow);
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -308,12 +306,13 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
             System.out.println("P2LFragmentOutputStreamImplV1.waitForConfirmationOnAll - in RUN");
             if(batch.isEmpty()) {
                 if(latestMissingRanges == null || latestMissingRanges.isEmpty()) {
+                    DebugStats.fragmentStream1_numResend.getAndIncrement();
                     addFirstInBatch(source.sub(Math.max(0, source.currentMaxEnd() - packageSize), source.currentMaxEnd()));
                 } else
                     reEnqueueMissingRanges();
             }
             sendBatch();
-        },batch_delay_ms*DEFAULT_BATCH_DELAY // con == null? batch_delay_ms: con.avRTT*3
+        },batch_delay_ms*RECEIPT_DELAY_MULTIPLIER // con == null? batch_delay_ms: con.avRTT*3
         );
     }
     @Override public boolean close(int timeout_ms) {
@@ -328,7 +327,11 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
             addFirstInBatch(source.sub(Math.max(0, source.currentMaxEnd() - packageSize), source.currentMaxEnd()));
             sendBatch();
         }
-        return waitForConfirmationOnAll(timeout_ms);
+        try {
+            return waitForConfirmationOnAll(timeout_ms);
+        } finally {
+            parent.unregister(this);
+        }
     }
     @Override public boolean isClosed() {
         return allReceived() || (remoteLatestReceivedDataOffset == -2);

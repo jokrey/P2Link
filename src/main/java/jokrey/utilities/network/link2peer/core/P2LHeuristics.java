@@ -8,8 +8,9 @@ import jokrey.utilities.network.link2peer.P2LMessage;
  * todo add explanations on why the values where chosen and what their theoretical bounds are
  */
 public class P2LHeuristics {
+    public static int ORDERED_STREAM_V2_MAX_BUFFER_SIZE =65536*100;// 16384; //todo - this max buffer size is not respected in the slightest;
     public static int BROADCAST_USES_HASH_DETOUR_RAW_SIZE_THRESHOLD = P2LMessage.CUSTOM_RAW_SIZE_LIMIT;
-    public static long STREAM_RECEIPT_TIMEOUT_MS = 500; //todo should be variable
+    public static long ORDERED_STREAM_V1_RECEIPT_TIMEOUT_MS = 500; //todo should be variable - or should it? - yes it should!
     /**
      * Has to be smaller 4*({@link P2LMessage#CUSTOM_RAW_SIZE_LIMIT} - ~20). This is so that the indices list in the receipt definitely fits
      * For the default value of raw limit this means that the max is: (1024-20)/4 = 251

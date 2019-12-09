@@ -48,17 +48,21 @@ import java.util.List;
  */
 public abstract class P2LFragmentInputStream implements P2LInputStream {
     protected final P2LNodeInternal parent;
-    protected final SocketAddress to;
+    protected final SocketAddress from;
     protected final P2LConnection con;
     protected final int type, conversationId;
-    protected P2LFragmentInputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId) {
+    protected P2LFragmentInputStream(P2LNodeInternal parent, SocketAddress from, P2LConnection con, int type, int conversationId) {
         this.parent = parent;
-        this.to = to;
+        this.from = from;
         this.con = con;
         this.type = type;
         this.conversationId = conversationId;
     }
-//    private HashMap<Integer, Integer> mappingOfStartToEndIndexOfMissingRanges = new HashMap<>(P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE);
+
+    @Override public SocketAddress getRawFrom() { return from; }
+    @Override public int getType() { return type; }
+    @Override public int getConversationId() { return conversationId; }
+    //    private HashMap<Integer, Integer> mappingOfStartToEndIndexOfMissingRanges = new HashMap<>(P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE);
 //    private int latestReceivedEndIndex = 0;
 //
 //    void received(P2LMessage message) throws IOException {
@@ -99,22 +103,21 @@ public abstract class P2LFragmentInputStream implements P2LInputStream {
         listeners.remove(listener);
     }
     public void writeResultsTo(TransparentBytesStorage storage) {
-        addFragmentReceivedListener(storage::set);
+        addFragmentReceivedListener((start, part, off, len, eof) -> {if(part!=null)storage.set(start, part, off, len);});
     }
 
-    protected void fireReceived(long fragmentOffset, byte[] receivedRaw, int dataOff, int dataLen) {
-        for(FragmentReceivedListener listener:listeners) listener.received(fragmentOffset, receivedRaw, dataOff, dataLen);
+    protected void fireReceived(long fragmentOffset, byte[] receivedRaw, int dataOff, int dataLen, boolean eof) {
+        for(FragmentReceivedListener listener:listeners) listener.received(fragmentOffset, receivedRaw, dataOff, dataLen, eof);
     }
     public interface FragmentReceivedListener {
         /**
-         *
          * @param fragmentOffset
          * @param receivedRaw
          * @param dataOff
          * @param dataLen
-         * todo MAYBE return whether the fragment was consumed and can be discarded - or
+         * @param eof
          */
-        void received(long fragmentOffset, byte[] receivedRaw, int dataOff, int dataLen);//todo potentially replace the three received vars with the DataChunk type
+        void received(long fragmentOffset, byte[] receivedRaw, int dataOff, int dataLen, boolean eof);//todo potentially replace the three received vars with the DataChunk type
         //can be directly written to disk - on file transfer the file can be written to 'randomly', i.e. later parts written first(using randomaccessfile) - earlier parts are automatically re-requested
 
         //todo if this proves reasonable and possible the fragment stream could be used to implement a P2LInputStream(mildly less efficient):

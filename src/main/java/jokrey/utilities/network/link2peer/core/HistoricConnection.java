@@ -2,8 +2,6 @@ package jokrey.utilities.network.link2peer.core;
 
 import jokrey.utilities.network.link2peer.P2Link;
 
-import java.util.Objects;
-
 /**
  * @author jokrey
  */

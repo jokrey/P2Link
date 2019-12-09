@@ -15,14 +15,17 @@ import java.net.SocketAddress;
  */
 public abstract class P2LOrderedInputStream extends InputStream implements P2LInputStream {
     protected final P2LNodeInternal parent;
-    protected final SocketAddress to;
+    protected final SocketAddress from;
     protected final int type, conversationId;
-    protected P2LOrderedInputStream(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
+    protected P2LOrderedInputStream(P2LNodeInternal parent, SocketAddress from, int type, int conversationId) {
         this.parent = parent;
-        this.to = to;
+        this.from = from;
         this.type = type;
         this.conversationId = conversationId;
     }
+    @Override public SocketAddress getRawFrom() { return from; }
+    @Override public int getType() { return type; }
+    @Override public int getConversationId() { return conversationId; }
 
     /**
      * Reads a single byte (represented as an integer between 0-255) from the stream.

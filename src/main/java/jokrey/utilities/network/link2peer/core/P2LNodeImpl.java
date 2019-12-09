@@ -234,8 +234,12 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         validateMsgIdNotInternal(messageType);
         return incomingHandler.streamMessageHandler.createFragmentOutputStream(this, to, establishedConnections.get(to), messageType, conversationId);
     }
-
-
+    @Override public void unregister(P2LInputStream stream) {
+        incomingHandler.streamMessageHandler.unregister(stream);
+    }
+    @Override public void unregister(P2LOutputStream stream) {
+        incomingHandler.streamMessageHandler.unregister(stream);
+    }
     //CONNECTION KEEPER::
     /**
      * established connections

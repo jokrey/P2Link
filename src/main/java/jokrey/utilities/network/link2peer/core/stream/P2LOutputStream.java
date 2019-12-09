@@ -3,6 +3,7 @@ package jokrey.utilities.network.link2peer.core.stream;
 import jokrey.utilities.network.link2peer.P2LMessage;
 
 import java.io.IOException;
+import java.net.SocketAddress;
 
 /**
  * @author jokrey
@@ -10,6 +11,12 @@ import java.io.IOException;
 public interface P2LOutputStream extends AutoCloseable {
     /** Internal use only. */
     void receivedReceipt(P2LMessage rawReceipt);
+    /** Internal use only. */
+    SocketAddress getRawFrom();
+    /** Internal use only. */
+    int getType();
+    /** Internal use only. */
+    int getConversationId();
 
     /**
      * Blocking method to obtain the guarantee that all data written AND subsequently flushed has been received by the peer.

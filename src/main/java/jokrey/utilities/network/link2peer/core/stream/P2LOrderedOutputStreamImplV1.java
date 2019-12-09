@@ -2,6 +2,7 @@ package jokrey.utilities.network.link2peer.core.stream;
 
 import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.core.DebugStats;
 import jokrey.utilities.network.link2peer.core.P2LConnection;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
@@ -52,10 +53,13 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
     private int latestAttemptedIndex = -1;
 
     public P2LOrderedOutputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId) {
-        super(parent, to, con, type, conversationId);
+        this(parent, to, (con==null?P2LMessage.CUSTOM_RAW_SIZE_LIMIT:con.remoteBufferSize), type, conversationId);
+    }
+    public P2LOrderedOutputStreamImplV1(P2LNodeInternal parent, SocketAddress to, int bufferSizeWithoutHeader, int type, int conversationId) {
+        super(parent, to, null, type, conversationId);
 
         headerSize = new StreamPartHeader(null, type, conversationId, 0, false, false).getSize();
-        unsendBuffer = new byte[(con==null?P2LMessage.CUSTOM_RAW_SIZE_LIMIT:con.remoteBufferSize) - headerSize];
+        unsendBuffer = new byte[bufferSizeWithoutHeader - headerSize];
     }
 
     @Override public synchronized void write(int b) throws IOException {
@@ -95,7 +99,8 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
             //help gc:
             Arrays.fill(unconfirmedSendPackages, null);
             Arrays.fill(shiftCache, null);
-            //todo - clean up stream message handler
+
+            parent.unregister(this);
             return confirmation;
         }
         return !hasUnconfirmedParts();
@@ -108,7 +113,7 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
     @Override public synchronized boolean waitForConfirmationOnAll(int timeout_ms) throws IOException {
         sendExtraordinaryReceiptRequest();
 
-        return SyncHelp.waitUntilOrThrowIO(this, () -> !hasUnconfirmedParts(), timeout_ms, this::sendExtraordinaryReceiptRequest, P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS);
+        return SyncHelp.waitUntilOrThrowIO(this, () -> !hasUnconfirmedParts(), timeout_ms, this::sendExtraordinaryReceiptRequest, P2LHeuristics.ORDERED_STREAM_V1_RECEIPT_TIMEOUT_MS);
     }
     private long lastReceiptRequest = 0;
     private boolean requestRecentlyMade() {
@@ -130,7 +135,7 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
     }
     private synchronized void waitForBufferCapacities(int timeout_ms) throws IOException {
         sendExtraordinaryReceiptRequest();
-        SyncHelp.waitUntilOrThrowIO(this, this::hasBufferCapacities, timeout_ms, this::sendExtraordinaryReceiptRequest, P2LHeuristics.STREAM_RECEIPT_TIMEOUT_MS);
+        SyncHelp.waitUntilOrThrowIO(this, this::hasBufferCapacities, timeout_ms, this::sendExtraordinaryReceiptRequest, P2LHeuristics.ORDERED_STREAM_V1_RECEIPT_TIMEOUT_MS);
     }
 
     private synchronized void packAndSend(boolean forceRequestReceipt) throws IOException {
@@ -219,6 +224,7 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
                                 newEarliestUnconfirmedIndex = -1;
                         } else {
                             System.out.println("handleReceipt - resend missingPart = " + missingPart);
+                            DebugStats.orderedStream1_numResend.getAndIncrement();
                             send(missingPart, !requestRecentlyMade() && eofAtIndex!=-1);
                         }
                         lastMissingPart = missingPart;

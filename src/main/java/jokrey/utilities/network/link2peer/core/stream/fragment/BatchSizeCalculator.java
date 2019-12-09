@@ -13,4 +13,5 @@ public abstract class BatchSizeCalculator {
 
     public abstract int getBatchSize();
     public abstract void adjustBatchSize(LossResult lossResult);
+    public abstract BatchSizeCalculatorCreator creator();
 }

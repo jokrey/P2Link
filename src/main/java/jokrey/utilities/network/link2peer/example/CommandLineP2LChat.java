@@ -6,11 +6,9 @@ import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.core.P2LHeuristics;
-import jokrey.utilities.network.link2peer.core.WhoAmIProtocol;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
-import java.net.SocketAddress;
 import java.util.List;
 import java.util.Scanner;
 

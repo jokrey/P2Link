@@ -3,21 +3,20 @@ package jokrey.utilities.network.link2peer.core.stream;
 import jokrey.utilities.debug_analysis_helper.TimeDiffMarker;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.core.P2LConnection;
+import jokrey.utilities.network.link2peer.core.P2LHeuristics;
 import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
 import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
-import jokrey.utilities.transparent_storage.bytes.wrapper.SubBytesStorage;
 
 import java.io.IOException;
 import java.net.SocketAddress;
-import java.nio.charset.StandardCharsets;
 
 /**
  * @author jokrey
  */
 public class P2LOrderedOutputStreamImplV2 extends P2LOrderedOutputStream implements P2LFragmentOutputStream.FragmentRetriever  {
     private final P2LFragmentOutputStreamImplV1 underlyingFragmentStream;
-    private final TransparentBytesStorage buffer = new ByteArrayStorage(P2LOrderedInputStreamImplV2.MAX_BUFFER_SIZE);
+    private final TransparentBytesStorage buffer = new ByteArrayStorage(P2LHeuristics.ORDERED_STREAM_V2_MAX_BUFFER_SIZE);
     private long firstBufferIndexRepresents = 0;
 
     protected P2LOrderedOutputStreamImplV2(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId) {
@@ -29,13 +28,15 @@ public class P2LOrderedOutputStreamImplV2 extends P2LOrderedOutputStream impleme
     @Override public void write(int b) throws IOException {
         if(underlyingFragmentStream.isClosed()) throw new IOException("Stream closed");
         buffer.append(new byte[] {(byte) (b&0xFF)});
+        if(buffer.contentSize() > P2LHeuristics.ORDERED_STREAM_V2_MAX_BUFFER_SIZE/2)
+            flush();
 //        System.out.println("write1 - buffer.asString = " + new String(buffer.getContent(), (int) firstBufferIndexRepresents, (int) buffer.contentSize(), StandardCharsets.UTF_8));
     }
 
     @Override public void write(byte[] b, int off, int len) throws IOException {
         if(underlyingFragmentStream.isClosed()) throw new IOException("Stream closed");
         buffer.set(buffer.contentSize(), b, off, len);
-        if(buffer.contentSize() > P2LOrderedInputStreamImplV2.MAX_BUFFER_SIZE/2)
+        if(buffer.contentSize() > P2LHeuristics.ORDERED_STREAM_V2_MAX_BUFFER_SIZE/2)
             flush();
 //        System.out.println("writeN - buffer.asString = " + new String(buffer.getContent(), (int) firstBufferIndexRepresents, (int) buffer.contentSize(), StandardCharsets.UTF_8));
     }
@@ -48,22 +49,35 @@ public class P2LOrderedOutputStreamImplV2 extends P2LOrderedOutputStream impleme
     }
 
 
-
-    @Override public SubBytesStorage sub(long start, long end) {
-        return buffer.subStorage(start, end);
+    @Override public byte[] sub(P2LFragmentOutputStream.Fragment fragment) {
+        return buffer.sub(fragment.realStartIndex - firstBufferIndexRepresents, fragment.realEndIndex - firstBufferIndexRepresents);
     }
-
+    @Override public P2LFragmentOutputStream.Fragment sub(long start, long end) {
+        return new P2LFragmentOutputStream.Fragment(this, start, end);
+    }
     @Override public long currentMaxEnd() {
         return firstBufferIndexRepresents + buffer.contentSize();
     }
-
     @Override public long totalNumBytes() {
         return closedAt;
     }
-
     @Override public void adviceEarliestRequiredIndex(long index) {
-        buffer.delete(0, index - firstBufferIndexRepresents);
+        //todo
+        TimeDiffMarker.setMark("adviceEarliestRequiredIndex");
+        System.out.println("adviceEarliestRequiredIndex - b - buffer.contentSize() = " + buffer.contentSize());
+        System.out.println("adviceEarliestRequiredIndex - b - index = " + index);
+//        System.out.println("adviceEarliestRequiredIndex - b - buffer = " + buffer);
+        System.out.println("adviceEarliestRequiredIndex - b - firstBufferIndexRepresents = " + firstBufferIndexRepresents);
+        System.out.println("adviceEarliestRequiredIndex - b - (index - firstBufferIndexRepresents > 0) = " + (index - firstBufferIndexRepresents > 0));
+        if(index - firstBufferIndexRepresents > 0) {
+            buffer.delete(0, index - firstBufferIndexRepresents);
+        }
         firstBufferIndexRepresents = index;
+        System.out.println("adviceEarliestRequiredIndex - a - buffer.contentSize() = " + buffer.contentSize());
+        System.out.println("adviceEarliestRequiredIndex - a - index = " + index);
+//        System.out.println("adviceEarliestRequiredIndex - a - buffer = " + buffer);
+        System.out.println("adviceEarliestRequiredIndex - a - firstBufferIndexRepresents = " + firstBufferIndexRepresents);
+        TimeDiffMarker.println("adviceEarliestRequiredIndex");
     }
 
 
@@ -76,13 +90,8 @@ public class P2LOrderedOutputStreamImplV2 extends P2LOrderedOutputStream impleme
         return underlyingFragmentStream.waitForConfirmationOnAll(timeout_ms);
     }
     @Override public boolean close(int timeout_ms) {
-        TimeDiffMarker.setMark("P2LOrderedOutputStreamImplV2.close");
-        try {
-            closedAt = firstBufferIndexRepresents + buffer.contentSize();
-            return underlyingFragmentStream.close(timeout_ms);
-        } finally {
-            TimeDiffMarker.println("P2LOrderedOutputStreamImplV2.close");
-        }
+        closedAt = firstBufferIndexRepresents + buffer.contentSize();
+        return underlyingFragmentStream.close(timeout_ms);
     }
     @Override public boolean isClosed() {
         return underlyingFragmentStream.isClosed();
