@@ -1,4 +1,4 @@
-import jokrey.utilities.network.link2peer.core.stream.P2LFragmentInputStreamImplV1;
+import jokrey.utilities.network.link2peer.node.stream.P2LFragmentInputStreamImplV1;
 import jokrey.utilities.network.link2peer.util.LongTupleList;
 import org.junit.jupiter.api.Test;
 

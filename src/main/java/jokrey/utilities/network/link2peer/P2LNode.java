@@ -1,8 +1,10 @@
 package jokrey.utilities.network.link2peer;
 
-import jokrey.utilities.network.link2peer.core.NodeCreator;
-import jokrey.utilities.network.link2peer.core.P2LInternalMessageTypes;
-import jokrey.utilities.network.link2peer.core.stream.*;
+import jokrey.utilities.network.link2peer.node.core.ConversationReceivalHandlerChangeThisName;
+import jokrey.utilities.network.link2peer.node.core.NodeCreator;
+import jokrey.utilities.network.link2peer.node.core.P2LConversation;
+import jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes;
+import jokrey.utilities.network.link2peer.node.stream.*;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
@@ -428,6 +430,8 @@ public interface P2LNode {
     interface Request<T> { P2LFuture<T> request() throws Throwable;}
 
 
+    void registerConversationFor(int type, ConversationReceivalHandlerChangeThisName handler);
+    P2LConversation convo(int type);
 
     /**
      * This method provides another possibility of asynchronously receiving messages.

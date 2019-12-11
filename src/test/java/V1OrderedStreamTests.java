@@ -1,11 +1,11 @@
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
-import jokrey.utilities.network.link2peer.core.DebugStats;
-import jokrey.utilities.network.link2peer.core.P2LHeuristics;
-import jokrey.utilities.network.link2peer.core.P2LNodeInternal;
-import jokrey.utilities.network.link2peer.core.stream.P2LInputStream;
-import jokrey.utilities.network.link2peer.core.stream.P2LOrderedInputStreamImplV1;
-import jokrey.utilities.network.link2peer.core.stream.P2LOrderedOutputStreamImplV1;
+import jokrey.utilities.network.link2peer.node.DebugStats;
+import jokrey.utilities.network.link2peer.node.P2LHeuristics;
+import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
+import jokrey.utilities.network.link2peer.node.stream.P2LInputStream;
+import jokrey.utilities.network.link2peer.node.stream.P2LOrderedInputStreamImplV1;
+import jokrey.utilities.network.link2peer.node.stream.P2LOrderedOutputStreamImplV1;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;

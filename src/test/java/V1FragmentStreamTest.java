@@ -1,11 +1,11 @@
 import jokrey.utilities.debug_analysis_helper.TimeDiffMarker;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
-import jokrey.utilities.network.link2peer.core.DebugStats;
-import jokrey.utilities.network.link2peer.core.stream.P2LFragmentInputStream;
-import jokrey.utilities.network.link2peer.core.stream.P2LFragmentOutputStream;
-import jokrey.utilities.network.link2peer.core.stream.P2LFragmentOutputStreamImplV1;
-import jokrey.utilities.network.link2peer.core.stream.fragment.*;
+import jokrey.utilities.network.link2peer.node.DebugStats;
+import jokrey.utilities.network.link2peer.node.stream.P2LFragmentInputStream;
+import jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputStream;
+import jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputStreamImplV1;
+import jokrey.utilities.network.link2peer.node.stream.fragment.*;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * @author jokrey
  */
 public class V1FragmentStreamTest {
+    //todo - test multiple, simultaneous streams...
+
     @Test void testFragmentStreamLargeSource_noIntentionalDrops_maxUdpSize_strikeDown() throws IOException, InterruptedException {
         testFragmentStream(0, 100_000_000, MAX_UDP_PACKET_SIZE,
                 new LossAcceptabilityCalculator_Packages(4),

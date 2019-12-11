@@ -5,7 +5,7 @@ import jokrey.utilities.command.line.helper.CommandLoop;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
-import jokrey.utilities.network.link2peer.core.P2LHeuristics;
+import jokrey.utilities.network.link2peer.node.P2LHeuristics;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
