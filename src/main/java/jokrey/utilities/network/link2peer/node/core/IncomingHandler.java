@@ -53,7 +53,8 @@ public class IncomingHandler {
                 return;
             }
         }
-//        System.out.println(parent.getSelfLink() + " - handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
+        if(DebugStats.MSG_PRINTS_ACTIVE)
+            System.out.println(parent.getSelfLink() + " - handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
 
         parent.notifyPacketReceivedFrom(from);
 

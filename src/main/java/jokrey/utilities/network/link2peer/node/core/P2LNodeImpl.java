@@ -18,7 +18,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.validateMsgTypeNotInternal;
-import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_STEP;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 
 /**
@@ -132,7 +131,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
 
 
-    @Override public void registerConversationFor(int type, ConversationReceivalHandlerChangeThisName handler) {
+    @Override public void registerConversationFor(int type, ConversationAnswererChangeThisName handler) {
         incomingHandler.conversationMessageHandler.registerConversationFor(type, handler);
     }
 
@@ -147,7 +146,8 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         if(message.header.getSender() != null) throw new IllegalArgumentException("sender of message has to be this null and will be automatically set by the sender");
 
         if(message.canBeSentInSinglePacket()) {
-//            System.out.println(getSelfLink()+" - sendInternalMessage - to = [" + to + "], message = " + message);
+            if(DebugStats.MSG_PRINTS_ACTIVE)
+                System.out.println(getSelfLink()+" - sendInternalMessage - to = [" + to + "], message = " + message);
             incomingHandler.serverSocket.send(message.toPacket(to));
         } else {
             //todo - is it really desirable to have packages be broken up THIS automatically???

@@ -18,11 +18,15 @@ public class DebugStats {
     public static AtomicInteger incomingHandler_numStreamParts = new AtomicInteger(0);
 
     public static AtomicInteger conversation_numRetries = new AtomicInteger(0);
+    public static AtomicInteger conversation_numValid = new AtomicInteger(0);
 
     public static int INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
     public static AtomicInteger incomingHandler_numIntentionallyDropped = new AtomicInteger(0);
 
+    public static boolean MSG_PRINTS_ACTIVE = false;
+
     public static void reset() {
+        MSG_PRINTS_ACTIVE = false;
         fragmentStream1_numResend.set(0);
         fragmentStream1_doubleReceived.set(0);
         fragmentStream1_validReceived.set(0);
@@ -33,6 +37,7 @@ public class DebugStats {
         incomingHandler_numStreamParts.set(0);
         incomingHandler_numIntentionallyDropped.set(0);
         conversation_numRetries.set(0);
+        conversation_numValid.set(0);
         INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE=0;
     }
 
@@ -40,6 +45,8 @@ public class DebugStats {
         print(false);
     }
     public static void print(boolean filterUnchanged) {
+        if(!filterUnchanged || MSG_PRINTS_ACTIVE)
+            System.out.println("MSG_PRINTS_ACTIVE = " + MSG_PRINTS_ACTIVE);
         if(!filterUnchanged || INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE!=0)
             System.out.println("INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = " + INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE);
         if(!filterUnchanged || incomingHandler_numIntentionallyDropped.get()!=0)
@@ -62,6 +69,8 @@ public class DebugStats {
             System.out.println("orderedStream1_validReceived = " + orderedStream1_validReceived);
         if(!filterUnchanged || conversation_numRetries.get()!=0)
             System.out.println("conversation_numRetries = " + conversation_numRetries);
+        if(!filterUnchanged || conversation_numValid.get()!=0)
+            System.out.println("conversation_numValid = " + conversation_numValid);
     }
 
     public static void printAndReset() {

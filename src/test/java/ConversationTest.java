@@ -25,10 +25,12 @@ public class ConversationTest {
         try {
 
             DebugStats.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
+            DebugStats.MSG_PRINTS_ACTIVE = false;
             boolean successConnect = nodes[0].establishConnection(nodes[1].getSelfLink()).get(1000);
             assertTrue(successConnect);
 
-            DebugStats.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 5;
+            DebugStats.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 60;
+            DebugStats.MSG_PRINTS_ACTIVE = true;
 
             System.out.println("\n\n\n\n\n");
             AtomicBoolean bool = new AtomicBoolean(false);
@@ -73,6 +75,7 @@ public class ConversationTest {
             assertArrayEquals(rm3, m3);
             assertTrue(bool.get());
 
+            sleep(1000);
         } finally {
             IntermediateTests.close(nodes);
             sleep(10);

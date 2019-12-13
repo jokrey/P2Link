@@ -152,11 +152,7 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
 //            }
 //            totalLostBytes+=rangeE-rangeS;
 
-            try {
-                enqueueRange(rangeS, rangeE);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            enqueueRange(rangeS, rangeE);
         }
 //        latestMissingRanges=null; //muy importante
         latestMissingRanges=latestMissing;

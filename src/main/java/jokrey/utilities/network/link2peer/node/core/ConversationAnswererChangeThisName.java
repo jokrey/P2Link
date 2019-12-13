@@ -8,6 +8,6 @@ import java.io.IOException;
  * @author jokrey
  */
 @FunctionalInterface
-public interface ConversationReceivalHandlerChangeThisName {
+public interface ConversationAnswererChangeThisName {
     void converse(P2LConversation convo, P2LMessage initMessage) throws IOException;
 }

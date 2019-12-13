@@ -10,6 +10,15 @@ import java.io.IOException;
 
 /**
  * Forced efficiency, short burst communication that uses the response as validation for receival.
+ *    Tcp - in the optimal case - should work similarly and have similar performance...
+ *
+ * todo For few dropped packages the number of double resend packages is relatively high
+ * todo Problem: Consider packets m0 and m1 and m2. client sends m0, server received m0 and sends m1, m1 is lost.
+ * todo          Since m1 is the ack for m0 -> client resends m0, roughly exactly when m0 arrieves the server realizes that it has not received m2 and resends m1.
+ * todo          Despite only m1 being lost m0 is resent
+ * todo   This problem may very well be unsolvable, but it should be kept in mind
+ *
+ * todo -
  *
  * @author jokrey
  */
@@ -36,6 +45,12 @@ public class P2LConversation {
         this.conversationId = conversationId;
     }
 
+    private boolean isServer = false;
+    void serverInit() {
+        step=0;
+        isServer = true;
+    }
+
     private long lastMessageSentAt = 0;
     private P2LMessage lastMessageReceived = null;
     public byte[] initExpect(byte[] bytes) throws IOException {
@@ -44,9 +59,12 @@ public class P2LConversation {
 
         step = 0;
 
-        return answerExpect(bytes);
+        return answerExpect(bytes, true);
     }
     public byte[] answerExpect(byte[] bytes) throws IOException {
+        return answerExpect(bytes, false);
+    }
+    private byte[] answerExpect(byte[] bytes, boolean init) throws IOException {
         if(step == -1) throw new IOException("conversation is closed");
         if(step == -2) throw new IOException("please initialize");
 //        System.out.println(parent.getSelfLink()+" - P2LConversation.answerExpect: "+"bytes = [" + Arrays.toString(bytes) + "]");
@@ -55,19 +73,26 @@ public class P2LConversation {
         P2LMessage msg = header.generateMessage(bytes);
 
         for(int i=0;i<maxRetries;i++) {
-            P2LFuture<P2LMessage> fut = conversationQueue.futureFor(con.link.getSocketAddress(), type, conversationId, (short) (step + 1));
+            //previous is the message we are currently answering to - so it has already been received - however it might be resend by the peer if the message sent below is lost
+            //   it is important the message is handled so that the conversation handler sees that it is expected and does not initiate a new conversation on m0 resend..
+            P2LFuture<P2LMessage> previous = init?null:conversationQueue.futureFor(con.link.getSocketAddress(), type, conversationId, step);
+            P2LFuture<P2LMessage> next = conversationQueue.futureFor(con.link.getSocketAddress(), type, conversationId, (short) (step + 1));
+
 
             parent.sendInternalMessage(con.link.getSocketAddress(), msg);
             lastMessageSentAt = System.currentTimeMillis();
 
             int waitTime = (int) (con.avRTT * m + a);
 //            System.out.println(parent.getSelfLink() + " - expect: " + type + ", " + conversationId + ", " + (step + 1));
-            P2LMessage result = fut.getOrNull(waitTime);
+
+            P2LMessage result = next.getOrNull(waitTime);
+            if(previous != null) previous.cancelIfNotCompleted();
 //            System.out.println(parent.getSelfLink() + " - result = " + result);
             if (result != null) {
                 lastMessageReceived = result;
                 con.updateAvRTT((int) (System.currentTimeMillis() - lastMessageSentAt));
                 step++;
+                DebugStats.conversation_numValid.getAndIncrement();
                 return result.asBytes();
             } else {
                 DebugStats.conversation_numRetries.getAndIncrement();
@@ -89,6 +114,7 @@ public class P2LConversation {
         P2LMessage msg = header.generateMessage(bytes);
 
         for(int i=0;i<maxRetries;i++) {
+            P2LFuture<P2LMessage> previous = conversationQueue.futureFor(con.link.getSocketAddress(), type, conversationId, step); //to consume
             P2LFuture<P2LMessage> fut = conversationQueue.receiptFutureFor(con.link.getSocketAddress(), type, conversationId, (step));
 
             lastMessageSentAt = System.currentTimeMillis();
@@ -97,11 +123,13 @@ public class P2LConversation {
             int waitTime = (int) (con.avRTT * m + a);
 //            System.out.println(parent.getSelfLink() + " - expect: " + type + ", " + conversationId + ", " + (step  ));
             P2LMessage result = fut.getOrNull(waitTime);
+            if(previous != null) previous.cancelIfNotCompleted();
 //            System.out.println(parent.getSelfLink() + " - result = " + result);
             if (result != null && result.validateIsReceiptFor(msg)) {
                 lastMessageReceived = result;
                 con.updateAvRTT((int) (System.currentTimeMillis() - lastMessageSentAt));
                 step = -1;
+                DebugStats.conversation_numValid.getAndIncrement();
                 return;
             } else {
                 msg.mutateToRequestReceipt();
@@ -110,11 +138,5 @@ public class P2LConversation {
         }
 
         throw new TimeoutException();
-    }
-
-    private boolean isServer = false;
-    public void serverInit() {
-        step=0;
-        isServer = true;
     }
 }

@@ -59,6 +59,7 @@ public class P2LMessageQueue {
 
     synchronized P2LFuture<P2LMessage> futureFor(SocketAddress from, short messageType, short conversationId, short step) {
         if(from == null) return futureFor(messageType);
+//        System.out.println("futureFor - from = [" + from + "], messageType = [" + messageType + "], conversationId = [" + conversationId + "], step = [" + step + "]");
         return futureFor(new SenderTypeConversationIdStepIdentifier(from, messageType, conversationId, step));
     }
     synchronized P2LFuture<P2LMessage> receiptFutureFor(SocketAddress from, short messageType, short conversationId) {
@@ -96,7 +97,7 @@ public class P2LMessageQueue {
         TypeIdentifier answersTypeRequest = received.header.getStep()!=P2LMessageHeader.NO_STEP?null:new TypeIdentifier(received);
 
 //        if(received.header.isReceipt())
-//            System.out.println("handleNewMessage[receipt] - answersRequest = " + answersRequest);
+//        System.out.println("handleNewMessage - answersRequest = " + answersRequest);
 
         Deque<P2LFuture<P2LMessage>> waitingForMessage = waitingReceivers.get(answersRequest); //higher priority
         Deque<P2LFuture<P2LMessage>> waitingForMessageId = answersTypeRequest==null?null:waitingReceivers.get(answersTypeRequest);
@@ -114,6 +115,8 @@ public class P2LMessageQueue {
                 if(waitingForMessageId.isEmpty())
                     waitingReceivers.remove(answersTypeRequest, waitingForMessageId);
             }
+
+//            System.out.println("toComplete = " + toComplete);
 
             if (toComplete == null) {
                 if(! received.header.isExpired() && answersTypeRequest != null) {

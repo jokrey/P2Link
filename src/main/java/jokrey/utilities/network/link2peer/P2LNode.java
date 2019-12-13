@@ -1,6 +1,6 @@
 package jokrey.utilities.network.link2peer;
 
-import jokrey.utilities.network.link2peer.node.core.ConversationReceivalHandlerChangeThisName;
+import jokrey.utilities.network.link2peer.node.core.ConversationAnswererChangeThisName;
 import jokrey.utilities.network.link2peer.node.core.NodeCreator;
 import jokrey.utilities.network.link2peer.node.core.P2LConversation;
 import jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes;
@@ -436,7 +436,7 @@ public interface P2LNode {
     interface Request<T> { P2LFuture<T> request() throws Throwable;}
 
 
-    void registerConversationFor(int type, ConversationReceivalHandlerChangeThisName handler);
+    void registerConversationFor(int type, ConversationAnswererChangeThisName handler);
     default P2LConversation convo(int type, int conversationId, P2Link to) {
         return convo(type, conversationId, to.getSocketAddress());
     }
