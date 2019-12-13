@@ -4,6 +4,8 @@ import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.node.message_headers.StreamReceiptHeader;
 
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
+
 /**
  * @author jokrey
  */
@@ -18,7 +20,7 @@ class P2LOrderedStreamReceipt {
     }
 
     static P2LMessage encode(int type, int conversationId, boolean eof, int latestReceived, int... missingParts) {
-        StreamReceiptHeader header = new StreamReceiptHeader(null, type, conversationId, eof);
+        StreamReceiptHeader header = new StreamReceiptHeader(null, toShort(type), toShort(conversationId), eof);
         int payloadLength = missingParts.length*4 + 4;
         byte[] raw = header.generateRaw(payloadLength);
         int raw_i = header.getSize();

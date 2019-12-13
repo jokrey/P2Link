@@ -78,7 +78,7 @@ import java.util.function.Function;
  * @author jokrey
  */
 public interface P2LNode {
-    int NO_CONVERSATION_ID = 0;
+    short NO_CONVERSATION_ID = 0;
 
     /**
      * @param selfLink port on which this node should listen for messages
@@ -115,7 +115,7 @@ public interface P2LNode {
      * Conversation id's should be created and send by the conversation initiator.
      * @return the created id
      */
-    int createUniqueConversationId();
+    short createUniqueConversationId();
 
 
     /**
@@ -244,6 +244,7 @@ public interface P2LNode {
      * If the the receipt was still not received after all retries, the connection is marked as broken.
      *
      * CURRENTLY: no handling of double message. Double received message in the context of a retry are handled twice (in case the receive drops)
+     *    work around has to be 'manual' using a conversation id
      *
      * @param to address to send to
      * @param message message to send
@@ -251,10 +252,15 @@ public interface P2LNode {
      * @param initialTimeout initial timeout - since doubled with each retry, max timeout is: (initialTimeout * 2^retries)
      * @throws IOException if any send went to garbage
      */
-    boolean sendMessageWithRetries(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) throws IOException; //initial timeout is doubled
+    boolean sendMessageWithRetries(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) throws IOException;
     /**@see #sendMessageWithRetries(SocketAddress, P2LMessage, int, int)*/
     default void sendMessageWithRetries(P2Link to, P2LMessage message, int attempts, int initialTimeout) throws IOException {
         sendMessageWithRetries(to.getSocketAddress(), message, attempts, initialTimeout);
+    }
+    boolean sendMessageWithRetries(SocketAddress to, P2LMessage message, int attempts) throws IOException;
+    /**@see #sendMessageWithRetries(SocketAddress, P2LMessage, int, int)*/
+    default void sendMessageWithRetries(P2Link to, P2LMessage message, int attempts) throws IOException {
+        sendMessageWithRetries(to.getSocketAddress(), message, attempts);
     }
 
 
@@ -279,11 +285,11 @@ public interface P2LNode {
     /**
      * Creates a future for an expected message with the given sender, messageType and conversationId (see {@link #createUniqueConversationId()}).
      * @param from the sender of the broadcast message (decoded from the raw ip packet)
-     * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
+     * @param type a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
      * @param conversationId the conversation id of the message
      * @return the created future
      */
-    P2LFuture<P2LMessage> expectMessage(SocketAddress from, int messageType, int conversationId);
+    P2LFuture<P2LMessage> expectMessage(SocketAddress from, int type, int conversationId);
     /**@see #expectMessage(SocketAddress, int, int)*/
     default P2LFuture<P2LMessage> expectMessage(P2Link from, int messageType, int conversationId) {
         return expectMessage(from.getSocketAddress(), messageType, conversationId);
@@ -431,7 +437,10 @@ public interface P2LNode {
 
 
     void registerConversationFor(int type, ConversationReceivalHandlerChangeThisName handler);
-    P2LConversation convo(int type);
+    default P2LConversation convo(int type, int conversationId, P2Link to) {
+        return convo(type, conversationId, to.getSocketAddress());
+    }
+    P2LConversation convo(int type, int conversationId, SocketAddress to);
 
     /**
      * This method provides another possibility of asynchronously receiving messages.

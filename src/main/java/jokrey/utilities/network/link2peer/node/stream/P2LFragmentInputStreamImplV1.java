@@ -11,6 +11,7 @@ import jokrey.utilities.network.link2peer.util.SyncHelp;
 import java.io.IOException;
 import java.net.SocketAddress;
 
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 import static jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputStreamImplV1.DEFAULT_BATCH_DELAY;
 import static jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputStreamImplV1.RECEIPT_DELAY_MULTIPLIER;
 
@@ -20,9 +21,9 @@ import static jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputSt
 public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
     private int receiptPackageMaxSize;
     long receipt_delay_ms;
-    protected P2LFragmentInputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId) {
+    protected P2LFragmentInputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId) {
         super(parent, to, con, type, conversationId);
-        int headerSize = new StreamReceiptHeader(null, type, conversationId,false).getSize();
+        int headerSize = new StreamReceiptHeader(null, toShort(type), toShort(conversationId),false).getSize();
         receiptPackageMaxSize = con==null?1024:con.remoteBufferSize - headerSize;
         long batch_delay_ms = con==null? DEFAULT_BATCH_DELAY :Math.max(con.avRTT, DEFAULT_BATCH_DELAY);
         receipt_delay_ms = batch_delay_ms * RECEIPT_DELAY_MULTIPLIER;//con==null?50:con.avRTT/2;
@@ -114,7 +115,7 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
 
     private synchronized void sendReceipt(int receiptPackageMaxSize) throws IOException {
         System.out.println("SEND RECEIPT("+receiptPackageMaxSize+", "+P2LMessage.CUSTOM_RAW_SIZE_LIMIT+") receipt.latestReceived = " + highestEndReceived+", receipt.missingRanges("+missingRanges.size()+") = " + missingRanges);
-        parent.sendInternalMessage(P2LFragmentStreamReceipt.encode(type, conversationId, isClosed(), (int) highestEndReceived, missingRanges, receiptID++, receiptPackageMaxSize), from);
+        parent.sendInternalMessage(from, P2LFragmentStreamReceipt.encode(type, conversationId, isClosed(), (int) highestEndReceived, missingRanges, receiptID++, receiptPackageMaxSize));
     }
 
     @Override public boolean isClosed() {

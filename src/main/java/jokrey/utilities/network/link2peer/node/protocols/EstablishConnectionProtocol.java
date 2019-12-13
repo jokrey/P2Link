@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
+import static jokrey.utilities.network.link2peer.P2LMessage.EXPIRE_INSTANTLY;
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.*;
 
 /**
@@ -66,22 +67,28 @@ public class EstablishConnectionProtocol {
 
     //GUARANTEED DIFFERENT CONVERSATION IDS FOR INITIAL DIRECT AND REVERSE CONNECTIONS, BECAUSE OF:
     // theoretical problem: coincidentally it could be possible that a peer initiates a connection using the same conversationId (SOLUTION: NEGATIVE AND POSITIVE CONVERSATION IDS)
-    private static int createConversationForInitialDirect(P2LNodeInternal parent) {
-        return - Math.abs(parent.createUniqueConversationId()); //ALWAYS NEGATIVE
+    public static short createConversationForInitialDirect(P2LNodeInternal parent) {
+        return (short) -abs(parent.createUniqueConversationId()); //ALWAYS NEGATIVE
     }
-    private static int createConversationForReverse(P2LNodeInternal parent) {
-        int conversationId;
+    public static short createConversationForReverse(P2LNodeInternal parent) {
+        short conversationId;
         do {
             conversationId = parent.createUniqueConversationId();
-        } while(conversationId==Integer.MIN_VALUE); //abs(min value) == min value, therefore min value illegal here
-        return Math.abs(conversationId); //ALWAYS POSITIVE
+        } while(conversationId==Short.MIN_VALUE); //abs(min value) == min value, therefore min value illegal here
+        return abs(conversationId); //ALWAYS POSITIVE
+    }
+    public static short abs(short a) {
+        return (a < 0) ? (short) -a : a;
     }
 
     private static boolean asInitiatorRequestReverseConnection(P2LNodeInternal parent, SocketAddress relaySocketAddress, P2Link to, boolean giveExplicitSelfLink, int attempts, int initialTimeout) {
+        System.err.println(parent.getSelfLink()+" - EstablishConnectionProtocol.asInitiatorRequestReverseConnection");
         int conversationId = createConversationForReverse(parent);
         P2LFuture<Boolean> future = new P2LFuture<>();
         parent.addConnectionEstablishedListener((link, connectConversationId) -> {
 //            if(link.equals(to)) //does not work - link to us can be different than link to relay server (which we queried the to link from)
+            System.out.println(parent.getSelfLink()+" - conversationId = " + conversationId);
+            System.out.println(parent.getSelfLink()+" - connectConversationId = " + connectConversationId);
             if(conversationId == connectConversationId)
                 future.setCompleted(true);
         });
@@ -95,7 +102,7 @@ public class EstablishConnectionProtocol {
         byte[] connectToRaw = initialRequestMessage.nextVariable();
         P2Link connectTo = connectToRaw.length==0?initialRequestMessage.header.getSender():P2Link.fromBytes(connectToRaw);
         P2Link requestFrom = P2Link.fromBytes(initialRequestMessage.nextVariable());
-        return parent.sendInternalMessageWithRetries(P2LMessage.Factory.createSendMessage(SL_REQUEST_DIRECT_CONNECT_TO, initialRequestMessage.header.getConversationId(), connectTo.getBytesRepresentation()),
+        return parent.sendInternalMessageWithRetries(P2LMessage.Factory.createSendMessage(SL_REQUEST_DIRECT_CONNECT_TO, initialRequestMessage.header.getConversationId(), EXPIRE_INSTANTLY, connectTo.getBytesRepresentation()),
                 requestFrom.getSocketAddress(), P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT);
     }
     public static void asAnswererRequestReverseConnection(P2LNodeInternal parent, P2LMessage initialRequestMessage) {
@@ -104,16 +111,16 @@ public class EstablishConnectionProtocol {
                 P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT);
     }
 
-    private static boolean asInitiatorDirect(P2LNodeInternal parent, P2Link to, Supplier<Integer> conversationIdSupplier, int attempts, int initialTimeout) {
+    private static boolean asInitiatorDirect(P2LNodeInternal parent, P2Link to, Supplier<Short> conversationIdSupplier, int attempts, int initialTimeout) {
         if(parent.connectionLimitReached()) return false;
 
         AtomicLong startAt = new AtomicLong();
-        Pair<P2LConnection, Integer> idWhichWon = parent.tryReceiveOrNull(attempts, initialTimeout, () -> {
-            Integer conversationId = conversationIdSupplier.get();
+        Pair<P2LConnection, Short> idWhichWon = parent.tryReceiveOrNull(attempts, initialTimeout, () -> {
+            Short conversationId = conversationIdSupplier.get();
             if (parent.isConnectedTo(to)) return new P2LFuture<>(new Pair<>(null, conversationId));
             return P2LFuture.before(
                     () -> {
-                        parent.sendInternalMessage(selfLinkToMessage(parent, SL_DIRECT_CONNECTION_REQUEST, conversationId), to.getSocketAddress());
+                        parent.sendInternalMessage(to.getSocketAddress(), selfLinkToMessage(parent, SL_DIRECT_CONNECTION_REQUEST, conversationId));
                         startAt.set(System.currentTimeMillis());
                     },
                     parent.expectInternalMessage(to.getSocketAddress(), R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId))
@@ -125,7 +132,7 @@ public class EstablishConnectionProtocol {
                         try {
                             return P2LFuture.before(
                                     () -> {
-                                        parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_ANSWER, conversationId, verifyNonce), to.getSocketAddress());
+                                        parent.sendInternalMessage(to.getSocketAddress(), P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_ANSWER, conversationId, EXPIRE_INSTANTLY, verifyNonce));
                                         startAt.set(System.currentTimeMillis());
                                     },
                                     parent.expectInternalMessage(to.getSocketAddress(), R_DIRECT_CONNECTION_ESTABLISHED, conversationId)
@@ -155,11 +162,11 @@ public class EstablishConnectionProtocol {
 
         int conversationId = initialRequestMessage.header.getConversationId();
         if (parent.connectionLimitReached()) {
-            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId, BitHelper.getBytes(P2LMessage.CUSTOM_RAW_SIZE_LIMIT)), from); //do not retry refusal
+            parent.sendInternalMessage(from, P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId, BitHelper.getBytes(P2LMessage.CUSTOM_RAW_SIZE_LIMIT))); //do not retry refusal
             return;
         }
         if (parent.isConnectedTo(peer.link)) {
-            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId, BitHelper.getBytes(P2LMessage.CUSTOM_RAW_SIZE_LIMIT)), from); //do not retry refusal
+            parent.sendInternalMessage(from, P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId, BitHelper.getBytes(P2LMessage.CUSTOM_RAW_SIZE_LIMIT))); //do not retry refusal
             return;
         }
 
@@ -174,13 +181,13 @@ public class EstablishConnectionProtocol {
 
         long startAt = System.currentTimeMillis();
         byte[] verifyNonce = P2LFuture.before(() ->
-                parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId, nonce), from),
+                parent.sendInternalMessage(from, P2LMessage.Factory.createSendMessage(R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST, conversationId, nonce)),
                 parent.expectInternalMessage(from, R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_ANSWER, conversationId))
                 .get(P2LHeuristics.DEFAULT_PROTOCOL_ANSWER_RECEIVE_TIMEOUT).asBytes();
         peer.avRTT = Math.toIntExact(System.currentTimeMillis() - startAt);
         if (Arrays.equals(nonce, verifyNonce)) {
             parent.graduateToEstablishedConnection(peer, initialRequestMessage.header.getConversationId());
-            parent.sendInternalMessage(selfLinkToMessage(parent, R_DIRECT_CONNECTION_ESTABLISHED, conversationId), from);
+            parent.sendInternalMessage(from, selfLinkToMessage(parent, R_DIRECT_CONNECTION_ESTABLISHED, conversationId));
         }
     }
 

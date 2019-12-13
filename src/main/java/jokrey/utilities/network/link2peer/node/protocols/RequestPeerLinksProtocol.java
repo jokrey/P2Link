@@ -19,7 +19,7 @@ public class RequestPeerLinksProtocol {
     public static List<P2Link> asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
         return parent.tryReceive(P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT, () ->
                 P2LFuture.before(() ->
-                        parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS), to),
+                        parent.sendInternalMessage(to, P2LMessage.Factory.createSendMessage(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS)),
                         parent.expectInternalMessage(to, C_PEER_LINKS))
                 .toType(message -> {
                     ArrayList<P2Link> peers = new ArrayList<>();
@@ -36,6 +36,6 @@ public class RequestPeerLinksProtocol {
             if (!origEstablishedConnection.getSocketAddress().equals(fromRaw))
                 establishedAsStrings.add(origEstablishedConnection.getStringRepresentation());
 
-        parent.sendInternalMessage(P2LMessage.Factory.createSendMessageFromVariables(C_PEER_LINKS, establishedAsStrings), fromRaw);
+        parent.sendInternalMessage(fromRaw, P2LMessage.Factory.createSendMessageFromVariables(C_PEER_LINKS, establishedAsStrings));
     }
 }

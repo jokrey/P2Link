@@ -5,10 +5,10 @@ import jokrey.utilities.network.link2peer.P2Link;
 /**
  * @author jokrey
  */
-public class StreamPartHeader extends ConversationHeader {
+public class StreamPartHeader extends ConversationIdHeader {
     public int index;
     private final boolean eofIndicator;
-    public StreamPartHeader(P2Link sender, int type, int conversationId, int index, boolean requestReceipt, boolean eofIndicator) {
+    public StreamPartHeader(P2Link sender, short type, short conversationId, int index, boolean requestReceipt, boolean eofIndicator) {
         super(sender, type, conversationId, requestReceipt);
 
         this.index = index;

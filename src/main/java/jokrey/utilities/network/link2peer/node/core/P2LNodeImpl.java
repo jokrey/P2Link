@@ -17,7 +17,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.validateMsgIdNotInternal;
+import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.validateMsgTypeNotInternal;
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_STEP;
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 
 /**
  *
@@ -53,12 +55,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
                     for(P2Link retryable:retryableHistoricConnections)
                         outgoingPool.execute(() -> EstablishConnectionProtocol.asInitiator(this, retryable, 1, P2LHeuristics.RETRY_HISTORIC_CONNECTION_TIMEOUT_MS)); //result does not matter - initiator will internally graduate a successful connection - and the timeout is much less than 10000
 
-                    incomingHandler.internalMessageQueue.clean();
-                    incomingHandler.receiptsQueue.clean();
-                    incomingHandler.userBrdMessageQueue.clean();
-                    incomingHandler.userMessageQueue.clean();
+                    incomingHandler.messageQueue.clean();
+                    incomingHandler.brdMessageQueue.clean();
                     incomingHandler.broadcastState.clean(true);
                     incomingHandler.longMessageHandler.clean();
+                    incomingHandler.conversationMessageHandler.clean();
 
                     Thread.sleep(P2LHeuristics.MAIN_NODE_SLEEP_TIMEOUT_MS);
 
@@ -123,7 +124,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
 
     @Override public P2LFuture<Integer> sendBroadcastWithReceipts(P2LMessage message) {
         if(message.header.getSender() == null) throw new IllegalArgumentException("sender of message has to be attached in broadcasts");
-        validateMsgIdNotInternal(message.header.getType());
+        validateMsgTypeNotInternal(message.header.getType());
 
         incomingHandler.broadcastState.markAsKnown(message.getContentHash());
 
@@ -131,19 +132,23 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
 
 
+    @Override public void registerConversationFor(int type, ConversationReceivalHandlerChangeThisName handler) {
+        incomingHandler.conversationMessageHandler.registerConversationFor(type, handler);
+    }
 
-
-
-
-
+    @Override public P2LConversation convo(int type, int conversationId, SocketAddress to) {
+        P2LConnection con = establishedConnections.get(to);
+        if(con == null) throw new IllegalStateException("convos can only be had with established connections, please consider establishing a connection to to");
+        return new P2LConversation(this, incomingHandler.conversationMessageHandler.conversationQueue, con, toShort(type), toShort(conversationId));
+    }
 
     //DIRECT MESSAGING:
-    @Override public void sendInternalMessage(P2LMessage message, SocketAddress to) throws IOException {
+    @Override public void sendInternalMessage(SocketAddress to, P2LMessage message) throws IOException {
         if(message.header.getSender() != null) throw new IllegalArgumentException("sender of message has to be this null and will be automatically set by the sender");
 
         if(message.canBeSentInSinglePacket()) {
-//            System.out.println("sendInternalMessage - message = " + message + ", to = " + to);
-            incomingHandler.serverSocket.send(message.toPacket(to)); //since the server socket is bound to a port, said port will be included in the udp packet
+//            System.out.println(getSelfLink()+" - sendInternalMessage - to = [" + to + "], message = " + message);
+            incomingHandler.serverSocket.send(message.toPacket(to));
         } else {
             //todo - is it really desirable to have packages be broken up THIS automatically???
             //todo    - like it is cool that breaking up packages does not make a difference, but... like it is so transparent it could lead to inefficiencies
@@ -152,24 +157,12 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
             incomingHandler.longMessageHandler.send(this, message, to);
         }
     }
-    @Override public void sendMessage(SocketAddress to, P2LMessage message) throws IOException {
-        validateMsgIdNotInternal(message.header.getType());
-        sendInternalMessage(message, to);
-    }
-    @Override public P2LFuture<Boolean> sendMessageWithReceipt(SocketAddress to, P2LMessage message) throws IOException {
-        validateMsgIdNotInternal(message.header.getType());
-        return sendInternalMessageWithReceipt(message, to);
-    }
-    @Override public boolean sendMessageWithRetries(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) {
-        validateMsgIdNotInternal(message.header.getType());
-        return sendInternalMessageWithRetries(message, to, attempts, initialTimeout);
-    }
-    @Override public P2LFuture<Boolean> sendInternalMessageWithReceipt(P2LMessage message, SocketAddress to) throws IOException {
+    @Override public P2LFuture<Boolean> sendInternalMessageWithReceipt(SocketAddress to, P2LMessage message) throws IOException {
         message.mutateToRequestReceipt();
         try {
             return P2LFuture.before(() ->
-                    sendInternalMessage(message, to),
-                    incomingHandler.receiptsQueue.receiptFutureFor(to, message.header.getType(), message.header.getConversationId()))
+                    sendInternalMessage(to, message),
+                    incomingHandler.messageQueue.receiptFutureFor(to, message.header.getType(), message.header.getConversationId()))
                     .toBooleanFuture(receipt -> receipt.validateIsReceiptFor(message));
         } catch (IOException t) {
             throw t;
@@ -178,63 +171,50 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
             throw new IOException(t.getClass()+" - "+t.getMessage());
         }
     }
-    @Override public boolean sendInternalMessageWithRetries(P2LMessage message, SocketAddress to, int attempts, int initialTimeout) {
-        boolean success = tryComplete(attempts, initialTimeout, () -> sendInternalMessageWithReceipt(message, to));
-        if(!success)
-            markBrokenConnection(toEstablished(to), true);
-        return success;
+
+    @Override public boolean sendInternalMessageWithRetries(SocketAddress to, P2LMessage message, int attempts) {
+        P2LConnection con = establishedConnections.get(to);
+        if(con == null) throw new IllegalArgumentException("to("+to+") has to be an established connection - to automatically determine the required values");
+        return sendInternalMessageWithRetries(message, to, attempts, (int) (con.avRTT*1.1));
     }
 
+    @Override public P2LFuture<P2LMessage> expectMessage(int messageType) {
+        validateMsgTypeNotInternal(messageType);
+        return incomingHandler.messageQueue.futureFor(toShort(messageType));
+    }
     @Override public P2LFuture<P2LMessage> expectInternalMessage(SocketAddress from, int messageType) {
-        return incomingHandler.internalMessageQueue.futureFor(from, messageType);
+        return incomingHandler.messageQueue.futureFor(from, toShort(messageType));
     }
     @Override public P2LFuture<P2LMessage> expectInternalMessage(SocketAddress from, int messageType, int conversationId) {
-        return incomingHandler.internalMessageQueue.futureFor(from, messageType, conversationId);
-    }
-    @Override public P2LFuture<P2LMessage> expectMessage(int messageType) {
-        validateMsgIdNotInternal(messageType);
-        return incomingHandler.userMessageQueue.futureFor(messageType);
-    }
-    public P2LFuture<P2LMessage> expectMessage(SocketAddress from, int messageType) {
-        validateMsgIdNotInternal(messageType);
-        return incomingHandler.userMessageQueue.futureFor(from, messageType);
-    }
-    public P2LFuture<P2LMessage> expectMessage(SocketAddress from, int messageType, int conversationId) {
-        validateMsgIdNotInternal(messageType);
-        return incomingHandler.userMessageQueue.futureFor(from, messageType, conversationId);
+        return incomingHandler.messageQueue.futureFor(from, toShort(messageType), toShort(conversationId));
     }
     @Override public P2LFuture<P2LMessage> expectBroadcastMessage(int messageType) {
-        validateMsgIdNotInternal(messageType);
-//        System.out.println("incomingHandler.userBrdMessageQueue.debugString() = " + incomingHandler.userBrdMessageQueue.debugString());
-        return incomingHandler.userBrdMessageQueue.futureFor(messageType);
+        validateMsgTypeNotInternal(messageType);
+        return incomingHandler.brdMessageQueue.futureFor(toShort(messageType));
     }
-//    @Override public P2LFuture<P2LMessage> expectBroadcastMessage(P2Link from, int messageType) {
-//        validateMsgIdNotInternal(messageType);
-//        return incomingHandler.userBrdMessageQueue.futureFor(from, messageType);
-//    }
     @Override public P2LOrderedInputStream createInputStream(SocketAddress from, int messageType, int conversationId) {
-        validateMsgIdNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.createInputStream(this, from, establishedConnections.get(from), messageType, conversationId);
+        validateMsgTypeNotInternal(messageType);
+        return incomingHandler.streamMessageHandler.createInputStream(this, from, establishedConnections.get(from), toShort(messageType), toShort(conversationId));
     }
     @Override public boolean registerCustomInputStream(SocketAddress from, int messageType, int conversationId, P2LInputStream inputStream) {
-        validateMsgIdNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.createCustomInputStream(from, messageType, conversationId, inputStream);
+        validateMsgTypeNotInternal(messageType);
+        return incomingHandler.streamMessageHandler.createCustomInputStream(from, toShort(messageType), toShort(conversationId), inputStream);
     }
     @Override public P2LOrderedOutputStream createOutputStream(SocketAddress to, int messageType, int conversationId) {
-        validateMsgIdNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.createOutputStream(this, to, establishedConnections.get(to), messageType, conversationId);
+        validateMsgTypeNotInternal(messageType);
+        return incomingHandler.streamMessageHandler.createOutputStream(this, to, establishedConnections.get(to), toShort(messageType), toShort(conversationId));
     }
     @Override public boolean registerCustomOutputStream(SocketAddress to, int messageType, int conversationId, P2LOutputStream outputStream) {
-        validateMsgIdNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.registerCustomOutputStream(to, messageType, conversationId, outputStream);
+        validateMsgTypeNotInternal(messageType);
+        return incomingHandler.streamMessageHandler.registerCustomOutputStream(to, toShort(messageType), toShort(conversationId), outputStream);
     }
     @Override public P2LFragmentInputStream createFragmentInputStream(SocketAddress from, int messageType, int conversationId) {
-        validateMsgIdNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.createFragmentInputStream(this, from, establishedConnections.get(from), messageType, conversationId);
+        validateMsgTypeNotInternal(messageType);
+        return incomingHandler.streamMessageHandler.createFragmentInputStream(this, from, establishedConnections.get(from), toShort(messageType), toShort(conversationId));
     }
     @Override public P2LFragmentOutputStream createFragmentOutputStream(SocketAddress to, int messageType, int conversationId) {
-        validateMsgIdNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.createFragmentOutputStream(this, to, establishedConnections.get(to), messageType, conversationId);
+        validateMsgTypeNotInternal(messageType);
+        return incomingHandler.streamMessageHandler.createFragmentOutputStream(this, to, establishedConnections.get(to), toShort(messageType), toShort(conversationId));
     }
     @Override public void unregister(P2LInputStream stream) {
         incomingHandler.streamMessageHandler.unregister(stream);
@@ -366,14 +346,21 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
 
 
     private AtomicInteger runningConversationId = new AtomicInteger(NO_CONVERSATION_ID + 1);
-    @Override public int createUniqueConversationId() {
-        int uniqueConversationId;
-        do {
-            uniqueConversationId = runningConversationId.getAndIncrement();
-        } while(uniqueConversationId==NO_CONVERSATION_ID); //race condition does not matter here - maybe a number is skipped, but it is still unique
-        return uniqueConversationId;//will eventually overflow - but by then the conversation has likely ended
-                                       //does not need to be unique between nodes - because it is always in combination with from(sender)+type
-                                       //potential problem:
+    @Override public short createUniqueConversationId() {
+        //Lock free - i hope
+        while(true) {
+            int id = runningConversationId.get();
+            if(id+1 == NO_CONVERSATION_ID) {
+                if(runningConversationId.compareAndSet(id, 1))
+                    return 1;
+            } else if(id+1 > Short.MAX_VALUE) {
+                if(runningConversationId.compareAndSet(id, Short.MIN_VALUE))
+                    return Short.MIN_VALUE;
+            } else {
+                if(runningConversationId.compareAndSet(id, id+1))
+                    return (short) (id+1);
+            }
+        }
     }
 
 
@@ -384,10 +371,8 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         System.out.println("establishedConnections("+establishedConnections.size()+") = " + establishedConnections);
         System.out.println("historicConnections("+historicConnections.size()+") = " + historicConnections);
         System.out.println("incomingHandler.broadcastState = " + incomingHandler.broadcastState.debugString());
-        System.out.println("incomingHandler.internalMessageQueue.debugString() = " + incomingHandler.internalMessageQueue.debugString());
-        System.out.println("incomingHandler.receiptsQueue.debugString() = " + incomingHandler.receiptsQueue.debugString());
-        System.out.println("incomingHandler.userMessageQueue.debugString() = " + incomingHandler.userMessageQueue.debugString());
-        System.out.println("incomingHandler.userBrdMessageQueue.debugString() = " + incomingHandler.userBrdMessageQueue.debugString());
+        System.out.println("incomingHandler.messageQueue.debugString() = " + incomingHandler.messageQueue.debugString());
+        System.out.println("incomingHandler.userBrdMessageQueue.debugString() = " + incomingHandler.brdMessageQueue.debugString());
         System.out.println("incomingHandler.longMessageHandler.debugString() = " + incomingHandler.longMessageHandler.debugString());
         System.out.println("incomingHandler.handleReceivedMessagesPool = " + incomingHandler.handleReceivedMessagesPool.debugString());
         System.out.println("outgoingPool = " + outgoingPool.debugString());

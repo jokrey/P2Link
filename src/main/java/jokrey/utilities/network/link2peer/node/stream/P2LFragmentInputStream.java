@@ -50,8 +50,8 @@ public abstract class P2LFragmentInputStream implements P2LInputStream {
     protected final P2LNodeInternal parent;
     protected final SocketAddress from;
     protected final P2LConnection con;
-    protected final int type, conversationId;
-    protected P2LFragmentInputStream(P2LNodeInternal parent, SocketAddress from, P2LConnection con, int type, int conversationId) {
+    protected final short type, conversationId;
+    protected P2LFragmentInputStream(P2LNodeInternal parent, SocketAddress from, P2LConnection con, short type, short conversationId) {
         this.parent = parent;
         this.from = from;
         this.con = con;
@@ -60,8 +60,8 @@ public abstract class P2LFragmentInputStream implements P2LInputStream {
     }
 
     @Override public SocketAddress getRawFrom() { return from; }
-    @Override public int getType() { return type; }
-    @Override public int getConversationId() { return conversationId; }
+    @Override public short getType() { return type; }
+    @Override public short getConversationId() { return conversationId; }
     //    private HashMap<Integer, Integer> mappingOfStartToEndIndexOfMissingRanges = new HashMap<>(P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE);
 //    private int latestReceivedEndIndex = 0;
 //

@@ -15,10 +15,9 @@ public abstract class P2LFragmentOutputStream implements P2LOutputStream {
     protected final P2LNodeInternal parent;
     protected final SocketAddress to;
     protected final P2LConnection con;
-    protected final int type;
-    protected final int conversationId;
+    protected final short type, conversationId;
     protected FragmentRetriever source;
-    protected P2LFragmentOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId) {
+    protected P2LFragmentOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId) {
         this.parent = parent;
         this.to = to;
         this.con = con;
@@ -26,8 +25,8 @@ public abstract class P2LFragmentOutputStream implements P2LOutputStream {
         this.conversationId = conversationId;
     }
     @Override public SocketAddress getRawFrom() { return to; }
-    @Override public int getType() { return type; }
-    @Override public int getConversationId() { return conversationId; }
+    @Override public short getType() { return type; }
+    @Override public short getConversationId() { return conversationId; }
 
 
     public void setSource(FragmentRetriever source) {

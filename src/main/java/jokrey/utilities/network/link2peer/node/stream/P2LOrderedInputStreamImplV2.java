@@ -23,7 +23,7 @@ public class P2LOrderedInputStreamImplV2 extends P2LOrderedInputStream {
     private int available = 0;
     private byte[] buffer = new byte[P2LHeuristics.ORDERED_STREAM_V2_MAX_BUFFER_SIZE];
 
-    protected P2LOrderedInputStreamImplV2(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId) {
+    protected P2LOrderedInputStreamImplV2(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId) {
         super(parent, to, type, conversationId);
         underlyingFragmentStream = new P2LFragmentInputStreamImplV1(parent, to, con, type, conversationId);
         underlyingFragmentStream.addFragmentReceivedListener((fragmentOffset, receivedRaw, dataOff, dataLen, eof) -> {

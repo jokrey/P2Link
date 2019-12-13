@@ -19,7 +19,7 @@ public class P2LOrderedOutputStreamImplV2 extends P2LOrderedOutputStream impleme
     private final TransparentBytesStorage buffer = new ByteArrayStorage(P2LHeuristics.ORDERED_STREAM_V2_MAX_BUFFER_SIZE);
     private long firstBufferIndexRepresents = 0;
 
-    protected P2LOrderedOutputStreamImplV2(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId) {
+    protected P2LOrderedOutputStreamImplV2(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId) {
         super(parent, to, con, type, conversationId);
         underlyingFragmentStream = new P2LFragmentOutputStreamImplV1(parent, to, con, type, conversationId);
         underlyingFragmentStream.setSource(this);
@@ -62,22 +62,21 @@ public class P2LOrderedOutputStreamImplV2 extends P2LOrderedOutputStream impleme
         return closedAt;
     }
     @Override public void adviceEarliestRequiredIndex(long index) {
-        //todo
-        TimeDiffMarker.setMark("adviceEarliestRequiredIndex");
-        System.out.println("adviceEarliestRequiredIndex - b - buffer.contentSize() = " + buffer.contentSize());
-        System.out.println("adviceEarliestRequiredIndex - b - index = " + index);
-//        System.out.println("adviceEarliestRequiredIndex - b - buffer = " + buffer);
-        System.out.println("adviceEarliestRequiredIndex - b - firstBufferIndexRepresents = " + firstBufferIndexRepresents);
-        System.out.println("adviceEarliestRequiredIndex - b - (index - firstBufferIndexRepresents > 0) = " + (index - firstBufferIndexRepresents > 0));
+//        TimeDiffMarker.setMark("adviceEarliestRequiredIndex");
+//        System.out.println("adviceEarliestRequiredIndex - b - buffer.contentSize() = " + buffer.contentSize());
+//        System.out.println("adviceEarliestRequiredIndex - b - index = " + index);
+////        System.out.println("adviceEarliestRequiredIndex - b - buffer = " + buffer);
+//        System.out.println("adviceEarliestRequiredIndex - b - firstBufferIndexRepresents = " + firstBufferIndexRepresents);
+//        System.out.println("adviceEarliestRequiredIndex - b - (index - firstBufferIndexRepresents > 0) = " + (index - firstBufferIndexRepresents > 0));
         if(index - firstBufferIndexRepresents > 0) {
-            buffer.delete(0, index - firstBufferIndexRepresents);
+            buffer.delete(0, Math.min(buffer.contentSize(), index - firstBufferIndexRepresents));
         }
         firstBufferIndexRepresents = index;
-        System.out.println("adviceEarliestRequiredIndex - a - buffer.contentSize() = " + buffer.contentSize());
-        System.out.println("adviceEarliestRequiredIndex - a - index = " + index);
-//        System.out.println("adviceEarliestRequiredIndex - a - buffer = " + buffer);
-        System.out.println("adviceEarliestRequiredIndex - a - firstBufferIndexRepresents = " + firstBufferIndexRepresents);
-        TimeDiffMarker.println("adviceEarliestRequiredIndex");
+//        System.out.println("adviceEarliestRequiredIndex - a - buffer.contentSize() = " + buffer.contentSize());
+//        System.out.println("adviceEarliestRequiredIndex - a - index = " + index);
+////        System.out.println("adviceEarliestRequiredIndex - a - buffer = " + buffer);
+//        System.out.println("adviceEarliestRequiredIndex - a - firstBufferIndexRepresents = " + firstBufferIndexRepresents);
+//        TimeDiffMarker.println("adviceEarliestRequiredIndex");
     }
 
 
@@ -86,7 +85,7 @@ public class P2LOrderedOutputStreamImplV2 extends P2LOrderedOutputStream impleme
     @Override public void receivedReceipt(P2LMessage rawReceipt) {
         underlyingFragmentStream.receivedReceipt(rawReceipt);
     }
-    @Override public boolean waitForConfirmationOnAll(int timeout_ms) throws IOException {
+    @Override public boolean waitForConfirmationOnAll(int timeout_ms) {
         return underlyingFragmentStream.waitForConfirmationOnAll(timeout_ms);
     }
     @Override public boolean close(int timeout_ms) {

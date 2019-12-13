@@ -22,7 +22,7 @@ import java.util.LinkedList;
  * @author jokrey
  */
 public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
-    public P2LOrderedInputStreamImplV1(P2LNodeInternal parent, SocketAddress to, int type, int conversationId) {
+    public P2LOrderedInputStreamImplV1(P2LNodeInternal parent, SocketAddress to, short type, short conversationId) {
         super(parent, to, type, conversationId);
     }
 
@@ -125,7 +125,7 @@ public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
 
         boolean eof = isClosed() || eofReached();
         try {
-            parent.sendInternalMessage(P2LOrderedStreamReceipt.encode(type, conversationId, eof, latestIndexReceived, getMissingPartIndices()), from);
+            parent.sendInternalMessage(from, P2LOrderedStreamReceipt.encode(type, conversationId, eof, latestIndexReceived, getMissingPartIndices()));
         } catch (IOException e) {
             e.printStackTrace();
         }

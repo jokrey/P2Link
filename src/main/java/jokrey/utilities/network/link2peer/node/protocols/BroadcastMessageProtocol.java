@@ -50,7 +50,7 @@ public class BroadcastMessageProtocol {
 
     private static boolean asInitiatorWithHash(P2LNodeInternal parent, P2LMessage message, SocketAddress to) {
         return parent.tryComplete(P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT, () ->
-                P2LFuture.before(() ->  parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(SC_BROADCAST_WITH_HASH, message.getContentHash().raw()), to),
+                P2LFuture.before(() ->  parent.sendInternalMessage(to, P2LMessage.Factory.createSendMessage(SC_BROADCAST_WITH_HASH, message.getContentHash().raw())),
                                         parent.expectInternalMessage(to, C_BROADCAST_HASH_KNOWLEDGE_ANSWER))
                 .andThen(peerHashKnowledgeOfMessage_msg -> {
                     boolean peerHashKnowledgeOfMessage = peerHashKnowledgeOfMessage_msg.nextBool();
@@ -58,8 +58,8 @@ public class BroadcastMessageProtocol {
                     if(!peerHashKnowledgeOfMessage) {
                         try {
                             parent.sendInternalMessage(
-                                    packBroadcastMessage(C_BROADCAST_MSG, message),
-                                    to);
+                                    to, packBroadcastMessage(C_BROADCAST_MSG, message)
+                            );
                         } catch (IOException e) {
                             return new P2LFuture<>(false);
                         }
@@ -76,12 +76,12 @@ public class BroadcastMessageProtocol {
 
         if(state.isKnown(brdMessageHash)) {
 //        if(wasKnown) {
-            parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(C_BROADCAST_HASH_KNOWLEDGE_ANSWER, true), from);
+            parent.sendInternalMessage(from, P2LMessage.Factory.createSendMessage(C_BROADCAST_HASH_KNOWLEDGE_ANSWER, true));
             //do not tell application about broadcast again
         } else {
             try {
                 P2LMessage message = P2LFuture.before(
-                        ()-> parent.sendInternalMessage(P2LMessage.Factory.createSendMessage(C_BROADCAST_HASH_KNOWLEDGE_ANSWER, false), from),
+                        ()-> parent.sendInternalMessage(from, P2LMessage.Factory.createSendMessage(C_BROADCAST_HASH_KNOWLEDGE_ANSWER, false)),
                         parent.expectInternalMessage(from, C_BROADCAST_MSG))
                         .get(P2LHeuristics.DEFAULT_PROTOCOL_ANSWER_RECEIVE_TIMEOUT);
                 P2LMessage receivedBroadcastMessage = unpackBroadcastMessage(message);
@@ -139,7 +139,7 @@ public class BroadcastMessageProtocol {
                 P2LMessage.makeVariableIndicatorFor(message.getPayloadLength()), message.asBytes());
     }
     private static P2LMessage unpackBroadcastMessage(P2LMessage message) {
-        int brdMsgType = message.nextInt();
+        short brdMsgType = message.nextShort();
         short expiresAfter = message.nextShort();
         P2Link sender = P2Link.fromString(message.nextVariableString());
         byte[] data = message.nextVariable();

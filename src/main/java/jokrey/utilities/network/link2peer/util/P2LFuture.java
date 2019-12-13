@@ -1,6 +1,8 @@
 package jokrey.utilities.network.link2peer.util;
 
+import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool.Task;
+import jokrey.utilities.simple.data_structure.pairs.Pair;
 import jokrey.utilities.simple.data_structure.stack.LinkedStack;
 import jokrey.utilities.simple.data_structure.stack.Stack;
 
@@ -222,6 +224,15 @@ public class P2LFuture<T> {
             }
         } finally {
             isGetWaiting = false;
+        }
+    }
+
+    void overrideResult(T newResult) {
+        if (newResult == null) throw new NullPointerException("result cannot be null");
+        synchronized (this) {
+            if (isCanceled()) throw new CanceledException();
+            this.result = newResult;
+            done();
         }
     }
 
@@ -520,6 +531,30 @@ public class P2LFuture<T> {
         if(futures.isEmpty())
             allResults.setCompleted(collector);
         return allResults;
+    }
+
+    public static <T, U> P2LFuture<Pair<T, U>> combineOr(P2LFuture<T> previous, P2LFuture<U> next) {
+        P2LFuture<Pair<T, U>> f = new P2LFuture<>();
+        previous.callMeBack(t -> {
+            Pair<T, U> previousResult = f.getResult();
+            if(previousResult == null)
+                f.overrideResult(new Pair<>(t, null));
+            else
+                f.overrideResult(new Pair<>(t, previousResult.r));
+
+        });
+        next.callMeBack(u -> {
+            Pair<T, U> previousResult = f.getResult();
+            if(previousResult == null)
+                f.overrideResult(new Pair<>(null, u));
+            else
+                f.overrideResult(new Pair<>(previousResult.l, u));
+        });
+        f.callMeBack(t -> { if(t == null) {
+            previous.cancelIfNotCompleted();
+            next.cancelIfNotCompleted();
+        } }); //if f is canceled, the underlying needs to be canceled as well - might be a short loop(i.e. the other callback canceled f, but that is not a problem)
+        return f;
     }
 
     /**

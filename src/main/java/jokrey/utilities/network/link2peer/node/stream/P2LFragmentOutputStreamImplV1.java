@@ -16,6 +16,8 @@ import java.util.ArrayList;
 import java.util.ListIterator;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
+
 /**
  *
  *
@@ -36,9 +38,9 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
     private long batch_delay_ms;
 
     private final BatchSizeCalculator batchSizeCalculator;
-    protected P2LFragmentOutputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId) {
+    protected P2LFragmentOutputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId) {
         super(parent, to, con, type, conversationId);
-        int headerSize = new StreamPartHeader(null, type, conversationId, 0, false, false).getSize();
+        int headerSize = new StreamPartHeader(null, toShort(type), toShort(conversationId), 0, false, false).getSize();
         packageSize = con==null?1024:con.remoteBufferSize - headerSize;
         batch_delay_ms = con==null? DEFAULT_BATCH_DELAY :Math.max(con.avRTT, DEFAULT_BATCH_DELAY);
 
@@ -166,7 +168,7 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
 //        return allSend || highestOffsetSentInLastBatch<0 || rangeE < highestOffsetSentInLastBatch-((batchSizeCalculator.getBatchSize())*packageSize);
 //    }
 
-    private void enqueueRange(long start, long end) throws InterruptedException {
+    private void enqueueRange(long start, long end) {
         long curStart = start;
         while(curStart < end) {
             DebugStats.fragmentStream1_numResend.getAndIncrement();
@@ -215,7 +217,7 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
                 numPackagesSentInBatch++;
                 highestOffsetSentInLastBatch = Math.max(highestOffsetSentInLastBatch, packageContent.realEndIndex);
                 latestSentIndex = Math.max(latestSentIndex, packageContent.realEndIndex);
-                parent.sendInternalMessage(message, to);
+                parent.sendInternalMessage(to, message);
 
                 LongTupleList current = sendSinceLastReceipt.get(0).r;
                 for (int i = current.size() - 1; i >= 0; i--) {
@@ -272,7 +274,7 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
         boolean lastPackage = packageContent.realEndIndex == source.totalNumBytes();
 //        System.out.println("lastPackage = " + lastPackage);
 //        System.out.println("packageContent.asString() = " + new String(packageContent.getContent(), StandardCharsets.UTF_8));
-        StreamPartHeader header = new StreamPartHeader(null, type, conversationId, (int) (packageContent.realStartIndex), false, lastPackage);
+        StreamPartHeader header = new StreamPartHeader(null, toShort(type), toShort(conversationId), (int) (packageContent.realStartIndex), false, lastPackage);
 //        System.out.println("content.length = " + content.length);
         return header.generateMessage(packageContent.content());
     }

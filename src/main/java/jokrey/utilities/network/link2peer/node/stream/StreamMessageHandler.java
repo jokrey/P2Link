@@ -26,18 +26,18 @@ public class StreamMessageHandler {
     private P2LInputStream getInputStream(P2LMessage m) {
         return inputStreams.get(new SenderTypeConversationIdentifier(m));
     }
-    public P2LOrderedInputStream createInputStream(P2LNodeInternal parent, SocketAddress from, P2LConnection con, int type, int conversationId) {
+    public P2LOrderedInputStream createInputStream(P2LNodeInternal parent, SocketAddress from, P2LConnection con, short type, short conversationId) {
         if(from == null || parent == null) throw new NullPointerException();
         HeaderIdentifier identifier = new SenderTypeConversationIdentifier(from, type, conversationId);
 //        return (P2LOrderedInputStream) inputStreams.computeIfAbsent(identifier, k -> new P2LOrderedInputStreamImplV1(parent, from, type, conversationId));
         return (P2LOrderedInputStream) inputStreams.computeIfAbsent(identifier, k -> new P2LOrderedInputStreamImplV2(parent, from, con, type, conversationId));
     }
-    public P2LFragmentInputStream createFragmentInputStream(P2LNodeInternal parent, SocketAddress from, P2LConnection con, int type, int conversationId) {
+    public P2LFragmentInputStream createFragmentInputStream(P2LNodeInternal parent, SocketAddress from, P2LConnection con, short type, short conversationId) {
         if(from == null || parent == null) throw new NullPointerException();
         HeaderIdentifier identifier = new SenderTypeConversationIdentifier(from, type, conversationId);
         return (P2LFragmentInputStream) inputStreams.computeIfAbsent(identifier, k -> new P2LFragmentInputStreamImplV1(parent, from, con, type, conversationId));
     }
-    public boolean createCustomInputStream(SocketAddress from, int type, int conversationId, P2LInputStream inputStream) {
+    public boolean createCustomInputStream(SocketAddress from, short type, short conversationId, P2LInputStream inputStream) {
         if(from == null) throw new NullPointerException();
         HeaderIdentifier identifier = new SenderTypeConversationIdentifier(from, type, conversationId);
         return inputStreams.putIfAbsent(identifier, inputStream) == null;
@@ -56,18 +56,18 @@ public class StreamMessageHandler {
     private P2LOutputStream getOutputStream(P2LMessage m) {
         return outputStreams.get(new SenderTypeConversationIdentifier(m));
     }
-    public P2LOrderedOutputStream createOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId) {
+    public P2LOrderedOutputStream createOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId) {
         if(parent == null || to == null) throw new NullPointerException();
         HeaderIdentifier identifier = new SenderTypeConversationIdentifier(to, type, conversationId);
 //        return (P2LOrderedOutputStream) outputStreams.computeIfAbsent(identifier, k -> new P2LOrderedOutputStreamImplV1(parent, to, con, type, conversationId));
         return (P2LOrderedOutputStream) outputStreams.computeIfAbsent(identifier, k -> new P2LOrderedOutputStreamImplV2(parent, to, con, type, conversationId));
     }
-    public P2LFragmentOutputStream createFragmentOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId) {
+    public P2LFragmentOutputStream createFragmentOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId) {
         if(parent == null || to == null) throw new NullPointerException();
         HeaderIdentifier identifier = new SenderTypeConversationIdentifier(to, type, conversationId);
         return (P2LFragmentOutputStream) outputStreams.computeIfAbsent(identifier, k -> new P2LFragmentOutputStreamImplV1(parent, to, con, type, conversationId));
     }
-    public boolean registerCustomOutputStream(SocketAddress from, int type, int conversationId, P2LOutputStream outputStream) {
+    public boolean registerCustomOutputStream(SocketAddress from, short type, short conversationId, P2LOutputStream outputStream) {
         if(from == null) throw new NullPointerException();
         HeaderIdentifier identifier = new SenderTypeConversationIdentifier(from, type, conversationId);
         return outputStreams.putIfAbsent(identifier, outputStream) == null;

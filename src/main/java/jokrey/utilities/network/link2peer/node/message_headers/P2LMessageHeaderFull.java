@@ -20,10 +20,10 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
     private final P2Link sender;
     @Override public P2Link getSender() { return sender; }
 
-    private final int type;
-    @Override public int getType() { return type; }
-    private final int conversationId;
-    @Override public int getConversationId() { return conversationId; }
+    private final short type;
+    @Override public short getType() { return type; }
+    private final short conversationId;
+    @Override public short getConversationId() { return conversationId; }
 
     //cannot be merged, index 0 is not necessarily the first packet received
     private final int partIndex;
@@ -54,6 +54,10 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
     @Override public short getExpiresAfter() {
         return expiresAfter;
     }
+    private final short step;
+    @Override public short getStep() {
+        return step;
+    }
 
     private final long createdAtCtm;//automatically set in the constructor
     @Override public boolean isExpired() {
@@ -63,13 +67,14 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
 
 
     public P2LMessageHeaderFull(P2Link sender,
-                                int type, int conversationId, short expiresAfter,
+                                short type, short conversationId, short expiresAfter, short step,
                                 int partIndex, int partNumberOfParts,
                                 boolean isReceipt, boolean isLongPart, boolean isStreamPart, boolean isStreamEof) {
         this.sender = sender;
         this.type = type;
         this.conversationId = conversationId;
         this.expiresAfter = expiresAfter;
+        this.step = step;
         this.partIndex = partIndex;
         this.partNumberOfParts = partNumberOfParts;
         this.isReceipt = isReceipt;

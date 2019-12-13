@@ -18,9 +18,9 @@ public interface P2LInputStream extends AutoCloseable {
     /** Internal use only. */
     SocketAddress getRawFrom();
     /** Internal use only. */
-    int getType();
+    short getType();
     /** Internal use only. */
-    int getConversationId();
+    short getConversationId();
 
     /** Closes this stream - subsequent calls to most methods may now thrown exceptions. Has to be idempotent. */
     @Override void close() throws IOException;

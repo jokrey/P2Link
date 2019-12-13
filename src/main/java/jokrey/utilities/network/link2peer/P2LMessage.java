@@ -20,7 +20,9 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 
+import static jokrey.utilities.network.link2peer.P2LNode.NO_CONVERSATION_ID;
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.isInternalMessageId;
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 
 /**
  * A message always has a sender and data. What actual data is transported is naturally arbitrary.
@@ -149,7 +151,7 @@ public class P2LMessage extends ByteArrayStorage {
         //todo - use less cryptographic function - the checksum of udp is already pretty safe - so even without the hash at all it is pretty safe
         //todo     - interesting would be a hash id that allows getting two receipts for the same sender-type-conversationId simultaneously  (though we are quickly approaching overkill territory here)
         Hash receiptHash = header.contentHashFromIgnoreSender(content, getPayloadLength());
-        P2LMessageHeader receiptHeader = new ReceiptHeader(null, header.getType(), header.getConversationId());
+        P2LMessageHeader receiptHeader = new ReceiptHeader(null, header.getType(), header.getConversationId(), header.getStep());
         return receiptHeader.generateMessage(receiptHash.raw());
     }
     public boolean validateIsReceiptFor(P2LMessage message) {
@@ -262,15 +264,15 @@ public class P2LMessage extends ByteArrayStorage {
         public static P2LMessage createSendMessage(int type, int conversationId, byte[] payload) {
             return createRawSendMessage(type, conversationId, EXPIRE_INSTANTLY, payload.length, payload);
         }
-        public static P2LMessage createSendMessage(int type, short expiresAfter, byte[] payload) {
-            return createRawSendMessage(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, payload.length, payload);
-        }
+//        public static P2LMessage createSendMessage(int type, short expiresAfter, byte[] payload) {
+//            return createRawSendMessage(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, payload.length, payload);
+//        }
         public static P2LMessage createSendMessage(int type, int conversationId, short expiresAfter, byte[] payload) {
             return createRawSendMessage(type, conversationId, expiresAfter, payload.length, payload);
         }
 
         public static P2LMessage createRawSendMessage(int type, int conversationId, short expiresAfter, int totalPayloadSize, byte[]... payloads) {
-            P2LMessageHeader header = P2LMessageHeader.from(null, type, conversationId, expiresAfter);
+            P2LMessageHeader header = P2LMessageHeader.from(null, toShort(type), toShort(conversationId), expiresAfter);
             byte[] raw = header.generateRaw(totalPayloadSize);
             int index = header.getSize();
             for(byte[] payload : payloads) {
@@ -285,7 +287,7 @@ public class P2LMessage extends ByteArrayStorage {
             return createSendMessage(type, trans.transform(payload));
         }
         public static <T>P2LMessage createSendMessage(int type, short expiresAfter, T payload) {
-            return createSendMessage(type, expiresAfter, trans.transform(payload));
+            return createSendMessage(type, NO_CONVERSATION_ID, expiresAfter, trans.transform(payload));
         }
         public static P2LMessage createSendMessageWith(int type, Object... payloads) {
             return createSendMessageFrom(type, P2LNode.NO_CONVERSATION_ID, payloads);
@@ -343,13 +345,13 @@ public class P2LMessage extends ByteArrayStorage {
             return createBroadcast(sender, brdMsgType, trans.transform(payload));
         }
         public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, byte[] payload) {
-            return new MinimalHeader(sender, brdMsgType, false).generateMessage(payload);
+            return new MinimalHeader(sender, toShort(brdMsgType), false).generateMessage(payload);
         }
         public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, short expiresAfter, Object payload) {
             return createBroadcast(sender, brdMsgType, expiresAfter, trans.transform(payload));
         }
         public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, short expiresAfter, byte[] payload) {
-            return new CustomExpirationHeader(sender, brdMsgType, expiresAfter, false).generateMessage(payload);
+            return new CustomExpirationHeader(sender, toShort(brdMsgType), expiresAfter, false).generateMessage(payload);
         }
 
 

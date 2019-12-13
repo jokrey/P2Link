@@ -18,10 +18,9 @@ public abstract class P2LOrderedOutputStream extends OutputStream implements P2L
     protected final P2LNodeInternal parent;
     protected final SocketAddress to;
     protected final P2LConnection con;
-    protected final int type;
-    protected final int conversationId;
+    protected final short type, conversationId;
 
-    protected P2LOrderedOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, int type, int conversationId) {
+    protected P2LOrderedOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId) {
         this.parent = parent;
         this.to = to;
         this.con = con;
@@ -29,8 +28,8 @@ public abstract class P2LOrderedOutputStream extends OutputStream implements P2L
         this.conversationId = conversationId;
     }
     @Override public SocketAddress getRawFrom() { return to; }
-    @Override public int getType() { return type; }
-    @Override public int getConversationId() { return conversationId; }
+    @Override public short getType() { return type; }
+    @Override public short getConversationId() { return conversationId; }
 
     /**
      * Writes a single byte of data. This method is non blocking.

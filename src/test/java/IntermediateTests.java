@@ -5,8 +5,10 @@ import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.core.NodeCreator;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
+import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.node.message_headers.StreamPartHeader;
+import jokrey.utilities.network.link2peer.node.protocols.EstablishConnectionProtocol;
 import jokrey.utilities.network.link2peer.util.CanceledException;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
@@ -26,6 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static jokrey.utilities.network.link2peer.P2LMessage.MAX_EXPIRATION_TIMEOUT;
+import static jokrey.utilities.network.link2peer.P2LNode.NO_CONVERSATION_ID;
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.rand;
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
 import static org.junit.jupiter.api.Assertions.*;
@@ -242,14 +245,14 @@ class IntermediateTests {
         ThreadLocalRandom.current().nextBytes(toSend_1To2);
         ThreadLocalRandom.current().nextBytes(toSend_2To1);
 //        int randomType = ThreadLocalRandom.current().nextInt(1, 400000);
-        int randomType = 4; //chosen by fair dice roll
+        int randomType = 4; //chosen by fair dice roll - not my joker by the way
 
         printPeers(node1, node2);
 
         P2LFuture<Boolean> sendResult;
-        sendResult = node1.sendMessageWithReceipt(node2.getSelfLink(), P2LMessage.Factory.createSendMessage(randomType, MAX_EXPIRATION_TIMEOUT, toSend_1To2));
+        sendResult = node1.sendMessageWithReceipt(node2.getSelfLink(), P2LMessage.Factory.createSendMessage(randomType, NO_CONVERSATION_ID, MAX_EXPIRATION_TIMEOUT, toSend_1To2));
         assertTrue(sendResult.get(2000));
-        sendResult = node2.sendMessageWithReceipt(node1.getSelfLink(), P2LMessage.Factory.createSendMessage(randomType, MAX_EXPIRATION_TIMEOUT, toSend_2To1));
+        sendResult = node2.sendMessageWithReceipt(node1.getSelfLink(), P2LMessage.Factory.createSendMessage(randomType, NO_CONVERSATION_ID, MAX_EXPIRATION_TIMEOUT, toSend_2To1));
         assertTrue(sendResult.get(2000));
 
         P2LMessage message = node1.expectMessage(randomType).get(200);
@@ -624,7 +627,7 @@ class IntermediateTests {
         P2LNode hidNode2 = null;
         P2LNode pubRelayNode3 = null;
         try {
-            //public - public
+//            public - public
             pubNode1 = NodeCreator.create(P2Link.createPublicLink("localhost", 7890));
             pubNode2 = NodeCreator.create(P2Link.createPublicLink("localhost", 7891));
 
@@ -682,6 +685,19 @@ class IntermediateTests {
         }
     }
 
+    @Test void conversationIdTest() throws IOException {
+        P2LNodeInternal parent = (P2LNodeInternal) NodeCreator.create(P2Link.createPublicLink("localhost", 60943));
+        for(int i=0;i<Short.MAX_VALUE*2;i++) {
+            short gen = EstablishConnectionProtocol.createConversationForInitialDirect(parent);
+            assertTrue(gen < 0);
+        }
+
+        for(int i=0;i<Short.MAX_VALUE*2;i++) {
+            short gen = EstablishConnectionProtocol.createConversationForReverse(parent);
+            assertTrue(gen > 0);
+        }
+    }
+
     public static void streamSplitAssertions(InputStream stream, String toSend, boolean forceClose) {
         int index = 0;
         String[] toSendSplit = toSend.split("\n");
@@ -707,10 +723,10 @@ class IntermediateTests {
             int numBytesThisPacket;
             int remaining = send.length-numBytesSend;
             if(i+1==packetCount) {
-                h = new StreamPartHeader(null, 1, P2LNode.NO_CONVERSATION_ID, i, false, true);
+                h = new StreamPartHeader(null, (short) 1, NO_CONVERSATION_ID, i, false, true);
                 numBytesThisPacket = remaining;
             } else {
-                h = new StreamPartHeader(null, 1, P2LNode.NO_CONVERSATION_ID, i, false, false);
+                h = new StreamPartHeader(null, (short) 1, NO_CONVERSATION_ID, i, false, false);
                 numBytesThisPacket = Math.min(remaining, rand(0, remaining/Math.max(1, (packetCount/4)) +2));
             }
             byte[] thisPacket = Arrays.copyOfRange(send, numBytesSend, numBytesSend+numBytesThisPacket);

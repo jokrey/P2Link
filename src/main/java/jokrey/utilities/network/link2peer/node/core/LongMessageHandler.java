@@ -51,10 +51,10 @@ class LongMessageHandler {
     void send(P2LNodeInternal parent, P2LMessage overLongMessage, SocketAddress to) throws IOException {
         if(overLongMessage.canBeSentInSinglePacket()) throw new IllegalArgumentException("message could be send in a single packet...");
         int maxPayloadSize = P2LMessage.CUSTOM_RAW_SIZE_LIMIT -
-                P2LMessageHeader.getSize(overLongMessage.header.isConversationIdPresent(), overLongMessage.header.isExpirationPresent(), true, false, false);
+                P2LMessageHeader.getSize(overLongMessage.header.isConversationIdPresent(), overLongMessage.header.isExpirationPresent(), overLongMessage.header.isStepPresent(), true, false, false);
         //todo - this is a little dumb: the custom raw size limit is only to avoid involuntary fragmentation in layer 1+2 and keep a small buffer size when receiving
         //todo     - but now we are doing the fragmentation.. (only in java so it is much slower than in HW)
-        //todo     - however if the receive buffer should generally remain small, I do not see an option
+        //todo     - however if the receive buffer should generally remain small, I do not see another option
         int numberOfRequiredParts = overLongMessage.getPayloadLength() / maxPayloadSize + 1;
         int lastPartSize = overLongMessage.getPayloadLength() % maxPayloadSize;
         if(lastPartSize == 0) {
@@ -66,7 +66,7 @@ class LongMessageHandler {
         for(int i=0;i<numberOfRequiredParts;i++) {
             int to_raw_i = from_raw_i + ((i+1==numberOfRequiredParts)? lastPartSize :maxPayloadSize);
             P2LMessage part = P2LMessage.Factory.messagePartFrom(overLongMessage, i, numberOfRequiredParts, from_raw_i, to_raw_i);
-            parent.sendInternalMessage(part, to);
+            parent.sendInternalMessage(to, part);
             from_raw_i = to_raw_i;
         }
 

@@ -14,7 +14,7 @@ import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTyp
  */
 public class PingProtocol {
     public static P2LFuture<Boolean> asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
-        return parent.sendInternalMessageWithReceipt(P2LMessage.Factory.createSendMessage(SL_PING, parent.createUniqueConversationId()), to);
+        return parent.sendInternalMessageWithReceipt(to, P2LMessage.Factory.createSendMessage(SL_PING, parent.createUniqueConversationId()));
     }
 //    static void asAnswerer(P2LNodeInternal parent, SocketAddress from) throws IOException {
 //        answering done automatically through receipts

@@ -17,6 +17,8 @@ public class DebugStats {
     public static AtomicInteger incomingHandler_numStreamReceipts = new AtomicInteger(0);
     public static AtomicInteger incomingHandler_numStreamParts = new AtomicInteger(0);
 
+    public static AtomicInteger conversation_numRetries = new AtomicInteger(0);
+
     public static int INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
     public static AtomicInteger incomingHandler_numIntentionallyDropped = new AtomicInteger(0);
 
@@ -30,19 +32,36 @@ public class DebugStats {
         incomingHandler_numStreamReceipts.set(0);
         incomingHandler_numStreamParts.set(0);
         incomingHandler_numIntentionallyDropped.set(0);
+        conversation_numRetries.set(0);
         INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE=0;
     }
 
     public static void print() {
-        System.out.println("INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = " + INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE);
-        System.out.println("incomingHandler_numStreamParts = " + incomingHandler_numStreamParts);
-        System.out.println("incomingHandler_numStreamReceipts = " + incomingHandler_numStreamReceipts);
-        System.out.println("fragmentStream1_numResend = " + fragmentStream1_numResend);
-        System.out.println("fragmentStream1_doubleReceived = " + fragmentStream1_doubleReceived);
-        System.out.println("fragmentStream1_validReceived = " + fragmentStream1_validReceived);
-        System.out.println("orderedStream1_numResend = " + orderedStream1_numResend);
-        System.out.println("orderedStream1_doubleReceived = " + orderedStream1_doubleReceived);
-        System.out.println("orderedStream1_validReceived = " + orderedStream1_validReceived);
+        print(false);
+    }
+    public static void print(boolean filterUnchanged) {
+        if(!filterUnchanged || INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE!=0)
+            System.out.println("INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = " + INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE);
+        if(!filterUnchanged || incomingHandler_numIntentionallyDropped.get()!=0)
+            System.out.println("incomingHandler_numIntentionallyDropped = " + incomingHandler_numIntentionallyDropped);
+        if(!filterUnchanged || incomingHandler_numStreamParts.get()!=0)
+            System.out.println("incomingHandler_numStreamParts = " + incomingHandler_numStreamParts);
+        if(!filterUnchanged || incomingHandler_numStreamReceipts.get()!=0)
+            System.out.println("incomingHandler_numStreamReceipts = " + incomingHandler_numStreamReceipts);
+        if(!filterUnchanged || fragmentStream1_numResend.get()!=0)
+            System.out.println("fragmentStream1_numResend = " + fragmentStream1_numResend);
+        if(!filterUnchanged || fragmentStream1_doubleReceived.get()!=0)
+            System.out.println("fragmentStream1_doubleReceived = " + fragmentStream1_doubleReceived);
+        if(!filterUnchanged || fragmentStream1_validReceived.get()!=0)
+            System.out.println("fragmentStream1_validReceived = " + fragmentStream1_validReceived);
+        if(!filterUnchanged || orderedStream1_numResend.get()!=0)
+            System.out.println("orderedStream1_numResend = " + orderedStream1_numResend);
+        if(!filterUnchanged || orderedStream1_doubleReceived.get()!=0)
+            System.out.println("orderedStream1_doubleReceived = " + orderedStream1_doubleReceived);
+        if(!filterUnchanged || orderedStream1_validReceived.get()!=0)
+            System.out.println("orderedStream1_validReceived = " + orderedStream1_validReceived);
+        if(!filterUnchanged || conversation_numRetries.get()!=0)
+            System.out.println("conversation_numRetries = " + conversation_numRetries);
     }
 
     public static void printAndReset() {

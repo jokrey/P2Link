@@ -5,10 +5,10 @@ import jokrey.utilities.network.link2peer.P2Link;
 /**
  * @author jokrey
  */
-public class FullShortMessageHeader extends CustomExpirationHeader {
+public class ConversationIdHeader extends MinimalHeader {
     private final short conversationId;
-    public FullShortMessageHeader(P2Link sender, short type, short conversationId, short expiresAfter, boolean requestReceipt) {
-        super(sender, type, expiresAfter, requestReceipt);
+    public ConversationIdHeader(P2Link sender, short type, short conversationId, boolean requestReceipt) {
+        super(sender, type, requestReceipt);
         this.conversationId = conversationId;
     }
 

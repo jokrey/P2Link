@@ -5,6 +5,8 @@ import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.node.message_headers.StreamReceiptHeader;
 import jokrey.utilities.network.link2peer.util.LongTupleList;
 
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
+
 /**
  * @author jokrey
  */
@@ -21,7 +23,7 @@ class P2LFragmentStreamReceipt {
     }
 
     static P2LMessage encode(int type, int conversationId, boolean eof, long latestReceived, LongTupleList missingParts, int receiptID, int maxPackageSize) {
-        StreamReceiptHeader header = new StreamReceiptHeader(null, type, conversationId, eof);
+        StreamReceiptHeader header = new StreamReceiptHeader(null, toShort(type), toShort(conversationId), eof);
         int maxPayloadLength = missingParts.size()*2 *8 + 8 + 4;
         byte[] raw = header.generateRaw(maxPayloadLength, maxPackageSize); //this max package size enforces that only the first x fitting packages are packed, the rest is just discarded
         int raw_i = header.getSize();

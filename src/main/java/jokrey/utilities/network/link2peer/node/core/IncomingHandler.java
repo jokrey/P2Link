@@ -12,9 +12,13 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketAddress;
 import java.net.SocketException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.*;
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_STEP;
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 
 /**
  * Protocol:
@@ -28,14 +32,12 @@ public class IncomingHandler {
     DatagramSocket serverSocket;
     private P2LNodeInternal parent;
 
-    final P2LMessageQueue internalMessageQueue = new P2LMessageQueue();
-    final P2LMessageQueue userMessageQueue = new P2LMessageQueue();
-    final P2LMessageQueue userBrdMessageQueue = new P2LMessageQueue();
-    final P2LMessageQueue receiptsQueue = new P2LMessageQueue();
+    final P2LMessageQueue messageQueue = new P2LMessageQueue();
+    final P2LMessageQueue brdMessageQueue = new P2LMessageQueue();
     final BroadcastMessageProtocol.BroadcastState broadcastState = new BroadcastMessageProtocol.BroadcastState();
     final LongMessageHandler longMessageHandler = new LongMessageHandler();
     final StreamMessageHandler streamMessageHandler = new StreamMessageHandler();
-//    final RetryHandler retryHandler = new RetryHandler();
+    final ConversationHandler conversationMessageHandler = new ConversationHandler();
 
     final P2LThreadPool handleReceivedMessagesPool = new P2LThreadPool(4, 64);
 
@@ -51,17 +53,17 @@ public class IncomingHandler {
                 return;
             }
         }
-//        System.out.println(parent.getSelfLink() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
+//        System.out.println(parent.getSelfLink() + " - handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
 
         parent.notifyPacketReceivedFrom(from);
 
+        //todo:?: allow streams and long messages ONLY from established connections? - why tho? - mtu knowledge + some more ddos protection maybe
         //todo: is this TOO transparent??? - allows unknowingly splitting up stream messages
         if(message.header.isLongPart()) {
-            message = longMessageHandler.received(message);
+            message = longMessageHandler.received(message);//NOTE: does not work for steps..
             if(message == null) return; //not yet entire message received
         }
 
-        //todo:?: allow streams and long messages ONLY from established connections? - why tho? - mtu knowledge + some more ddos protection maybe
         if(message.header.isStreamPart()) {
             if(message.header.isReceipt()) {
                 streamMessageHandler.receivedReceipt(message);
@@ -70,51 +72,40 @@ public class IncomingHandler {
                 streamMessageHandler.receivedPart(message);
                 DebugStats.incomingHandler_numStreamParts.getAndIncrement();
             }
-            return;
-        }
-
-        if (message.header.requestReceipt()) {
-            //TODO - problem: double send of message, after receipt packet was lost
-            //todo -   ends in message being handled twice (conversation id likely different, but message has same semantics)
-//            if(message.isRetry) {
-//                boolean hasBeenHandled = retryHandler.hasBeenHandled(message);
-//                if(hasBeenHandled)
-//                    return;
-//            } else {
-//                retryHandler.markHandled(message);
-            parent.sendInternalMessage(message.createReceipt(), from);
-//            }
-        }
-        if (message.header.isReceipt())
-            receiptsQueue.handleNewMessage(message);
-        else if (message.header.getType() == SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS) { //requires connection to asAnswererDirect data on the other side.....
-            RequestPeerLinksProtocol.asAnswerer(parent, from);
-        } else if (message.header.getType() == SL_WHO_AM_I) {
-            WhoAmIProtocol.asAnswerer(parent, receivedPacket);
-        } else if (message.header.getType() == SL_PING) {
-//            PingProtocol.asAnswerer(parent, from);
-            //ping always requests a receipt - so that was already sent
-        } else if (message.header.getType() == SL_DIRECT_CONNECTION_REQUEST) {
-            EstablishConnectionProtocol.asAnswererDirect(parent, receivedPacket.getSocketAddress(), message);
-        } else if(message.header.getType() == SL_REQUEST_DIRECT_CONNECT_TO) {
-            EstablishConnectionProtocol.asAnswererRequestReverseConnection(parent, message);
-        } else if(message.header.getType() == SL_RELAY_REQUEST_DIRECT_CONNECT) {
-            EstablishConnectionProtocol.asAnswererRelayRequestReverseConnection(parent, message);
-        } else if(message.header.getType() == SC_BROADCAST_WITHOUT_HASH) {
-            if(parent.isConnectedTo(from))
-                BroadcastMessageProtocol.asAnswererWithoutHash(parent, userBrdMessageQueue, broadcastState, from, message);
-        } else if (message.header.getType() == SC_BROADCAST_WITH_HASH) {
-            if(parent.isConnectedTo(from))
-                BroadcastMessageProtocol.asAnswererWithHash(parent, userBrdMessageQueue, broadcastState, from, message);
-        } else if (message.header.getType() == SC_DISCONNECT) {
-            if(parent.isConnectedTo(from))
-                DisconnectSingleConnectionProtocol.asAnswerer(parent, from);
+        } else if(message.header.getStep() != NO_STEP) {
+            conversationMessageHandler.received(parent, from, message);
         } else {
-            if (message.isInternalMessage()) {
-                internalMessageQueue.handleNewMessage(message);
+            if (message.header.requestReceipt())
+                parent.sendInternalMessage(from, message.createReceipt());
+
+            if(message.header.isReceipt())
+                messageQueue.handleNewMessage(message);
+            else if (message.header.getType() == SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS) { //requires connection to asAnswererDirect data on the other side.....
+                RequestPeerLinksProtocol.asAnswerer(parent, from);
+            } else if (message.header.getType() == SL_WHO_AM_I) {
+                WhoAmIProtocol.asAnswerer(parent, receivedPacket);
+            } else if (message.header.getType() == SL_PING) {
+//            PingProtocol.asAnswerer(parent, from);
+                //ping always requests a receipt - so that was already sent
+            } else if (message.header.getType() == SL_DIRECT_CONNECTION_REQUEST) {
+                EstablishConnectionProtocol.asAnswererDirect(parent, receivedPacket.getSocketAddress(), message);
+            } else if(message.header.getType() == SL_REQUEST_DIRECT_CONNECT_TO) {
+                EstablishConnectionProtocol.asAnswererRequestReverseConnection(parent, message);
+            } else if(message.header.getType() == SL_RELAY_REQUEST_DIRECT_CONNECT) {
+                EstablishConnectionProtocol.asAnswererRelayRequestReverseConnection(parent, message);
+            } else if(message.header.getType() == SC_BROADCAST_WITHOUT_HASH) {
+                if(parent.isConnectedTo(from))
+                    BroadcastMessageProtocol.asAnswererWithoutHash(parent, brdMessageQueue, broadcastState, from, message);
+            } else if (message.header.getType() == SC_BROADCAST_WITH_HASH) {
+                if(parent.isConnectedTo(from))
+                    BroadcastMessageProtocol.asAnswererWithHash(parent, brdMessageQueue, broadcastState, from, message);
+            } else if (message.header.getType() == SC_DISCONNECT) {
+                if(parent.isConnectedTo(from))
+                    DisconnectSingleConnectionProtocol.asAnswerer(parent, from);
             } else {
-                userMessageQueue.handleNewMessage(message);
-                parent.notifyUserMessageReceived(message);
+                messageQueue.handleNewMessage(message);
+                if (!message.isInternalMessage() && !message.header.isReceipt())
+                    parent.notifyUserMessageReceived(message);
             }
         }
 
@@ -158,10 +149,8 @@ public class IncomingHandler {
     void close() {
         serverSocket.close();
         handleReceivedMessagesPool.shutdown();
-        internalMessageQueue.clear();
-        userMessageQueue.clear();
-        userBrdMessageQueue.clear();
-        receiptsQueue.clear();
+        messageQueue.clear();
+        brdMessageQueue.clear();
         broadcastState.clear();
     }
     boolean isClosed() {

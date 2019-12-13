@@ -11,17 +11,19 @@ import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 import java.io.IOException;
 import java.net.SocketAddress;
 
+import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.validateMsgTypeNotInternal;
+
 public interface P2LNodeInternal extends P2LNode {
     void graduateToEstablishedConnection(P2LConnection peer, int conversationId);
     void markBrokenConnection(P2Link address, boolean retry);
     int remainingNumberOfAllowedPeerConnections();
 
-    void sendInternalMessage(P2LMessage message, SocketAddress to) throws IOException;
-    P2LFuture<Boolean> sendInternalMessageWithReceipt(P2LMessage message, SocketAddress to) throws IOException;
-    boolean sendInternalMessageWithRetries(P2LMessage message, SocketAddress to, int attempts, int initialTimeout);
+    void sendInternalMessage(SocketAddress to, P2LMessage message) throws IOException;
+    P2LFuture<Boolean> sendInternalMessageWithReceipt(SocketAddress to, P2LMessage message) throws IOException;
+    boolean sendInternalMessageWithRetries(SocketAddress to, P2LMessage message, int attempts) throws IOException;
 
-    P2LFuture<P2LMessage> expectInternalMessage(SocketAddress from, int msgId);
-    P2LFuture<P2LMessage> expectInternalMessage(SocketAddress from, int msgId, int conversationId);
+    P2LFuture<P2LMessage> expectInternalMessage(SocketAddress from, int type);
+    P2LFuture<P2LMessage> expectInternalMessage(SocketAddress from, int type, int conversationId);
 
     P2LFuture<Integer> executeAllOnSendThreadPool(P2LThreadPool.Task... tasks);
     void notifyPacketReceivedFrom(SocketAddress from);
@@ -33,4 +35,37 @@ public interface P2LNodeInternal extends P2LNode {
 
     void unregister(P2LInputStream stream);
     void unregister(P2LOutputStream stream);
+    
+    
+    //DEFAULT OVERRIDES - NEWLY POSSIBLE
+    default void sendMessage(SocketAddress to, P2LMessage message) throws IOException {
+        validateMsgTypeNotInternal(message.header.getType());
+        sendInternalMessage(to, message);
+    }
+    default P2LFuture<Boolean> sendMessageWithReceipt(SocketAddress to, P2LMessage message) throws IOException {
+        validateMsgTypeNotInternal(message.header.getType());
+        return sendInternalMessageWithReceipt(to, message);
+    }
+    default boolean sendInternalMessageWithRetries(P2LMessage message, SocketAddress to, int attempts, int initialTimeout) {
+        boolean success = tryComplete(attempts, initialTimeout, () -> sendInternalMessageWithReceipt(to, message));
+        if(!success)
+            markBrokenConnection(toEstablished(to), true);
+        return success;
+    }
+    default boolean sendMessageWithRetries(SocketAddress to, P2LMessage message, int attempts) throws IOException {
+        validateMsgTypeNotInternal(message.header.getType());
+        return sendInternalMessageWithRetries(to, message, attempts);
+    }
+    default boolean sendMessageWithRetries(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) {
+        validateMsgTypeNotInternal(message.header.getType());
+        return sendInternalMessageWithRetries(message, to, attempts, initialTimeout);
+    }
+    default P2LFuture<P2LMessage> expectMessage(SocketAddress from, int type) {
+        validateMsgTypeNotInternal(type);
+        return expectInternalMessage(from, type);
+    }
+    default P2LFuture<P2LMessage> expectMessage(SocketAddress from, int type, int conversationId) {
+        validateMsgTypeNotInternal(type);
+        return expectInternalMessage(from, type, conversationId);
+    }
 }

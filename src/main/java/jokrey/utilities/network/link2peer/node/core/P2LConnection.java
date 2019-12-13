@@ -26,6 +26,9 @@ public class P2LConnection {
     }
     void notifyActivity() {lastPacketReceived = System.currentTimeMillis();}
 
+    public void updateAvRTT(int latestTook) {
+        avRTT = (avRTT*5 + latestTook)/6; //todo - maybe use a not as idiotic system -
+    }
 
     @Override public String toString() {
         return "P2LConnection{" +

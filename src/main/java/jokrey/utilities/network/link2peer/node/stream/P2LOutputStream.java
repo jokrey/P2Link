@@ -14,9 +14,9 @@ public interface P2LOutputStream extends AutoCloseable {
     /** Internal use only. */
     SocketAddress getRawFrom();
     /** Internal use only. */
-    int getType();
+    short getType();
     /** Internal use only. */
-    int getConversationId();
+    short getConversationId();
 
     /**
      * Blocking method to obtain the guarantee that all data written AND subsequently flushed has been received by the peer.

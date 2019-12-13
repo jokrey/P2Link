@@ -7,10 +7,10 @@ import jokrey.utilities.network.link2peer.P2Link;
  */
 public class LongMessagePartHeader extends FullShortMessageHeader {
     private final int index, size;
-    public LongMessagePartHeader(P2Link sender, int type, int conversationId, short expiresAfter, int index, int size) {
+    public LongMessagePartHeader(P2Link sender, short type, short conversationId, short expiresAfter, int index, int size) {
         this(sender, type, conversationId, expiresAfter, index, size, false);
     }
-    public LongMessagePartHeader(P2Link sender, int type, int conversationId, short expiresAfter,
+    public LongMessagePartHeader(P2Link sender, short type, short conversationId, short expiresAfter,
                                  int index, int size, boolean requestReceipt) {
         super(sender, type, conversationId, expiresAfter, requestReceipt);
         this.index = index;

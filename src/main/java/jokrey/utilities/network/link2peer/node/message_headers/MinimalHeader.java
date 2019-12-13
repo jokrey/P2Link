@@ -12,9 +12,9 @@ import java.util.Objects;
  */
 public class MinimalHeader implements P2LMessageHeader {
     private final P2Link sender;
-    private final int type;
+    private final short type;
     private boolean requestReceipt;
-    public MinimalHeader(P2Link sender, int type, boolean requestReceipt) {
+    public MinimalHeader(P2Link sender, short type, boolean requestReceipt) {
         this.sender = sender;
         this.type = type;
         this.requestReceipt = requestReceipt;
@@ -24,7 +24,7 @@ public class MinimalHeader implements P2LMessageHeader {
         return sender;
     }
 
-    @Override public int getType() {
+    @Override public short getType() {
         return type;
     }
 
@@ -54,7 +54,8 @@ public class MinimalHeader implements P2LMessageHeader {
 
     @Override public boolean isExpired() { return true; }
     @Override public boolean isReceipt() { return false; }
-    @Override public int getConversationId() { return P2LNode.NO_CONVERSATION_ID; }
+    @Override public short getConversationId() { return P2LNode.NO_CONVERSATION_ID; }
+    @Override public short getStep() { return NO_STEP; }
     @Override public short getExpiresAfter() { return P2LMessage.EXPIRE_INSTANTLY; }
     @Override public boolean isLongPart() { return false; }
     @Override public boolean isStreamPart() { return false; }
