@@ -136,9 +136,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
 
     @Override public P2LConversation convo(int type, int conversationId, SocketAddress to) {
-        P2LConnection con = establishedConnections.get(to);
-        if(con == null) throw new IllegalStateException("convos can only be had with established connections, please consider establishing a connection to to");
-        return new P2LConversation(this, incomingHandler.conversationMessageHandler.conversationQueue, con, toShort(type), toShort(conversationId));
+        return new P2LConversation(this, incomingHandler.conversationMessageHandler.conversationQueue, establishedConnections.get(to), toShort(type), toShort(conversationId));
     }
 
     //DIRECT MESSAGING:
@@ -273,11 +271,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
             notifyConnectionEstablished(peer.link, conversationId);
     }
     @Override public void markBrokenConnection(P2Link address, boolean retry) {
-        P2LConnection wasRemoved = establishedConnections.remove(address.getSocketAddress());
+        P2LConnection wasRemoved = address==null?null:establishedConnections.remove(address.getSocketAddress());
         if(wasRemoved==null) {
             System.err.println(address+" is not an established connection - could not mark as broken (already marked??)");
         } else {
-            historicConnections.put(address.getSocketAddress(), new HistoricConnection(address, wasRemoved.remoteBufferSize, wasRemoved.avRTT));
+            historicConnections.put(address.getSocketAddress(), new HistoricConnection(address, retry, wasRemoved.remoteBufferSize, wasRemoved.avRTT));
             notifyConnectionDisconnected(address);
         }
     }

@@ -3,6 +3,7 @@ package jokrey.utilities.network.link2peer.node.protocols;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
+import jokrey.utilities.network.link2peer.node.core.P2LConversation;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
@@ -17,25 +18,42 @@ import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTyp
 
 public class RequestPeerLinksProtocol {
     public static List<P2Link> asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
-        return parent.tryReceive(P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT, () ->
-                P2LFuture.before(() ->
-                        parent.sendInternalMessage(to, P2LMessage.Factory.createSendMessage(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS)),
-                        parent.expectInternalMessage(to, C_PEER_LINKS))
-                .toType(message -> {
-                    ArrayList<P2Link> peers = new ArrayList<>();
-                    String raw;
-                    while((raw = message.nextVariableString()) != null)
-                        peers.add(P2Link.fromStringEnsureRelayLinkAvailable(raw, (InetSocketAddress) to));
-                    return peers;
-                }));
+//        return parent.tryReceive(P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT, () ->
+//                P2LFuture.before(() ->
+//                        parent.sendInternalMessage(to, P2LMessage.Factory.createSendMessage(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS)),
+//                        parent.expectInternalMessage(to, C_PEER_LINKS))
+//                .toType(message -> {
+//                    ArrayList<P2Link> peers = new ArrayList<>();
+//                    String raw;
+//                    while((raw = message.nextVariableString()) != null)
+//                        peers.add(P2Link.fromStringEnsureRelayLinkAvailable(raw, (InetSocketAddress) to));
+//                    return peers;
+//                }));
+        P2LConversation convo = parent.convo(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS, parent.createUniqueConversationId(), to);
+        P2LMessage message = convo.initExpectMsg(new byte[0]);
+        convo.close();
+
+        ArrayList<P2Link> peers = new ArrayList<>();
+        String raw;
+        while((raw = message.nextVariableString()) != null)
+            peers.add(P2Link.fromStringEnsureRelayLinkAvailable(raw, (InetSocketAddress) to));
+        return peers;
     }
-    public static void asAnswerer(P2LNodeInternal parent, SocketAddress fromRaw) throws IOException {
-        P2Link[] origEstablishedConnections = parent.getEstablishedConnections().toArray(new P2Link[0]);
+    public static void asAnswerer(P2LConversation convo, P2LMessage m0) throws IOException {
+        P2Link[] origEstablishedConnections = convo.parent.getEstablishedConnections().toArray(new P2Link[0]);
         ArrayList<String> establishedAsStrings = new ArrayList<>(origEstablishedConnections.length);
         for (P2Link origEstablishedConnection : origEstablishedConnections)
-            if (!origEstablishedConnection.getSocketAddress().equals(fromRaw))
+            if (!origEstablishedConnection.getSocketAddress().equals(convo.getPeer()))
                 establishedAsStrings.add(origEstablishedConnection.getStringRepresentation());
-
-        parent.sendInternalMessage(fromRaw, P2LMessage.Factory.createSendMessageFromVariables(C_PEER_LINKS, establishedAsStrings));
+        convo.answerClose(P2LMessage.Factory.createSendMessageFromVariables(C_PEER_LINKS, establishedAsStrings).asBytes());
     }
+//    public static void asAnswerer(P2LNodeInternal parent, SocketAddress fromRaw) throws IOException {
+//        P2Link[] origEstablishedConnections = parent.getEstablishedConnections().toArray(new P2Link[0]);
+//        ArrayList<String> establishedAsStrings = new ArrayList<>(origEstablishedConnections.length);
+//        for (P2Link origEstablishedConnection : origEstablishedConnections)
+//            if (!origEstablishedConnection.getSocketAddress().equals(fromRaw))
+//                establishedAsStrings.add(origEstablishedConnection.getStringRepresentation());
+//
+//        parent.sendInternalMessage(fromRaw, P2LMessage.Factory.createSendMessageFromVariables(C_PEER_LINKS, establishedAsStrings));
+//    }
 }

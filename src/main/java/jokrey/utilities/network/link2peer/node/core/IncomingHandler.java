@@ -56,7 +56,8 @@ public class IncomingHandler {
         if(DebugStats.MSG_PRINTS_ACTIVE)
             System.out.println(parent.getSelfLink() + " - handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
 
-        parent.notifyPacketReceivedFrom(from);
+        if(message.header.getType() != SC_DISCONNECT)
+            parent.notifyPacketReceivedFrom(from);
 
         //todo:?: allow streams and long messages ONLY from established connections? - why tho? - mtu knowledge + some more ddos protection maybe
         //todo: is this TOO transparent??? - allows unknowingly splitting up stream messages
@@ -79,10 +80,10 @@ public class IncomingHandler {
             if (message.header.requestReceipt())
                 parent.sendInternalMessage(from, message.createReceipt());
 
-            if(message.header.isReceipt())
+            if(message.header.isReceipt()) {
                 messageQueue.handleNewMessage(message);
-            else if (message.header.getType() == SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS) { //requires connection to asAnswererDirect data on the other side.....
-                RequestPeerLinksProtocol.asAnswerer(parent, from);
+//           } else if (message.header.getType() == SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS) { //requires connection to asAnswererDirect data on the other side.....
+//                RequestPeerLinksProtocol.asAnswerer(parent, from);
             } else if (message.header.getType() == SL_WHO_AM_I) {
                 WhoAmIProtocol.asAnswerer(parent, receivedPacket);
             } else if (message.header.getType() == SL_PING) {
@@ -101,8 +102,9 @@ public class IncomingHandler {
                 if(parent.isConnectedTo(from))
                     BroadcastMessageProtocol.asAnswererWithHash(parent, brdMessageQueue, broadcastState, from, message);
             } else if (message.header.getType() == SC_DISCONNECT) {
-                if(parent.isConnectedTo(from))
+                if(parent.isConnectedTo(from)) {
                     DisconnectSingleConnectionProtocol.asAnswerer(parent, from);
+                }
             } else {
                 messageQueue.handleNewMessage(message);
                 if (!message.isInternalMessage() && !message.header.isReceipt())
@@ -114,6 +116,8 @@ public class IncomingHandler {
 
     IncomingHandler(P2LNodeInternal parentG) throws IOException {
         this.parent = parentG;
+
+        conversationMessageHandler.registerConversationFor(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS, RequestPeerLinksProtocol::asAnswerer);
 
         serverSocket = new DatagramSocket(parent.getSelfLink().getPort());
         serverSocket.setTrafficClass(0x10 | 0x08); //emphasize IPTOS_THROUGHPUT & IPTOS_LOWDELAY  - these options will likely be ignored by the underlying implementation

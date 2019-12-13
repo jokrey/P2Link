@@ -14,6 +14,9 @@ public class P2LConnection {
     public int avRTT;
     public int fragmentStreamVar = -1;
 
+    public P2LConnection(P2Link link, int remoteBufferSize) {
+        this(link, remoteBufferSize, -1);
+    }
     public P2LConnection(P2Link link, int remoteBufferSize, int avRTT) {
         this.link=link;
         this.remoteBufferSize = remoteBufferSize;
@@ -27,7 +30,10 @@ public class P2LConnection {
     void notifyActivity() {lastPacketReceived = System.currentTimeMillis();}
 
     public void updateAvRTT(int latestTook) {
-        avRTT = (avRTT*5 + latestTook)/6; //todo - maybe use a not as idiotic system -
+        if(avRTT == -1)
+            avRTT = latestTook;
+        else
+            avRTT = (avRTT*5 + latestTook)/6; //todo - maybe use a not as idiotic system -
     }
 
     @Override public String toString() {

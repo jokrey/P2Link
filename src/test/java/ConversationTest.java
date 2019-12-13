@@ -74,8 +74,59 @@ public class ConversationTest {
             assertArrayEquals(rm1, m1);
             assertArrayEquals(rm3, m3);
             assertTrue(bool.get());
+        } finally {
+            IntermediateTests.close(nodes);
+            sleep(10);
 
-            sleep(1000);
+//            DebugStats.printAndReset();
+            DebugStats.print();
+        }
+    }
+
+
+
+    @Test void convTest2() throws IOException {
+//        DebugStats.reset();
+
+        P2LNode[] nodes = IntermediateTests.generateNodes(2, 62880);
+        try {
+
+            DebugStats.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
+            DebugStats.MSG_PRINTS_ACTIVE = false;
+            boolean successConnect = nodes[0].establishConnection(nodes[1].getSelfLink()).get(1000);
+            assertTrue(successConnect);
+
+//            DebugStats.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 60;
+            DebugStats.MSG_PRINTS_ACTIVE = true;
+
+            AtomicBoolean bool = new AtomicBoolean(false);
+
+            byte[] rm0 = new byte[1000];
+            byte[] rm1 = new byte[1000];
+            ThreadLocalRandom.current().nextBytes(rm0);
+            ThreadLocalRandom.current().nextBytes(rm1);
+
+            /*m0*/
+            nodes[1].registerConversationFor(25, (convo, m0) -> {
+                assertArrayEquals(rm0, m0.asBytes());
+                convo.answerClose(rm1);
+                bool.set(true);
+            });
+
+            TimeDiffMarker.setMark("convo");
+            P2LConversation convo = nodes[0].convo(25, conversationId++, nodes[1].getSelfLink());
+            byte[] m1 = convo.initExpect(rm0);
+            convo.close();
+
+            TimeDiffMarker.println("convo");
+
+
+            assertArrayEquals(rm1, m1);
+
+            sleep(50);
+
+            assertTrue(bool.get());
+
         } finally {
             IntermediateTests.close(nodes);
             sleep(10);

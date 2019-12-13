@@ -249,11 +249,15 @@ class IntermediateTests {
 
         printPeers(node1, node2);
 
-        P2LFuture<Boolean> sendResult;
-        sendResult = node1.sendMessageWithReceipt(node2.getSelfLink(), P2LMessage.Factory.createSendMessage(randomType, NO_CONVERSATION_ID, MAX_EXPIRATION_TIMEOUT, toSend_1To2));
-        assertTrue(sendResult.get(2000));
-        sendResult = node2.sendMessageWithReceipt(node1.getSelfLink(), P2LMessage.Factory.createSendMessage(randomType, NO_CONVERSATION_ID, MAX_EXPIRATION_TIMEOUT, toSend_2To1));
-        assertTrue(sendResult.get(2000));
+        DebugStats.MSG_PRINTS_ACTIVE = true;
+//        P2LFuture<Boolean> sendResult;
+//        sendResult =
+                node1.sendMessageWithRetries(node2.getSelfLink(), P2LMessage.Factory.createSendMessage(randomType, NO_CONVERSATION_ID, MAX_EXPIRATION_TIMEOUT, toSend_1To2), 3, 500);
+//        assertTrue(sendResult.get(2000));
+//        sendResult =
+                node2.sendMessageWithRetries(node1.getSelfLink(), P2LMessage.Factory.createSendMessage(randomType, NO_CONVERSATION_ID, MAX_EXPIRATION_TIMEOUT, toSend_2To1), 3, 500);
+//        assertTrue(sendResult.get(2000));
+        DebugStats.MSG_PRINTS_ACTIVE = false;
 
         P2LMessage message = node1.expectMessage(randomType).get(200);
         assertTrue(message.payloadEquals(toSend_2To1)); //more efficient
@@ -327,6 +331,7 @@ class IntermediateTests {
         nodesAndNumberOfReceivedMessages.clear();
         sleep(1000);
 
+        printPeers(senderNode);
         assertTrue(connectAsRing(nodes).get(1000));
         assertTrue(senderNode.establishConnection(nodes[0].getSelfLink()).get(1000));
         printPeers(senderNode);

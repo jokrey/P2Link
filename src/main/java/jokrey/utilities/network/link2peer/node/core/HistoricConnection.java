@@ -7,10 +7,11 @@ import jokrey.utilities.network.link2peer.node.P2LHeuristics;
  * @author jokrey
  */
 class HistoricConnection extends P2LConnection {
-    public HistoricConnection(P2Link link, int remoteBufferSize, int avRTT) {
+    public HistoricConnection(P2Link link, boolean retry, int remoteBufferSize, int avRTT) {
         super(link, remoteBufferSize, avRTT);
         if(link.getSocketAddress()==null)
             throw new NullPointerException("otherwise we would have a problem on retry");
+        if(!retry) nextAttemptAt = Long.MAX_VALUE;
     }
 
     long nextAttemptAt = System.currentTimeMillis();
