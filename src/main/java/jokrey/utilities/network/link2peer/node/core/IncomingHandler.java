@@ -2,7 +2,7 @@ package jokrey.utilities.network.link2peer.node.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
-import jokrey.utilities.network.link2peer.node.*;
+import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.protocols.*;
 import jokrey.utilities.network.link2peer.node.stream.StreamMessageHandler;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
@@ -12,13 +12,10 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketAddress;
 import java.net.SocketException;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.*;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_STEP;
-import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 
 /**
  * Protocol:
@@ -56,8 +53,7 @@ public class IncomingHandler {
         if(DebugStats.MSG_PRINTS_ACTIVE)
             System.out.println(parent.getSelfLink() + " - handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
 
-        if(message.header.getType() != SC_DISCONNECT)
-            parent.notifyPacketReceivedFrom(from);
+        parent.notifyPacketReceivedFrom(from);
 
         //todo:?: allow streams and long messages ONLY from established connections? - why tho? - mtu knowledge + some more ddos protection maybe
         //todo: is this TOO transparent??? - allows unknowingly splitting up stream messages
@@ -84,8 +80,8 @@ public class IncomingHandler {
                 messageQueue.handleNewMessage(message);
 //           } else if (message.header.getType() == SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS) { //requires connection to asAnswererDirect data on the other side.....
 //                RequestPeerLinksProtocol.asAnswerer(parent, from);
-            } else if (message.header.getType() == SL_WHO_AM_I) {
-                WhoAmIProtocol.asAnswerer(parent, receivedPacket);
+//            } else if (message.header.getType() == SL_WHO_AM_I) {
+//                WhoAmIProtocol.asAnswerer(parent, receivedPacket);
             } else if (message.header.getType() == SL_PING) {
 //            PingProtocol.asAnswerer(parent, from);
                 //ping always requests a receipt - so that was already sent
@@ -95,12 +91,12 @@ public class IncomingHandler {
                 EstablishConnectionProtocol.asAnswererRequestReverseConnection(parent, message);
             } else if(message.header.getType() == SL_RELAY_REQUEST_DIRECT_CONNECT) {
                 EstablishConnectionProtocol.asAnswererRelayRequestReverseConnection(parent, message);
-            } else if(message.header.getType() == SC_BROADCAST_WITHOUT_HASH) {
-                if(parent.isConnectedTo(from))
-                    BroadcastMessageProtocol.asAnswererWithoutHash(parent, brdMessageQueue, broadcastState, from, message);
-            } else if (message.header.getType() == SC_BROADCAST_WITH_HASH) {
-                if(parent.isConnectedTo(from))
-                    BroadcastMessageProtocol.asAnswererWithHash(parent, brdMessageQueue, broadcastState, from, message);
+//            } else if(message.header.getType() == SC_BROADCAST_WITHOUT_HASH) {
+//                if(parent.isConnectedTo(from))
+//                    BroadcastMessageProtocol.asAnswererWithoutHash(parent, brdMessageQueue, broadcastState, from, message);
+//            } else if (message.header.getType() == SC_BROADCAST_WITH_HASH) {
+//                if(parent.isConnectedTo(from))
+//                    BroadcastMessageProtocol.asAnswererWithHash(parent, brdMessageQueue, broadcastState, from, message);
             } else if (message.header.getType() == SC_DISCONNECT) {
                 if(parent.isConnectedTo(from)) {
                     DisconnectSingleConnectionProtocol.asAnswerer(parent, from);
@@ -117,7 +113,18 @@ public class IncomingHandler {
     IncomingHandler(P2LNodeInternal parentG) throws IOException {
         this.parent = parentG;
 
-        conversationMessageHandler.registerConversationFor(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS, RequestPeerLinksProtocol::asAnswerer);
+        conversationMessageHandler.registerConversationFor(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS, (convo, no) ->
+                RequestPeerLinksProtocol.asAnswerer(parent, convo));
+        conversationMessageHandler.registerConversationFor(SL_WHO_AM_I,
+                WhoAmIProtocol::asAnswerer);
+        conversationMessageHandler.registerConversationFor(SC_BROADCAST_WITHOUT_HASH, (convo, m0) -> {
+            if(parent.isConnectedTo(convo.getPeer()))
+                BroadcastMessageProtocol.asAnswererWithoutHash(parent, convo, m0, brdMessageQueue, broadcastState);
+        });
+        conversationMessageHandler.registerConversationFor(SC_BROADCAST_WITH_HASH, (convo, m0) -> {
+            if(parent.isConnectedTo(convo.getPeer()))
+                BroadcastMessageProtocol.asAnswererWithHash(parent, convo, m0, brdMessageQueue, broadcastState);
+        });
 
         serverSocket = new DatagramSocket(parent.getSelfLink().getPort());
         serverSocket.setTrafficClass(0x10 | 0x08); //emphasize IPTOS_THROUGHPUT & IPTOS_LOWDELAY  - these options will likely be ignored by the underlying implementation

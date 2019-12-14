@@ -2,7 +2,6 @@ package jokrey.utilities.network.link2peer.node.core;
 
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
-import jokrey.utilities.network.link2peer.node.core.P2LNodeImpl;
 
 import java.io.IOException;
 

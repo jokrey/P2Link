@@ -78,8 +78,6 @@ import java.util.function.Function;
  * @author jokrey
  */
 public interface P2LNode {
-    short NO_CONVERSATION_ID = 0;
-
     /**
      * @param selfLink port on which this node should listen for messages
      * @return a new node listening to the given port
@@ -108,7 +106,7 @@ public interface P2LNode {
 
     /**
      * Creates a unique conversation id(terms and conditions apply - i.e. cycles after 2^32-1 calls).
-     * Guaranteed to never equal {@link #NO_CONVERSATION_ID}, i.e. 0.
+     * Guaranteed to never equal {@link jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader#NO_CONVERSATION_ID}, i.e. 0.
      * Conversation id's are used to create unambiguous message requests in conversations.
      * When multiple conversations of the same type are run concurrently, for example through retrying after dropped packages or in slow connections,
      *    then it is required to still handle them separately.
@@ -437,10 +435,10 @@ public interface P2LNode {
 
 
     void registerConversationFor(int type, ConversationAnswererChangeThisName handler);
-    default P2LConversation convo(int type, int conversationId, P2Link to) {
-        return convo(type, conversationId, to.getSocketAddress());
+    default P2LConversation convo(int type, P2Link to) {
+        return convo(type, to.getSocketAddress());
     }
-    P2LConversation convo(int type, int conversationId, SocketAddress to);
+    P2LConversation convo(int type, SocketAddress to);
 
     /**
      * This method provides another possibility of asynchronously receiving messages.

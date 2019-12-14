@@ -218,7 +218,7 @@ public interface P2LMessageHeader {
     }
     static P2LMessageHeader from(P2Link sender,
                                  short type, short conversationId, short expiresAfter, short step, boolean requestReceipt) {
-        boolean conversationIdFieldPresent = conversationId != P2LNode.NO_CONVERSATION_ID;
+        boolean conversationIdFieldPresent = conversationId != NO_CONVERSATION_ID;
         boolean expirationFieldPresent = expiresAfter != EXPIRE_INSTANTLY;
         boolean stepFieldPresent = step != NO_STEP;
 
@@ -236,7 +236,7 @@ public interface P2LMessageHeader {
                                  short type, short conversationId, short expiresAfter, short step,
                                  int partIndex, int partNumberOfParts,
                                  boolean requestReceipt, boolean isReceipt, boolean isLongPart, boolean isStreamPart, boolean isStreamEof) {
-        boolean conversationIdFieldPresent = conversationId != P2LNode.NO_CONVERSATION_ID;
+        boolean conversationIdFieldPresent = conversationId != NO_CONVERSATION_ID;
         boolean expirationFieldPresent = expiresAfter != EXPIRE_INSTANTLY;
         boolean stepFieldPresent = step != NO_STEP;
 
@@ -292,7 +292,7 @@ public interface P2LMessageHeader {
         return size;
     }
     default boolean isConversationIdPresent() {
-        return getConversationId() != P2LNode.NO_CONVERSATION_ID;
+        return getConversationId() != NO_CONVERSATION_ID;
     }
     default int getConversationIdFieldOffset() { return getConversationIdFieldOffset(isConversationIdPresent()); }
     static int getConversationIdFieldOffset(boolean conversationIdFieldPresent) {
@@ -346,7 +346,7 @@ public interface P2LMessageHeader {
         return BitHelper.getInt16From(raw, HEADER_BYTES_OFFSET_TYPE);
     }
     static short readConversationIdFromHeader(byte[] raw, boolean conversationIdFieldPresent) {
-        if(!conversationIdFieldPresent) return P2LNode.NO_CONVERSATION_ID;
+        if(!conversationIdFieldPresent) return NO_CONVERSATION_ID;
         return BitHelper.getInt16From(raw, getConversationIdFieldOffset(conversationIdFieldPresent));
     }
     static short readExpirationFromHeader(byte[] raw, boolean conversationIdFieldPresent, boolean expirationFieldPresent) {

@@ -20,8 +20,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 
-import static jokrey.utilities.network.link2peer.P2LNode.NO_CONVERSATION_ID;
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.isInternalMessageId;
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_CONVERSATION_ID;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 
 /**
@@ -240,13 +240,13 @@ public class P2LMessage extends ByteArrayStorage {
          * @return the new message
          */
         public static P2LMessage createSendMessage(int type) {
-            return createRawSendMessage(type, P2LNode.NO_CONVERSATION_ID, EXPIRE_INSTANTLY, 0);
+            return createRawSendMessage(type, NO_CONVERSATION_ID, EXPIRE_INSTANTLY, 0);
         }
         public static P2LMessage createSendMessage(int type, int conversationId) {
             return createRawSendMessage(type, conversationId, EXPIRE_INSTANTLY, 0);
         }
         public static P2LMessage createSendMessage(int type, short expiresAfter) {
-            return createRawSendMessage(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, 0);
+            return createRawSendMessage(type, NO_CONVERSATION_ID, expiresAfter, 0);
         }
         public static P2LMessage createSendMessage(int type, int conversationId, short expiresAfter) {
             return createRawSendMessage(type, conversationId, expiresAfter, 0);
@@ -259,13 +259,13 @@ public class P2LMessage extends ByteArrayStorage {
          * @return the new message
          */
         public static P2LMessage createSendMessage(int type, byte[] payload) {
-            return createRawSendMessage(type, P2LNode.NO_CONVERSATION_ID, EXPIRE_INSTANTLY, payload.length, payload);
+            return createRawSendMessage(type, NO_CONVERSATION_ID, EXPIRE_INSTANTLY, payload.length, payload);
         }
         public static P2LMessage createSendMessage(int type, int conversationId, byte[] payload) {
             return createRawSendMessage(type, conversationId, EXPIRE_INSTANTLY, payload.length, payload);
         }
 //        public static P2LMessage createSendMessage(int type, short expiresAfter, byte[] payload) {
-//            return createRawSendMessage(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, payload.length, payload);
+//            return createRawSendMessage(type, NO_CONVERSATION_ID, expiresAfter, payload.length, payload);
 //        }
         public static P2LMessage createSendMessage(int type, int conversationId, short expiresAfter, byte[] payload) {
             return createRawSendMessage(type, conversationId, expiresAfter, payload.length, payload);
@@ -290,13 +290,13 @@ public class P2LMessage extends ByteArrayStorage {
             return createSendMessage(type, NO_CONVERSATION_ID, expiresAfter, trans.transform(payload));
         }
         public static P2LMessage createSendMessageWith(int type, Object... payloads) {
-            return createSendMessageFrom(type, P2LNode.NO_CONVERSATION_ID, payloads);
+            return createSendMessageFrom(type, NO_CONVERSATION_ID, payloads);
         }
         public static P2LMessage createSendMessageFrom(int type, int conversationId, Object... payloads) {
             return createSendMessageFrom(type, conversationId, EXPIRE_INSTANTLY, payloads);
         }
         public static P2LMessage createSendMessageFromWithExpiration(int type, short expiresAfter, Object... payloads) {
-            return createSendMessageFrom(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, payloads);
+            return createSendMessageFrom(type, NO_CONVERSATION_ID, expiresAfter, payloads);
         }
         public static P2LMessage createSendMessageFrom(int type, int conversationId, short expiresAfter, Object... payloads) {
             byte[][] total = new byte[payloads.length][];
@@ -311,7 +311,7 @@ public class P2LMessage extends ByteArrayStorage {
             return createSendMessageFromVariablesWithExpiration(type, EXPIRE_INSTANTLY, payloads);
         }
         public static P2LMessage createSendMessageFromVariablesWithExpiration(int type, short expiresAfter, Object... payloads) {
-            return createSendMessageFromVariablesWithExpiration(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, payloads);
+            return createSendMessageFromVariablesWithExpiration(type, NO_CONVERSATION_ID, expiresAfter, payloads);
         }
         public static P2LMessage createSendMessageFromVariablesWithConversationId(int type, int conversationId, Object... payloads) {
             return createSendMessageFromVariablesWithExpiration(type, conversationId, EXPIRE_INSTANTLY, payloads);
@@ -338,7 +338,7 @@ public class P2LMessage extends ByteArrayStorage {
                 total[i] = makeVariableIndicatorFor(total[i + 1].length);
                 sizeCounter += total[i].length + total[i + 1].length;
             }
-            return createRawSendMessage(type, P2LNode.NO_CONVERSATION_ID, expiresAfter, sizeCounter, total);
+            return createRawSendMessage(type, NO_CONVERSATION_ID, expiresAfter, sizeCounter, total);
         }
 
         public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, Object payload) {

@@ -9,6 +9,7 @@ import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.validateMsgTypeNotInternal;
@@ -28,16 +29,32 @@ public interface P2LNodeInternal extends P2LNode {
     P2LFuture<Integer> executeAllOnSendThreadPool(P2LThreadPool.Task... tasks);
     void notifyPacketReceivedFrom(SocketAddress from);
 
+    void registerInternalConversationFor(int type, ConversationAnswererChangeThisName handler);
+
+    P2LConversationImpl internalConvo(int type, int conversationId, SocketAddress to);
+
     void notifyUserBroadcastMessageReceived(P2LMessage message);
     void notifyUserMessageReceived(P2LMessage message);
 
     P2Link toEstablished(SocketAddress address);
+    P2LConnection getConnection(InetSocketAddress socketAddress);
 
     void unregister(P2LInputStream stream);
     void unregister(P2LOutputStream stream);
     
     
     //DEFAULT OVERRIDES - NEWLY POSSIBLE
+    default void registerConversationFor(int type, ConversationAnswererChangeThisName handler) {
+        validateMsgTypeNotInternal(type);
+        registerInternalConversationFor(type, handler);
+    }
+    default P2LConversationImpl internalConvo(int type, SocketAddress to) {
+        return internalConvo(type, createUniqueConversationId(), to);
+    }
+    default P2LConversationImpl convo(int type, SocketAddress to) {
+        validateMsgTypeNotInternal(type);
+        return internalConvo(type, to);
+    }
     default void sendMessage(SocketAddress to, P2LMessage message) throws IOException {
         validateMsgTypeNotInternal(message.header.getType());
         sendInternalMessage(to, message);

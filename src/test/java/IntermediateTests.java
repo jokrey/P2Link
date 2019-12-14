@@ -3,8 +3,8 @@ import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.DebugStats;
-import jokrey.utilities.network.link2peer.node.core.NodeCreator;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
+import jokrey.utilities.network.link2peer.node.core.NodeCreator;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.node.message_headers.StreamPartHeader;
@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static jokrey.utilities.network.link2peer.P2LMessage.MAX_EXPIRATION_TIMEOUT;
-import static jokrey.utilities.network.link2peer.P2LNode.NO_CONVERSATION_ID;
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_CONVERSATION_ID;
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.rand;
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
 import static org.junit.jupiter.api.Assertions.*;
@@ -459,6 +459,11 @@ class IntermediateTests {
             assertEquals(new Integer(1), numberOfReceivedMessages);
 
         close(nodes);
+
+
+
+
+        //TODO - broadcast test that is guaranteed to use intermediate hashes
     }
 
     @Test void messagePassingWithTypeConvertedFutureWorks() throws IOException {

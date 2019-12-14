@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static jokrey.utilities.network.link2peer.P2LMessage.MAX_UDP_PACKET_SIZE;
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_CONVERSATION_ID;
 import static jokrey.utilities.network.link2peer.util.P2LFuture.ENDLESS_WAIT;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -87,8 +88,8 @@ public class V1FragmentStreamTest {
             assertTrue(connectionEstablished.get(10000));
 
             TransparentBytesStorage source = new ByteArrayStorage(toSend);
-            P2LFragmentInputStream in = nodes[0].createFragmentInputStream(nodes[1].getSelfLink(), 555, P2LNode.NO_CONVERSATION_ID);
-            P2LFragmentOutputStream out = nodes[1].createFragmentOutputStream(nodes[0].getSelfLink(), 555, P2LNode.NO_CONVERSATION_ID);
+            P2LFragmentInputStream in = nodes[0].createFragmentInputStream(nodes[1].getSelfLink(), 555, NO_CONVERSATION_ID);
+            P2LFragmentOutputStream out = nodes[1].createFragmentOutputStream(nodes[0].getSelfLink(), 555, NO_CONVERSATION_ID);
             out.setSource(toSend);
 
 
@@ -129,8 +130,8 @@ public class V1FragmentStreamTest {
             ThreadLocalRandom.current().nextBytes(toSend);
 
             TimeDiffMarker.setMark_d();
-            P2LFragmentInputStream in = nodes[0].createFragmentInputStream(nodes[1].getSelfLink(), 555, P2LNode.NO_CONVERSATION_ID);
-            P2LFragmentOutputStream out = nodes[1].createFragmentOutputStream(nodes[0].getSelfLink(), 555, P2LNode.NO_CONVERSATION_ID);
+            P2LFragmentInputStream in = nodes[0].createFragmentInputStream(nodes[1].getSelfLink(), 555, NO_CONVERSATION_ID);
+            P2LFragmentOutputStream out = nodes[1].createFragmentOutputStream(nodes[0].getSelfLink(), 555, NO_CONVERSATION_ID);
 
             out.setSource(toSend);
             out.send();
@@ -151,8 +152,8 @@ public class V1FragmentStreamTest {
 
             TimeDiffMarker.setMark_d();
             TransparentBytesStorage source = new ByteArrayStorage(toSend);
-            P2LFragmentInputStream in = nodes[0].createFragmentInputStream(nodes[1].getSelfLink(), 555, P2LNode.NO_CONVERSATION_ID);
-            P2LFragmentOutputStream out = nodes[1].createFragmentOutputStream(nodes[0].getSelfLink(), 555, P2LNode.NO_CONVERSATION_ID);
+            P2LFragmentInputStream in = nodes[0].createFragmentInputStream(nodes[1].getSelfLink(), 555, NO_CONVERSATION_ID);
+            P2LFragmentOutputStream out = nodes[1].createFragmentOutputStream(nodes[0].getSelfLink(), 555, NO_CONVERSATION_ID);
 
             out.setSource(toSend);
             out.send();

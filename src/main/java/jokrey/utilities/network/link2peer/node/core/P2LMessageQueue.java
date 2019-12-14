@@ -1,13 +1,14 @@
 package jokrey.utilities.network.link2peer.node.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.*;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.net.SocketAddress;
 import java.util.*;
+
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.*;
 
 /**
  * TODO PROBLEM:
@@ -38,7 +39,7 @@ public class P2LMessageQueue {
     }
     synchronized P2LFuture<P2LMessage> futureFor(SocketAddress from, short messageType) {
         if(from == null) return futureFor(messageType);
-        return futureFor(from, messageType, P2LNode.NO_CONVERSATION_ID);
+        return futureFor(from, messageType, NO_CONVERSATION_ID);
     }
     synchronized P2LFuture<P2LMessage> futureFor(SocketAddress from, short messageType, short conversationId) {
         if(from == null) throw new NullPointerException("from cannot be null here");

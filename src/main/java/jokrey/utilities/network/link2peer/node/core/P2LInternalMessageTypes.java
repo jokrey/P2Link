@@ -14,13 +14,11 @@ public class P2LInternalMessageTypes {
     public static short SC_DISCONNECT = -22;
     public static short SC_BROADCAST_WITHOUT_HASH = -23;
 
-    public static short C_PEER_LINKS = -31;
     public static short C_BROADCAST_HASH_KNOWLEDGE_ANSWER = -32;
     public static short C_BROADCAST_MSG = -33;
 
     public static short R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_REQUEST = -991;
     public static short R_DIRECT_CONNECTION_REQUEST_VERIFY_NONCE_ANSWER = -992;
-    public static short R_WHO_AM_I_ANSWER = -993;
     public static short R_DIRECT_CONNECTION_ESTABLISHED = -994;
 
     public static boolean isInternalMessageId(int msgId) {

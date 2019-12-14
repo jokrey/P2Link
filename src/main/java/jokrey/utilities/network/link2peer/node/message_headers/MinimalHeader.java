@@ -2,7 +2,6 @@ package jokrey.utilities.network.link2peer.node.message_headers;
 
 import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
 
 import java.util.Objects;
@@ -54,7 +53,7 @@ public class MinimalHeader implements P2LMessageHeader {
 
     @Override public boolean isExpired() { return true; }
     @Override public boolean isReceipt() { return false; }
-    @Override public short getConversationId() { return P2LNode.NO_CONVERSATION_ID; }
+    @Override public short getConversationId() { return NO_CONVERSATION_ID; }
     @Override public short getStep() { return NO_STEP; }
     @Override public short getExpiresAfter() { return P2LMessage.EXPIRE_INSTANTLY; }
     @Override public boolean isLongPart() { return false; }

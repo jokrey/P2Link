@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static jokrey.utilities.network.link2peer.P2LMessage.MAX_UDP_PACKET_SIZE;
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_CONVERSATION_ID;
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -37,8 +38,8 @@ public class V2OrderedStreamTests {
             boolean successConnect = nodes[0].establishConnection(nodes[1].getSelfLink()).get(1000); //TODO TOO SLOW FOR SOME VERY COMPLEX REASON
             assertTrue(successConnect);
 
-            InputStream in = nodes[0].createInputStream(nodes[1].getSelfLink(), 5, P2LNode.NO_CONVERSATION_ID);
-            OutputStream out = nodes[1].createOutputStream(nodes[0].getSelfLink(), 5, P2LNode.NO_CONVERSATION_ID);
+            InputStream in = nodes[0].createInputStream(nodes[1].getSelfLink(), 5, NO_CONVERSATION_ID);
+            OutputStream out = nodes[1].createOutputStream(nodes[0].getSelfLink(), 5, NO_CONVERSATION_ID);
 
 //        byte[] toSend = new byte[1_000_000];//10kb
             byte[] toSend = new byte[100_000_000];//100mb
@@ -80,8 +81,8 @@ public class V2OrderedStreamTests {
 
         try {
 
-            InputStream in = nodes[0].createInputStream(nodes[1].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
-            OutputStream out = nodes[1].createOutputStream(nodes[0].getSelfLink(), 1, P2LNode.NO_CONVERSATION_ID);
+            InputStream in = nodes[0].createInputStream(nodes[1].getSelfLink(), 1, NO_CONVERSATION_ID);
+            OutputStream out = nodes[1].createOutputStream(nodes[0].getSelfLink(), 1, NO_CONVERSATION_ID);
 
             String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
 
@@ -114,8 +115,8 @@ public class V2OrderedStreamTests {
         P2LNode[] nodes = IntermediateTests.generateNodes(2, 62880);
 
         try {
-            P2LOrderedInputStream in = nodes[0].createInputStream(nodes[1].getSelfLink(), 2, P2LNode.NO_CONVERSATION_ID);
-            P2LOrderedOutputStream out = nodes[1].createOutputStream(nodes[0].getSelfLink(), 2, P2LNode.NO_CONVERSATION_ID);
+            P2LOrderedInputStream in = nodes[0].createInputStream(nodes[1].getSelfLink(), 2, NO_CONVERSATION_ID);
+            P2LOrderedOutputStream out = nodes[1].createOutputStream(nodes[0].getSelfLink(), 2, NO_CONVERSATION_ID);
 
             P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
                 out.write(new byte[] {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16});
@@ -154,8 +155,8 @@ public class V2OrderedStreamTests {
         P2LNode[] nodes = IntermediateTests.generateNodes(2, 62880);
 
         try {
-            P2LOrderedInputStream in = nodes[0].createInputStream(nodes[1].getSelfLink(), 3, P2LNode.NO_CONVERSATION_ID);
-            P2LOrderedOutputStream out = nodes[1].createOutputStream(nodes[0].getSelfLink(), 3, P2LNode.NO_CONVERSATION_ID);
+            P2LOrderedInputStream in = nodes[0].createInputStream(nodes[1].getSelfLink(), 3, NO_CONVERSATION_ID);
+            P2LOrderedOutputStream out = nodes[1].createOutputStream(nodes[0].getSelfLink(), 3, NO_CONVERSATION_ID);
 
             P2LFuture<Boolean> sendTask = P2LThreadPool.executeSingle(() -> {
                 out.write(new byte[] {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16});

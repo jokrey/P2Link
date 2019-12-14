@@ -19,6 +19,7 @@ public class DebugStats {
 
     public static AtomicInteger conversation_numRetries = new AtomicInteger(0);
     public static AtomicInteger conversation_numValid = new AtomicInteger(0);
+    public static AtomicInteger conversation_numDoubleReceived = new AtomicInteger(0);
 
     public static int INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
     public static AtomicInteger incomingHandler_numIntentionallyDropped = new AtomicInteger(0);
@@ -38,6 +39,7 @@ public class DebugStats {
         incomingHandler_numIntentionallyDropped.set(0);
         conversation_numRetries.set(0);
         conversation_numValid.set(0);
+        conversation_numDoubleReceived.set(0);
         INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE=0;
     }
 
@@ -71,6 +73,8 @@ public class DebugStats {
             System.out.println("conversation_numRetries = " + conversation_numRetries);
         if(!filterUnchanged || conversation_numValid.get()!=0)
             System.out.println("conversation_numValid = " + conversation_numValid);
+        if(!filterUnchanged || conversation_numDoubleReceived.get()!=0)
+            System.out.println("conversation_numDoubleReceived = " + conversation_numDoubleReceived);
     }
 
     public static void printAndReset() {

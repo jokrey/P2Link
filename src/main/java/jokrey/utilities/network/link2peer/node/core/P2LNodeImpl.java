@@ -3,13 +3,15 @@ package jokrey.utilities.network.link2peer.node.core;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
-import jokrey.utilities.network.link2peer.node.*;
+import jokrey.utilities.network.link2peer.node.DebugStats;
+import jokrey.utilities.network.link2peer.node.P2LHeuristics;
 import jokrey.utilities.network.link2peer.node.protocols.*;
 import jokrey.utilities.network.link2peer.node.stream.*;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,6 +20,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.validateMsgTypeNotInternal;
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_CONVERSATION_ID;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 
 /**
@@ -131,12 +134,14 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
 
 
-    @Override public void registerConversationFor(int type, ConversationAnswererChangeThisName handler) {
+    @Override public void registerInternalConversationFor(int type, ConversationAnswererChangeThisName handler) {
         incomingHandler.conversationMessageHandler.registerConversationFor(type, handler);
     }
 
-    @Override public P2LConversation convo(int type, int conversationId, SocketAddress to) {
-        return new P2LConversation(this, incomingHandler.conversationMessageHandler.conversationQueue, establishedConnections.get(to), toShort(type), toShort(conversationId));
+    @Override public P2LConversationImpl internalConvo(int type, int conversationId, SocketAddress to) {
+        return new P2LConversationImpl(this, incomingHandler.conversationMessageHandler.conversationQueue,
+                establishedConnections.get(to), to,
+                toShort(conversationId), toShort(type));
     }
 
     //DIRECT MESSAGING:
@@ -242,6 +247,9 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     @Override public P2Link toEstablished(SocketAddress address) {
         P2LConnection con = establishedConnections.get(address);
         return con==null?null:con.link;
+    }
+    @Override public P2LConnection getConnection(InetSocketAddress address) {
+        return establishedConnections.get(address);
     }
     @Override public Set<P2Link> getEstablishedConnections() {
         HashSet<P2Link> set = new HashSet<>(establishedConnections.size());

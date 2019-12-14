@@ -1,6 +1,5 @@
 package jokrey.utilities.network.link2peer.util;
 
-import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool.Task;
 import jokrey.utilities.simple.data_structure.pairs.Pair;
 import jokrey.utilities.simple.data_structure.stack.LinkedStack;
