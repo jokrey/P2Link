@@ -27,6 +27,10 @@ public interface P2LNodeInternal extends P2LNode {
     P2LFuture<P2LMessage> expectInternalMessage(SocketAddress from, int type, int conversationId);
 
     P2LFuture<Integer> executeAllOnSendThreadPool(P2LThreadPool.Task... tasks);
+    @Override default P2LFuture<Integer> executeThreaded(P2LThreadPool.Task... tasks) {
+        return executeAllOnSendThreadPool(tasks);
+    }
+
     void notifyPacketReceivedFrom(SocketAddress from);
 
     void registerInternalConversationFor(int type, ConversationAnswererChangeThisName handler);

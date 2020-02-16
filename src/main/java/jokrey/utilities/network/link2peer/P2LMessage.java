@@ -344,8 +344,11 @@ public class P2LMessage extends ByteArrayStorage {
         public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, Object payload) {
             return createBroadcast(sender, brdMsgType, trans.transform(payload));
         }
-        public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, byte[] payload) {
+        public static P2LMessage createBroadcast(P2Link sender, short brdMsgType, byte[] payload) {
             return new MinimalHeader(sender, toShort(brdMsgType), false).generateMessage(payload);
+        }
+        public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, byte[] payload) {
+            return createBroadcast(sender, toShort(brdMsgType), payload);
         }
         public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, short expiresAfter, Object payload) {
             return createBroadcast(sender, brdMsgType, expiresAfter, trans.transform(payload));

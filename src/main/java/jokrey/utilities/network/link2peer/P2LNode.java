@@ -6,6 +6,7 @@ import jokrey.utilities.network.link2peer.node.core.P2LConversation;
 import jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes;
 import jokrey.utilities.network.link2peer.node.stream.*;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
+import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -439,6 +440,8 @@ public interface P2LNode {
         return convo(type, to.getSocketAddress());
     }
     P2LConversation convo(int type, SocketAddress to);
+
+    P2LFuture<Integer> executeThreaded(P2LThreadPool.Task... tasks);
 
     /**
      * This method provides another possibility of asynchronously receiving messages.

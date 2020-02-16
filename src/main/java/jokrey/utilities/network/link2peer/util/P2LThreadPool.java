@@ -56,8 +56,22 @@ public class P2LThreadPool {
             futures.add(execute(task));
         return P2LFuture.reduceConvertWhenCompleted(futures, b -> b?1:0, P2LFuture.PLUS);
     }
+    public synchronized P2LFuture<Integer> execute(List<Task> tasks) {
+        ArrayList<P2LFuture<Boolean>> futures = new ArrayList<>(tasks.size());
+        for(Task task:tasks)
+            futures.add(execute(task));
+        return P2LFuture.reduceConvertWhenCompleted(futures, b -> b?1:0, P2LFuture.PLUS);
+    }
     public synchronized P2LFuture<Integer> execute(ProvidingTask<Boolean>... tasks) {
         ArrayList<P2LFuture<Boolean>> futures = new ArrayList<>(tasks.length);
+        for(ProvidingTask<Boolean> task:tasks)
+            futures.add(execute(task));
+        return P2LFuture.reduceConvertWhenCompleted(futures, b -> b?1:0, P2LFuture.PLUS);
+    }
+    public synchronized P2LFuture<Integer> executeThreadedCounter(List<ProvidingTask<Boolean>> tasks) {
+        if(tasks.isEmpty())
+            return new P2LFuture<>(new Integer(0));
+        ArrayList<P2LFuture<Boolean>> futures = new ArrayList<>(tasks.size());
         for(ProvidingTask<Boolean> task:tasks)
             futures.add(execute(task));
         return P2LFuture.reduceConvertWhenCompleted(futures, b -> b?1:0, P2LFuture.PLUS);
