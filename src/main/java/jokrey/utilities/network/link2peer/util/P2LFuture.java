@@ -511,7 +511,7 @@ public class P2LFuture<T> {
      * @param futures collection of futures of the same type
      * @return the newly created future for the collection of results
      */
-    public static <T> P2LFuture<Collection<T>> oneForAll(Collection<P2LFuture<T>> futures) {
+    public static <T, F extends P2LFuture<T>> P2LFuture<Collection<T>> oneForAll(Collection<F> futures) {
         int origSize = futures.size();
         AtomicInteger counter = new AtomicInteger(0);
         LinkedList<T> collector = new LinkedList<>();

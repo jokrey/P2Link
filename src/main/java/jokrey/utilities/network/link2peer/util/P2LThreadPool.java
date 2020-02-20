@@ -56,13 +56,13 @@ public class P2LThreadPool {
             futures.add(execute(task));
         return P2LFuture.reduceConvertWhenCompleted(futures, b -> b?1:0, P2LFuture.PLUS);
     }
-    public synchronized P2LFuture<Integer> execute(List<Task> tasks) {
+    public synchronized P2LFuture<Integer> executeThreadedSuccessCounter(List<Task> tasks) {
         ArrayList<P2LFuture<Boolean>> futures = new ArrayList<>(tasks.size());
         for(Task task:tasks)
             futures.add(execute(task));
         return P2LFuture.reduceConvertWhenCompleted(futures, b -> b?1:0, P2LFuture.PLUS);
     }
-    public synchronized P2LFuture<Integer> execute(ProvidingTask<Boolean>... tasks) {
+    public synchronized P2LFuture<Integer> executeThreadedCounter(ProvidingTask<Boolean>... tasks) {
         ArrayList<P2LFuture<Boolean>> futures = new ArrayList<>(tasks.length);
         for(ProvidingTask<Boolean> task:tasks)
             futures.add(execute(task));
@@ -98,6 +98,18 @@ public class P2LThreadPool {
                 }
             }
         });
+    }
+    public synchronized <R> List<P2LTask<R>> execute(ProvidingTask<R>... tasks) {
+        ArrayList<P2LTask<R>> futures = new ArrayList<>(tasks.length);
+        for(ProvidingTask<R> task : tasks)
+            futures.add(execute(task));
+        return futures;
+    }
+    public synchronized <R> List<P2LTask<R>> execute(List<ProvidingTask<R>> tasks) {
+        ArrayList<P2LTask<R>> futures = new ArrayList<>(tasks.size());
+        for(ProvidingTask<R> task : tasks)
+            futures.add(execute(task));
+        return futures;
     }
     public synchronized <R>P2LTask<R> execute(P2LTask<R> task) {
         if(task == null) throw new NullPointerException();
