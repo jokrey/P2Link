@@ -1,4 +1,5 @@
 import jokrey.utilities.debug_analysis_helper.TimeDiffMarker;
+import jokrey.utilities.encoder.tag_based.implementation.paired.length_indicator.type.transformer.LITypeToBytesTransformer;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
@@ -512,7 +513,7 @@ class IntermediateTests {
         close(nodes);
     }
     @Test void messagePassingWithCallMeBackFutureWorks() throws IOException {
-        P2LNode[] nodes = generateNodes(2, 60040);
+        P2LNode[] nodes = generateNodes(2, 60041);
         nodes[1].expectMessage(1).callMeBack(m -> {
             System.out.println("CALLED!!!!!");
             assertEquals(142, m.nextInt());
@@ -725,7 +726,7 @@ class IntermediateTests {
     }
     static List<P2LMessage> toBytesAndSplitRandomly(String toSend, int packetCount) {
         ArrayList<P2LMessage> packets = new ArrayList<>(packetCount);
-        byte[] send = P2LMessage.trans.transform(toSend);
+        byte[] send = new LITypeToBytesTransformer().transform(toSend);
 
         int numBytesSend = 0;
         for(int i=0;i<packetCount;i++) {

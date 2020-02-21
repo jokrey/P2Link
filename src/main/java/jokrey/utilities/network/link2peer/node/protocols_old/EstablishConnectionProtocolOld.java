@@ -1,6 +1,7 @@
 package jokrey.utilities.network.link2peer.node.protocols_old;
 
 import jokrey.utilities.bitsandbytes.BitHelper;
+import jokrey.utilities.encoder.as_union.li.bytes.LIbae;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
@@ -201,9 +202,9 @@ public class EstablishConnectionProtocolOld {
         if(selfLink.isPublicLink()) {
             byte[] selfLinkByteRepresentation = selfLink.getBytesRepresentation();
             return P2LMessage.Factory.createSendMessageFrom(type, conversationId,
-                    P2LMessage.CUSTOM_RAW_SIZE_LIMIT, P2LMessage.makeVariableIndicatorFor(selfLinkByteRepresentation.length), selfLinkByteRepresentation);
+                    P2LMessage.CUSTOM_RAW_SIZE_LIMIT, LIbae.generateLI(selfLinkByteRepresentation.length), selfLinkByteRepresentation);
         }
-        return P2LMessage.Factory.createSendMessageFrom(type, conversationId, P2LMessage.CUSTOM_RAW_SIZE_LIMIT, P2LMessage.makeVariableIndicatorFor(0));
+        return P2LMessage.Factory.createSendMessageFrom(type, conversationId, P2LMessage.CUSTOM_RAW_SIZE_LIMIT, LIbae.generateLI(0));
     }
     private static P2LConnection fromMessage(P2LNodeInternal parent, P2LMessage m, int avRTT) {
         int remoteBufferSize = m.nextInt();

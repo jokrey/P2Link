@@ -12,7 +12,7 @@ import java.util.Objects;
 public class MinimalHeader implements P2LMessageHeader {
     private final P2Link sender;
     private final short type;
-    private boolean requestReceipt;
+    public boolean requestReceipt;
     public MinimalHeader(P2Link sender, short type, boolean requestReceipt) {
         this.sender = sender;
         this.type = type;

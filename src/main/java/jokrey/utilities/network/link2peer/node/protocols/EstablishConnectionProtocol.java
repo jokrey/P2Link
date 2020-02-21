@@ -2,6 +2,7 @@ package jokrey.utilities.network.link2peer.node.protocols;
 
 import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.encoder.as_union.li.bytes.LIbae;
+import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
@@ -132,8 +133,7 @@ public class EstablishConnectionProtocol {
         short conversationId = conversationIdOverride==NO_CONVERSATION_ID?createConversationForInitialDirect(parent):conversationIdOverride;
         P2LConversation convo = parent.internalConvo(SL_DIRECT_CONNECTION_REQUEST, conversationId, to.getSocketAddress());
 
-        byte[] selfLinkBytes = toMessage(parent);
-        byte[] verifyNonce = convo.initExpect(selfLinkBytes);
+        byte[] verifyNonce = convo.initExpect(toMessage(parent, convo));
 
 
         if(verifyNonce.length == 0) {
@@ -173,25 +173,21 @@ public class EstablishConnectionProtocol {
 
             if (Arrays.equals(nonce, verifyNonce)) {
                 parent.graduateToEstablishedConnection(peer, initialRequestMessage.header.getConversationId());
-                convo.answerClose(toMessage(parent));
+                convo.answerClose(toMessage(parent, convo));
             } else
                 convo.answerClose(new byte[0]);
         }
     }
 
-    private static byte[] toMessage(P2LNodeInternal parent) {
+    private static MessageEncoder toMessage(P2LNodeInternal parent, P2LConversation convo) {
         P2Link selfLink = parent.getSelfLink();
         byte[] selfLinkBytes;
         if(selfLink.isPublicLink())
             selfLinkBytes = selfLink.getBytesRepresentation();
         else
             selfLinkBytes = P2LConversation.EMPTY_BYTES;
-        byte[] li = P2LMessage.makeVariableIndicatorFor(selfLinkBytes.length);
-        byte[] raw = new byte[4 + li.length + selfLinkBytes.length];
-        BitHelper.writeInt32(raw, 0, P2LMessage.CUSTOM_RAW_SIZE_LIMIT);
-        System.arraycopy(li, 0, raw, 4, li.length);
-        System.arraycopy(selfLinkBytes, 0, raw, 4+li.length, selfLinkBytes.length);
-        return raw;
+
+        return MessageEncoder.encodeAll(convo.headerSize(), P2LMessage.CUSTOM_RAW_SIZE_LIMIT, selfLinkBytes);
     }
 
     private static P2LConnection fromMessage(P2LNodeInternal parent, P2LMessage m, int avRTT) {

@@ -1,8 +1,10 @@
 package jokrey.utilities.network.link2peer.node.core;
 
+import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.message_headers.ConversationHeader;
+import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
 
@@ -30,6 +32,7 @@ public class P2LConversationImpl implements P2LConversation {
     private final P2LConnection con;
     public final SocketAddress peer;
     private final short type, conversationId;
+    private final int headerSize;
 
     private short step = -2;
 
@@ -46,10 +49,13 @@ public class P2LConversationImpl implements P2LConversation {
             this.con = new P2LConnection(null, 1024, -1);
         else
             this.con = con;
+
+        headerSize = new ConversationHeader(null, type, conversationId, step, false).getSize();
     }
 
     @Override public SocketAddress getPeer() { return peer; }
     @Override public int getAvRTT() { return con.avRTT; }
+    @Override public int headerSize() { return headerSize; }
 
     private int calcWaitBeforeRetryTime() {
         return con.avRTT == -1? 500 :(int) (con.avRTT * m + a);
@@ -64,22 +70,20 @@ public class P2LConversationImpl implements P2LConversation {
 
     private long lastMessageSentAt = 0;
     private P2LMessage lastMessageReceived = null;
-    @Override public P2LMessage initExpectMsg(byte[] bytes) throws IOException {
-//        System.out.println(parent.getSelfLink()+" - P2LConversation.initExpect: "+"bytes = [" + Arrays.toString(bytes) + "]");
+    @Override public P2LMessage initExpectMsg(MessageEncoder encoded) throws IOException {
         if(step != -2) throw new IOException("cannot init twice");
         step = 0;
-        return answerExpectMsg(bytes, true);
+        return answerExpectMsg(encoded, true);
     }
-    @Override public P2LMessage initExpectCloseMsg(byte[] bytes) throws IOException {
-//        System.out.println(parent.getSelfLink()+" - P2LConversation.initExpect: "+"bytes = [" + Arrays.toString(bytes) + "]");
+    @Override public P2LMessage initExpectCloseMsg(MessageEncoder encoded) throws IOException {
         if(step != -2) throw new IOException("cannot init twice");
         step = 0;
-        P2LMessage result = answerExpectMsg(bytes, true);
+        P2LMessage result = answerExpectMsg(encoded, true);
         step = -1;
         return result;
     }
-    @Override public P2LMessage answerExpectMsg(byte[] bytes) throws IOException {
-        return answerExpectMsg(bytes, false);
+    @Override public P2LMessage answerExpectMsg(MessageEncoder encoded) throws IOException {
+        return answerExpectMsg(encoded, false);
     }
 
 
@@ -89,34 +93,34 @@ public class P2LConversationImpl implements P2LConversation {
         parent.sendInternalMessage(peer, lastMessageReceived.createReceipt());
         step = -1;
     }
-    @Override public void closeWith(byte[] bytes) throws IOException {
+    @Override public void closeWith(MessageEncoder encoded) throws IOException {
         if(!isServer) throw new IllegalStateException("can only be used when server");
         if(step != 0) throw new IllegalStateException("can only be used as first instruction");
         ConversationHeader header = new ConversationHeader(null, type, conversationId, isServer ? (short) (step + 1) : step, false);
-        P2LMessage msg = header.generateMessage(bytes);
+        P2LMessage msg = P2LMessage.from(header, encoded);
         step = -1;
         parent.sendInternalMessage(peer, msg);
     }
 
-    @Override public void initClose(byte[] bytes) throws IOException {
+    @Override public void initClose(MessageEncoder encoded) throws IOException {
         if(step != -2) throw new IOException("cannot init twice");
         step = 0;
-        answerClose(bytes, true);
+        answerClose(encoded, true);
         step = -1;
     }
 
-    @Override public void answerClose(byte[] bytes) throws IOException {
-        answerClose(bytes, false);
+    @Override public void answerClose(MessageEncoder encoded) throws IOException {
+        answerClose(encoded, false);
     }
 
 
 
-    private P2LMessage answerExpectMsg(byte[] bytes, boolean init) throws IOException {
+    private P2LMessage answerExpectMsg(MessageEncoder encoded, boolean init) throws IOException {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
 
         ConversationHeader header = new ConversationHeader(null, type, conversationId, isServer ? (short) (step + 1) : step, false);
-        P2LMessage msg = header.generateMessage(bytes);
+        P2LMessage msg = P2LMessage.from(header, encoded);
 
         for(int i=0;i<maxAttempts;i++) {
             //previous is the message we are currently answering to - so it has already been received - however it might be resend by the peer if the message sent below is lost
@@ -147,11 +151,11 @@ public class P2LConversationImpl implements P2LConversation {
 
         throw new TimeoutException();
     }
-    private void answerClose(byte[] bytes, boolean init) throws IOException {
+    private void answerClose(MessageEncoder encoded, boolean init) throws IOException {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
         ConversationHeader header = new ConversationHeader(null, type, conversationId, isServer ? (short) (step + 1) : step, false);
-        P2LMessage msg = header.generateMessage(bytes);
+        P2LMessage msg = P2LMessage.from(header, encoded);
 
         for(int i=0;i<maxAttempts;i++) {
             //previous is the message we are currently answering to - so it has already been received - however it might be resend by the peer if the message sent below is lost

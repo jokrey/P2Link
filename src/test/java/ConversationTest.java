@@ -100,6 +100,18 @@ public class ConversationTest {
                     convo.closeWith(rm[1]);
                 });
     }
+    @Test void convTest_serverDirectClose_9Drops_1Retry() throws IOException {
+        byte[][] rm = rand(2, 1000);
+        testEnvConversation(true, 0, 1, false,
+                (convo, no) -> {//client
+                    byte[] m1 = convo.initExpectClose(rm[0]);
+                    assertArrayEquals(rm[1], m1);
+                },
+                (convo, m0) -> {//server
+                    assertArrayEquals(rm[0], m0.asBytes());
+                    convo.closeWith(rm[1]);
+                });
+    }
 
     @Test void convTest_clientDirectClose_60Drops_100MaxRetries() throws IOException {
         byte[][] rm = rand(1, 1000);

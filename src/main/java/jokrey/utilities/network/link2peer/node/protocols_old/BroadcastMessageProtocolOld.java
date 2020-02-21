@@ -1,5 +1,6 @@
 package jokrey.utilities.network.link2peer.node.protocols_old;
 
+import jokrey.utilities.encoder.as_union.li.bytes.LIbae;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
@@ -136,8 +137,8 @@ public class BroadcastMessageProtocolOld {
         byte[] senderBytes = message.header.getSender().getBytesRepresentation();
         return P2LMessage.Factory.createSendMessageWith(carrierMessageType,
                 message.header.getType(), message.header.getExpiresAfter(),
-                P2LMessage.makeVariableIndicatorFor(senderBytes.length), senderBytes,
-                P2LMessage.makeVariableIndicatorFor(message.getPayloadLength()), message.asBytes());
+                LIbae.generateLI(senderBytes.length), senderBytes,
+                LIbae.generateLI(message.getPayloadLength()), message.asBytes());
     }
     private static P2LMessage unpackBroadcastMessage(P2LMessage message) {
         int brdMsgType = message.nextInt();

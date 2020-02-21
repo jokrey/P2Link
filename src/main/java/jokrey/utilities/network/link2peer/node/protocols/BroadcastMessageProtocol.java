@@ -1,5 +1,6 @@
 package jokrey.utilities.network.link2peer.node.protocols;
 
+import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
@@ -17,7 +18,8 @@ import java.util.ArrayList;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.*;
+import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.SC_BROADCAST_WITHOUT_HASH;
+import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.SC_BROADCAST_WITH_HASH;
 
 /**
  * @author jokrey
@@ -116,12 +118,7 @@ public class BroadcastMessageProtocol {
     //    additionally the sender needs to be explicitly stored - as it is omitted/automatically determined in normal messages
     private static byte[] packBroadcastMessage(P2LMessage broadcastMessage) {
         byte[] senderBytes = broadcastMessage.header.getSender().getBytesRepresentation();
-
-        //TODO instead of going the long way around use libae - and allow libae to be a short, long, int etc en/decoder (optionally and next to the variable stuff)
-        return P2LMessage.Factory.createSendMessageWith(0,
-                broadcastMessage.header.getType(), broadcastMessage.header.getExpiresAfter(),
-                P2LMessage.makeVariableIndicatorFor(senderBytes.length), senderBytes,
-                P2LMessage.makeVariableIndicatorFor(broadcastMessage.getPayloadLength()), broadcastMessage.asBytes()).asBytes();
+        return MessageEncoder.encodeAll(0, broadcastMessage.header.getType(), broadcastMessage.header.getExpiresAfter(), senderBytes, broadcastMessage.asBytes()).asBytes();
     }
     private static P2LMessage unpackBroadcastMessage(P2LMessage packedMessage) {
         short brdMsgType = packedMessage.nextShort();

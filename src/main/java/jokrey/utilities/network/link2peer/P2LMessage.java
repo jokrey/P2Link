@@ -3,12 +3,10 @@ package jokrey.utilities.network.link2peer;
 import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.encoder.as_union.li.LIPosition;
 import jokrey.utilities.encoder.as_union.li.bytes.LIbae;
+import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
 import jokrey.utilities.encoder.tag_based.implementation.paired.length_indicator.type.transformer.LITypeToBytesTransformer;
 import jokrey.utilities.encoder.type_transformer.bytes.TypeToBytesTransformer;
-import jokrey.utilities.network.link2peer.node.message_headers.CustomExpirationHeader;
-import jokrey.utilities.network.link2peer.node.message_headers.MinimalHeader;
-import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader;
-import jokrey.utilities.network.link2peer.node.message_headers.ReceiptHeader;
+import jokrey.utilities.network.link2peer.node.message_headers.*;
 import jokrey.utilities.network.link2peer.util.Hash;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 import jokrey.utilities.transparent_storage.bytes.wrapper.SubBytesStorage;
@@ -39,7 +37,7 @@ import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessage
  *
  * @author jokrey
  */
-public class P2LMessage extends ByteArrayStorage {
+public class P2LMessage extends MessageEncoder {
     /**
      * Hard limit for the udp package size.
      * 65507 is the HARD limitation on windows, the number can be set lower by the app developer to safe memory using {@link #CUSTOM_RAW_SIZE_LIMIT}
@@ -67,6 +65,7 @@ public class P2LMessage extends ByteArrayStorage {
     public final P2LMessageHeader header;
 
     private Hash contentHash;
+
     /** @return a cached version of the contentHash of this message. The contentHash is 20 bytes long(sha1), usable with contentHash map and includes sender, type and data. */
     public Hash getContentHash() {
         if(contentHash == null)
@@ -76,11 +75,9 @@ public class P2LMessage extends ByteArrayStorage {
 
     /** Create a new P2LMessage */
     public P2LMessage(P2LMessageHeader header, Hash contentHash, byte[] raw, int payloadLength) {
-        super(true, raw, header.getSize() + payloadLength);
+        super(true, raw, header.getSize(), header.getSize() + payloadLength);
         this.header = header;
         this.contentHash = contentHash;
-
-        resetReader();
     }
 
     /** @return a udp datagram packet from the internal data - it can be decoded on the receiver side using {@link #fromPacket(P2Link, DatagramPacket)}
@@ -219,11 +216,13 @@ public class P2LMessage extends ByteArrayStorage {
         return header.isExpired();
     }
 
-    public byte[] asBytes() {
-        return payload().getContent();
+
+
+    public static P2LMessage from(P2LMessageHeader header, MessageEncoder encoded) {
+        if(header.getSize() != encoded.offset) throw new IllegalArgumentException("given encoded message has an incorrect offset(!= header size)");
+        header.writeTo(encoded.content);
+        return new P2LMessage(header, null, encoded.content, encoded.size-encoded.offset);
     }
-
-
     /**
      * Factory for P2LMessages.
      * Since received messages are automatically decoded, this factory only provides public methods to create send messages.
@@ -233,6 +232,16 @@ public class P2LMessage extends ByteArrayStorage {
      * Either encoding method can be comfortably decoded on the receiver side using the decoder methods(such as {@link #nextBool()}, {@link #nextVariable()}, {@link #nextVariableString()}).
      */
     public static class Factory {
+        public static P2LMessage createSendMessageWith(int type, Object... payloads) {
+            P2LMessageHeader header = P2LMessageHeader.from(null, toShort(type), toShort(NO_CONVERSATION_ID), EXPIRE_INSTANTLY);
+            return P2LMessage.from(header, MessageEncoder.encodeAll(header.getSize(), payloads));
+        }
+
+
+
+        /** Type transformer used internally for type transformations - when encoding standard types into payload parts with this transformer, the message can be efficiently decoded */
+        public static final TypeToBytesTransformer trans = new LITypeToBytesTransformer();
+
         /**
          * Creates an empty message to be send(i.e. sender is not set and will be determined by the node automatically).
          * The resulting message does not have a payload. This is typically useful in messages used for synchronization or receive receipts.
@@ -289,9 +298,6 @@ public class P2LMessage extends ByteArrayStorage {
         public static <T>P2LMessage createSendMessage(int type, short expiresAfter, T payload) {
             return createSendMessage(type, NO_CONVERSATION_ID, expiresAfter, trans.transform(payload));
         }
-        public static P2LMessage createSendMessageWith(int type, Object... payloads) {
-            return createSendMessageFrom(type, NO_CONVERSATION_ID, payloads);
-        }
         public static P2LMessage createSendMessageFrom(int type, int conversationId, Object... payloads) {
             return createSendMessageFrom(type, conversationId, EXPIRE_INSTANTLY, payloads);
         }
@@ -321,7 +327,7 @@ public class P2LMessage extends ByteArrayStorage {
             int sizeCounter = 0;
             for(int i=0;i<total.length;i+=2) {
                 total[i+1] = trans.transform(payloads[i/2]);
-                total[i] = makeVariableIndicatorFor(total[i+1].length);
+                total[i] = LIbae.generateLI(total[i+1].length);
                 sizeCounter+=total[i].length + total[i+1].length;
             }
             return createRawSendMessage(type, conversationId, expiresAfter, sizeCounter, total);
@@ -335,7 +341,7 @@ public class P2LMessage extends ByteArrayStorage {
             int sizeCounter = 0;
             for(int i=0;i<total.length;i+=2) {
                 total[i + 1] = trans.transform(payloadsIterator.next());
-                total[i] = makeVariableIndicatorFor(total[i + 1].length);
+                total[i] = LIbae.generateLI(total[i + 1].length);
                 sizeCounter += total[i].length + total[i + 1].length;
             }
             return createRawSendMessage(type, NO_CONVERSATION_ID, expiresAfter, sizeCounter, total);
@@ -380,79 +386,5 @@ public class P2LMessage extends ByteArrayStorage {
             }
             return new P2LMessage(reassembledHeader, null, raw, totalByteSize);
         }
-    }
-
-    //DECODE HELPER
-    /** Type transformer used internally for type transformations - when encoding standard types into payload parts with this transformer, the message can be efficiently decoded */
-    public static final TypeToBytesTransformer trans = new LITypeToBytesTransformer();
-
-    private int pointer=-1;
-    /** resets the internal iterating pointer */
-    public void resetReader() {pointer = header.getSize();}
-
-    /** decodes the next payload byte as a boolean (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_boolean(byte[])}) */
-    public boolean nextBool() {
-        return content[pointer++] == 1;
-    }
-    /** decodes the next payload byte as a byte (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_byte(byte[])}) */
-    public byte nextByte() {
-        return content[pointer++];
-    }
-    /** decodes the next 2 payload bytes as an integer(32bit) (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_int(byte[])}) */
-    public short nextShort() {
-        int before = pointer;
-        pointer+=2; //temp maybe useless if this evaluates to pointer value before...
-        return BitHelper.getInt16From(content, before);
-    }
-    /** decodes the next 4 payload bytes as an integer(32bit) (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_int(byte[])}) */
-    public int nextInt() {
-        int before = pointer;
-        pointer+=4; //temp maybe useless if this evaluates to pointer value before...
-        return BitHelper.getInt32From(content, before);
-    }
-    /** decodes the next 8 payload bytes as an integer(64bit) (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_long(byte[])}) */
-    public long nextLong() {
-        int before = pointer;
-        pointer+=8; //temp maybe useless if this evaluates to pointer value before...
-        return BitHelper.getIntFromNBytes(content, before, 8);
-    }
-    /** decodes the next 4 payload bytes as a floating point number(32 bit) (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_float(byte[])} (byte[])}) */
-    public float nextFloat() {
-        int before = pointer;
-        pointer+=4; //temp maybe useless if this evaluates to pointer value before...
-        return BitHelper.getFloat32From(content, before);
-    }
-    /** decodes the next 8 payload bytes as a floating point number(64 bit) (same as, but more context efficient {@link LITypeToBytesTransformer#detransform_double(byte[])} (byte[])}) */
-    public double nextDouble() {
-        int before = pointer;
-        pointer+=8; //temp maybe useless if this evaluates to pointer value before...
-        return BitHelper.getFloat64From(content, before);
-    }
-    /** decodes the next n payload bytes as bytes - uses length indicator functionality to determine n (same as, but more context efficient {@link LIbae#decode(LIPosition)}) */
-    public byte[] nextVariable() {
-        long[] li_bounds = LIbae.get_next_li_bounds(content, pointer, pointer, requiredRawSize() - 1);
-        if(li_bounds == null) return null;
-        pointer = (int) li_bounds[1];
-        return Arrays.copyOfRange(content, (int) li_bounds[0], (int) li_bounds[1]);
-    }
-    /** decodes the next n payload bytes as a utf8 string - uses length indicator functionality to determine n (same as, but more context efficient {@link LIbae#decode(LIPosition)}) */
-    public String nextVariableString() {
-        long[] li_bounds = LIbae.get_next_li_bounds(content, pointer, pointer, requiredRawSize() - 1);
-        if(li_bounds == null) return null;
-        pointer = (int) li_bounds[1];
-        return new String(content, (int) li_bounds[0], (int) (li_bounds[1]-li_bounds[0]), StandardCharsets.UTF_8);
-    }
-    /**
-     * Used to generate a length indicator for a variable payload part. Has to be added to the payload as a payload part before the variable payload part.
-     * @param payloadPartLength length of the variable payload part
-     * @return variable payload part prefix
-     */
-    public static byte[] makeVariableIndicatorFor(int payloadPartLength) {
-        return LIbae.generateLI(payloadPartLength);
-    }
-
-    /** decodes all payload bytes as a utf8 string */
-    public String asString() {
-        return new String(content, header.getSize(), getPayloadLength(), StandardCharsets.UTF_8);
     }
 }
