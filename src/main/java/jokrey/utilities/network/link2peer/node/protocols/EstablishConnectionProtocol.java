@@ -10,13 +10,12 @@ import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LConversation;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
-import jokrey.utilities.simple.data_structure.pairs.Pair;
+
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.security.SecureRandom;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicLong;
-import static jokrey.utilities.network.link2peer.P2LMessage.EXPIRE_INSTANTLY;
+
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.*;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_CONVERSATION_ID;
 
@@ -51,7 +50,7 @@ public class EstablishConnectionProtocol {
                 //todo - this scenario could not be realistically tested as of yet AND cannot be tested automatically
                 for(int i=0;i<attempts;i++) {
                     //attempt direct connection to the link the relay server sees
-                    if(asInitiatorDirect(parent, to,1, initialTimeout))
+                    if(asInitiatorDirect(parent, to))
                         return true;
                     //if that does not work, request a reverse connection to the link the relay server sees of this node (either one should be the correct outside nat address)
                     if(relayAvailable && asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, false, initialTimeout))
@@ -61,12 +60,12 @@ public class EstablishConnectionProtocol {
                 return false;
             } else {
                 if(!relayAvailable)
-                    return asInitiatorDirect(parent, to, 1, initialTimeout);
+                    return asInitiatorDirect(parent, to);
                 else
                     return asInitiatorRequestReverseConnection(parent, to.getRelaySocketAddress(), to, true, initialTimeout);
             }
         } else {// if(to.isPublicLink()) {
-            return asInitiatorDirect(parent, to, attempts, initialTimeout);
+            return asInitiatorDirect(parent, to);
         }
     }
 
@@ -120,14 +119,14 @@ public class EstablishConnectionProtocol {
     public static void asAnswererRequestReverseConnection(P2LNodeInternal parent, P2LConversation convo, P2LMessage initialRequestMessage) throws IOException {
         convo.close();
         P2Link connectTo = P2Link.fromBytes(initialRequestMessage.asBytes());
-        asInitiatorDirect(parent, connectTo, initialRequestMessage.header.getConversationId(),
-                P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT);
+        asInitiatorDirect(parent, connectTo, initialRequestMessage.header.getConversationId()
+        );
     }
 
-    private static boolean asInitiatorDirect(P2LNodeInternal parent, P2Link to, int attempts, int initialTimeout) throws IOException {
-        return asInitiatorDirect(parent, to, NO_CONVERSATION_ID, attempts, initialTimeout);
+    private static boolean asInitiatorDirect(P2LNodeInternal parent, P2Link to) throws IOException {
+        return asInitiatorDirect(parent, to, NO_CONVERSATION_ID);
     }
-    private static boolean asInitiatorDirect(P2LNodeInternal parent, P2Link to, short conversationIdOverride, int attempts, int initialTimeout) throws IOException {
+    private static boolean asInitiatorDirect(P2LNodeInternal parent, P2Link to, short conversationIdOverride) throws IOException {
         if(parent.connectionLimitReached()) return false;
 
         short conversationId = conversationIdOverride==NO_CONVERSATION_ID?createConversationForInitialDirect(parent):conversationIdOverride;
