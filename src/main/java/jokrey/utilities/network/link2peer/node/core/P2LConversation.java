@@ -65,4 +65,7 @@ public interface P2LConversation {
     default byte[] answerExpect(byte[] bytes) throws IOException { return answerExpect(MessageEncoder.from(headerSize(), bytes)); }
     default byte[] initExpect(byte[] bytes) throws IOException { return initExpect(MessageEncoder.from(headerSize(), bytes)); }
     default byte[] initExpectClose(byte[] bytes) throws IOException { return initExpectClose(MessageEncoder.from(headerSize(), bytes)); }
+
+
+    default MessageEncoder encode(Object... payloads) { return MessageEncoder.encodeAll(headerSize(), payloads); }
 }
