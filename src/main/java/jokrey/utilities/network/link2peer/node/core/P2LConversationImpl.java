@@ -55,7 +55,10 @@ public class P2LConversationImpl implements P2LConversation {
 
     @Override public SocketAddress getPeer() { return peer; }
     @Override public int getAvRTT() { return con.avRTT; }
-    @Override public int headerSize() { return headerSize; }
+    @Override public int getHeaderSize() { return headerSize; }
+    @Override public int getMaxPayloadSizePerPackage() {
+        return con.remoteBufferSize - headerSize;
+    }
 
     private int calcWaitBeforeRetryTime() {
         return con.avRTT == -1? 500 :(int) (con.avRTT * m + a);

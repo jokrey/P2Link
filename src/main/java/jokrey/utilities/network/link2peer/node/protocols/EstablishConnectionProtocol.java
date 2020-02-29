@@ -186,7 +186,7 @@ public class EstablishConnectionProtocol {
         else
             selfLinkBytes = P2LConversation.EMPTY_BYTES;
 
-        return MessageEncoder.encodeAll(convo.headerSize(), P2LMessage.CUSTOM_RAW_SIZE_LIMIT, selfLinkBytes);
+        return MessageEncoder.encodeAll(convo.getHeaderSize(), P2LMessage.CUSTOM_RAW_SIZE_LIMIT, selfLinkBytes);
     }
 
     private static P2LConnection fromMessage(P2LNodeInternal parent, P2LMessage m, int avRTT) {

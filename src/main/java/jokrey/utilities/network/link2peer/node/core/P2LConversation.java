@@ -19,11 +19,13 @@ import java.net.SocketAddress;
 public interface P2LConversation {
     SocketAddress getPeer();
     int getAvRTT();
+    int getHeaderSize();
+    int getMaxPayloadSizePerPackage();
+
     void setMaxAttempts(int maxRetries);
     void setM(float m);
     void setA(int a);
 
-    int headerSize();
 
     P2LMessage initExpectMsg(MessageEncoder encoded) throws IOException;
     P2LMessage answerExpectMsg(MessageEncoder encoded) throws IOException;
@@ -56,16 +58,16 @@ public interface P2LConversation {
     }
 
 
-    default P2LMessage initExpectMsg(byte[] bytes) throws IOException { return initExpectMsg(MessageEncoder.from(headerSize(), bytes)); }
-    default P2LMessage answerExpectMsg(byte[] bytes) throws IOException { return answerExpectMsg(MessageEncoder.from(headerSize(), bytes)); }
-    default void initClose(byte[] bytes) throws IOException { initClose(MessageEncoder.from(headerSize(), bytes)); }
-    default void answerClose(byte[] bytes) throws IOException { answerClose(MessageEncoder.from(headerSize(), bytes)); }
-    default P2LMessage initExpectCloseMsg(byte[] bytes) throws IOException { return initExpectCloseMsg(MessageEncoder.from(headerSize(), bytes)); }
-    default void closeWith(byte[] bytes) throws IOException { closeWith(MessageEncoder.from(headerSize(), bytes)); }
-    default byte[] answerExpect(byte[] bytes) throws IOException { return answerExpect(MessageEncoder.from(headerSize(), bytes)); }
-    default byte[] initExpect(byte[] bytes) throws IOException { return initExpect(MessageEncoder.from(headerSize(), bytes)); }
-    default byte[] initExpectClose(byte[] bytes) throws IOException { return initExpectClose(MessageEncoder.from(headerSize(), bytes)); }
+    default P2LMessage initExpectMsg(byte[] bytes) throws IOException { return initExpectMsg(MessageEncoder.from(getHeaderSize(), bytes)); }
+    default P2LMessage answerExpectMsg(byte[] bytes) throws IOException { return answerExpectMsg(MessageEncoder.from(getHeaderSize(), bytes)); }
+    default void initClose(byte[] bytes) throws IOException { initClose(MessageEncoder.from(getHeaderSize(), bytes)); }
+    default void answerClose(byte[] bytes) throws IOException { answerClose(MessageEncoder.from(getHeaderSize(), bytes)); }
+    default P2LMessage initExpectCloseMsg(byte[] bytes) throws IOException { return initExpectCloseMsg(MessageEncoder.from(getHeaderSize(), bytes)); }
+    default void closeWith(byte[] bytes) throws IOException { closeWith(MessageEncoder.from(getHeaderSize(), bytes)); }
+    default byte[] answerExpect(byte[] bytes) throws IOException { return answerExpect(MessageEncoder.from(getHeaderSize(), bytes)); }
+    default byte[] initExpect(byte[] bytes) throws IOException { return initExpect(MessageEncoder.from(getHeaderSize(), bytes)); }
+    default byte[] initExpectClose(byte[] bytes) throws IOException { return initExpectClose(MessageEncoder.from(getHeaderSize(), bytes)); }
 
 
-    default MessageEncoder encode(Object... payloads) { return MessageEncoder.encodeAll(headerSize(), payloads); }
+    default MessageEncoder encode(Object... payloads) { return MessageEncoder.encodeAll(getHeaderSize(), payloads); }
 }
