@@ -48,6 +48,8 @@ public class MinimalHeader implements P2LMessageHeader {
     @Override public String toString() {
         return getClass().getSimpleName()+"{" + "sender='" + sender + '\'' + ", type=" + type + (isConversationIdPresent()?", conversationId=" + getConversationId():"") +
                 (isExpirationPresent()?", expiresAfter=" + getExpiresAfter():"") +
+                (isStepPresent()?", step=" + getStep():"") +
+                (isLongPart()?", l-index=" + getPartIndex()+", l-size=" + getNumberOfParts():"") +
                 ", requestReceipt=" + requestReceipt + ", isReceipt=" + isReceipt() + '}';
     }
 

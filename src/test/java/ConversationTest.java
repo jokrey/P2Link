@@ -38,12 +38,12 @@ public class ConversationTest {
                 });
     }
 
-    private byte[] rand(int size) {
+    public static byte[] rand(int size) {
         byte[] b = new byte[size];
         ThreadLocalRandom.current().nextBytes(b);
         return b;
     }
-    private byte[][] rand(int num, int size) {
+    public static byte[][] rand(int num, int size) {
         byte[][] bs = new byte[num][];
         for(int i=0;i<bs.length;i++)
             bs[i] = rand(size);

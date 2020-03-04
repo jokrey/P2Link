@@ -7,16 +7,19 @@ import jokrey.utilities.network.link2peer.P2Link;
  */
 public class LongMessagePartHeader extends FullShortMessageHeader {
     private final int index, size;
-    public LongMessagePartHeader(P2Link sender, short type, short conversationId, short expiresAfter, int index, int size) {
-        this(sender, type, conversationId, expiresAfter, index, size, false);
+    private final short step;
+    public LongMessagePartHeader(P2Link sender, short type, short conversationId, short expiresAfter, short step, int index, int size) {
+        this(sender, type, conversationId, expiresAfter, step, index, size, false);
     }
-    public LongMessagePartHeader(P2Link sender, short type, short conversationId, short expiresAfter,
+    public LongMessagePartHeader(P2Link sender, short type, short conversationId, short expiresAfter, short step,
                                  int index, int size, boolean requestReceipt) {
         super(sender, type, conversationId, expiresAfter, requestReceipt);
         this.index = index;
         this.size = size;
+        this.step = step;
     }
 
+    @Override public short getStep() { return step; }
     @Override public int getPartIndex() { return index; }
     @Override public int getNumberOfParts() { return size; }
     @Override public boolean isLongPart() { return true; }

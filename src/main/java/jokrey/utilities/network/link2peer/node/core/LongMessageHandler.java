@@ -22,7 +22,7 @@ class LongMessageHandler {
     P2LMessage received(P2LMessage part) {
         cleanUpLock.readLock().lock();
         try {
-            HeaderIdentifier identifier = new P2LMessageHeader.SenderTypeConversationIdentifier(part);
+            HeaderIdentifier identifier = new P2LMessageHeader.SenderTypeConversationIdStepIdentifier(part);
             if(part.header.getNumberOfParts() > P2LHeuristics.LONG_MESSAGE_MAX_NUMBER_OF_PARTS) {
                 System.err.println("received long message part with size("+part.header.getNumberOfParts()+") > max("+P2LHeuristics.LONG_MESSAGE_MAX_NUMBER_OF_PARTS+"). " +
                         "Consider using a stream instead.");
@@ -66,6 +66,7 @@ class LongMessageHandler {
         for(int i=0;i<numberOfRequiredParts;i++) {
             int to_raw_i = from_raw_i + ((i+1==numberOfRequiredParts)? lastPartSize :maxPayloadSize);
             P2LMessage part = P2LMessage.Factory.messagePartFrom(overLongMessage, i, numberOfRequiredParts, from_raw_i, to_raw_i);
+//            System.out.println("sending part = " + part);
             parent.sendInternalMessage(to, part);
             from_raw_i = to_raw_i;
         }
@@ -94,6 +95,10 @@ class LongMessageHandler {
             parts = new P2LMessage[size];
         }
         synchronized void received(P2LMessage part) {
+            if(parts.length <= part.header.getPartIndex()) {
+//                System.out.println("part = " + part);
+                throw new ArrayIndexOutOfBoundsException(part.header.getPartIndex()+"/"+parts.length);
+            }
             if(parts[part.header.getPartIndex()]==null) {
                 parts[part.header.getPartIndex()] = part;
                 totalByteSize += part.getPayloadLength();
