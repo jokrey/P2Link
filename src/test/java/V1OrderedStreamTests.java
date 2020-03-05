@@ -140,6 +140,8 @@ public class V1OrderedStreamTests {
     }
 
     @Test void streamTest_sendOrderReverse_guaranteedFewerThanBufferPacketsSend_noDrops() throws IOException {
+        DebugStats.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
+
         P2LNode[] nodes = IntermediateTests.generateNodes(2, 62840);
 
         InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().getSocketAddress(), (short) 1, (short) 0);

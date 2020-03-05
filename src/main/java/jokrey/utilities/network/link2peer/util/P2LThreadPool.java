@@ -1,6 +1,7 @@
 package jokrey.utilities.network.link2peer.util;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * todo WAY TOO MUCH SYNCHRONIZED (everything is locked)
@@ -20,6 +21,7 @@ public class P2LThreadPool {
         this(coreThreads, maxThreads, Integer.MAX_VALUE);
     }
     public P2LThreadPool(int coreThreads, int maxThreads, int maxQueuedTasks) {
+        if(maxThreads < coreThreads) throw new IllegalArgumentException("cannot have more core threads("+coreThreads+") than max threads("+maxThreads+")");
         this.coreThreads = coreThreads;
         this.maxThreads = maxThreads;
         this.maxQueuedTasks = maxQueuedTasks;
@@ -37,18 +39,150 @@ public class P2LThreadPool {
         pool.clear();
         queuedTasks.clear();
     }
-    private synchronized void taskFinished(P2LThread noLongerOccupied) {
+    private void taskFinished(P2LThread noLongerOccupied) {
         if(shutdown) return;
 
-        P2LTask unstartedTask = queuedTasks.poll();
-        if(unstartedTask==null) {
-            synchronized (this) {
-                if (pool.size() > coreThreads)
-                    pool.remove(noLongerOccupied);
+        P2LTask unstartedTask;
+        synchronized (this) {
+            unstartedTask = queuedTasks.poll();
+//            System.out.println("taskFinished - left="+queuedTasks.size()+" - new="+unstartedTask);
+            if (unstartedTask==null && pool.size() > coreThreads && noLongerOccupied.shutdownIfIdle()) {
+                pool.remove(noLongerOccupied);
+//                System.out.println("thread removed");
             }
-        } else
-            noLongerOccupied.runTask(unstartedTask);
+        }
+        if(unstartedTask != null) {
+            boolean taskScheduledSuccessfully = noLongerOccupied.runTask(unstartedTask);
+            if(!taskScheduledSuccessfully) {
+                synchronized (this) {
+                    queuedTasks.offer(unstartedTask);
+//                    System.out.println("reoffered");
+                }
+            }
+//            else
+//                System.out.println("run on previously occupied");
+        }
     }
+
+    public synchronized <R>P2LTask<R> execute(P2LTask<R> task) {
+        if(task == null) throw new NullPointerException();
+        if(shutdown) throw new ShutDownException();
+
+        int size = pool.size();
+        boolean isCommitted = false;
+        Iterator<P2LThread> poolIterator = pool.iterator();
+        while (poolIterator.hasNext()) {
+            P2LThread thread = poolIterator.next();
+            if (!isCommitted && thread.runTask(task)) {
+//                System.out.println("execute.runOnExisting");
+                isCommitted = true;
+            } else if (size > coreThreads && thread.shutdownIfIdle()) {
+//                System.out.println("thread removed");
+                poolIterator.remove();
+                size--;
+            }
+        }
+        if(!isCommitted) {
+            if(size<maxThreads) {
+//                System.out.println("execute.runOnNew");
+                pool.add(new P2LThread(task));
+//                System.out.println("thread added");
+            } else if(queuedTasks.size() < maxQueuedTasks) {
+//                System.out.println("execute.offered");
+                queuedTasks.offer(task);
+            } else {
+                throw new CapacityReachedException();
+            }
+        }
+
+        return task;
+    }
+
+    private class P2LThread implements Runnable {
+        boolean shutdown = false;
+        private final AtomicReference<P2LTask<?>> task = new AtomicReference<>(null);
+        P2LThread() { this(null); }
+        P2LThread(P2LTask<?> task) {
+            runTask(task);
+            new Thread(this).start();
+        }
+
+        synchronized void shutdown() {
+            shutdown = true;
+            P2LTask<?> before = task.getAndSet(null);
+            if(before!=null)
+                before.cancelIfNotCompleted();
+            synchronized (task) {task.notifyAll();}
+        }
+        synchronized boolean shutdownIfIdle() {
+            if(task.get() != null) return false;
+            //if a new task is added here, but not yet executed and then this thread is shutdown - then that task is lost and never executed...
+            shutdown();
+            return true;
+        }
+        synchronized boolean runTask(P2LTask<?> t) {
+            if(!shutdown && t!=null && task.compareAndSet(null, t)) {
+                synchronized (task) {task.notifyAll();}
+//                System.out.println("runTask("+t+") - SUCCESS");
+                return true;
+            }
+//            System.out.println("runTask() - FAIL");
+            return false;
+        }
+
+        @Override public void run() {
+            while(!shutdown) {
+                P2LTask<?> t = task.get();
+                if(t!=null) {
+                    t.start();
+                    task.set(null);
+                    //here 'runTask' can swoop in and take the thread - so task finished has to handle that scenario
+                    P2LThreadPool.this.taskFinished(this);
+                } else {
+                    synchronized (task) {
+                        try {
+                            task.wait();
+                        } catch (InterruptedException e) { e.printStackTrace(); }
+
+//                        P2LThreadPool.this.taskFinished(this);
+
+//                        System.out.println("P2LThreadPool.this = " + P2LThreadPool.this.debugString());
+                    }
+                }
+            }
+        }
+    }
+
+    @FunctionalInterface
+    public interface Task {
+        void run() throws Throwable;
+    }
+    @FunctionalInterface
+    public interface ProvidingTask<R> {
+        R run() throws Throwable;
+    }
+
+
+    public String debugString() {
+        return "P2LThreadPool{" +
+                "coreThreads=" + coreThreads +
+                ", maxThreads=" + maxThreads +
+                ", maxQueuedTasks=" + maxQueuedTasks +
+                ", pool.size=" + pool.size() +
+                ", queuedTasks.size=" + queuedTasks.size() +
+                ", isShutdown?=" + shutdown +
+                '}';
+    }
+
+
+
+
+
+
+
+
+
+
 
     public synchronized P2LFuture<Integer> execute(Task... tasks) {
         ArrayList<P2LFuture<Boolean>> futures = new ArrayList<>(tasks.length);
@@ -111,35 +245,6 @@ public class P2LThreadPool {
             futures.add(execute(task));
         return futures;
     }
-    public synchronized <R>P2LTask<R> execute(P2LTask<R> task) {
-        if(task == null) throw new NullPointerException();
-        if(shutdown) throw new ShutDownException();
-
-        int size = pool.size();
-        boolean isCommitted = false;
-        Iterator<P2LThread> poolIterator = pool.iterator();
-        while (poolIterator.hasNext()) {
-            P2LThread thread = poolIterator.next();
-            if (!isCommitted && thread.runTask(task)) {
-                isCommitted = true;
-            } else if (size > coreThreads && thread.shutdownIfIdle()) {
-                poolIterator.remove();
-                size--;
-            }
-        }
-        if(!isCommitted) {
-            if(size<maxThreads) {
-                pool.add(new P2LThread(task));
-            } else if(queuedTasks.size() < maxQueuedTasks) {
-                queuedTasks.offer(task);
-            } else {
-                throw new CapacityReachedException();
-            }
-        }
-
-        return task;
-    }
-
     public static P2LTask<Boolean> executeSingle(Task t) {
         P2LTask<Boolean> task = new P2LTask<Boolean>() {
             @Override protected Boolean run() {
@@ -155,74 +260,5 @@ public class P2LThreadPool {
 
         new Thread(task::start).start();
         return task;
-    }
-
-    private class P2LThread implements Runnable {
-        boolean shutdown = false;
-        private P2LTask task;
-        P2LThread() { this(null); }
-        P2LThread(P2LTask task) {
-            new Thread(this).start();
-            runTask(task);
-        }
-
-        synchronized void shutdown() {
-            if(task!=null)
-                task.cancelIfNotCompleted();
-            task = null;
-            shutdown = true;
-            notify();
-        }
-        synchronized boolean shutdownIfIdle() {
-            if(task != null) return false;
-            shutdown();
-            return true;
-        }
-
-        synchronized boolean runTask(P2LTask t) {
-            if(task == null) {
-                task = t;
-                notify();
-                return true;
-            }
-            return false;
-        }
-
-        @Override public void run() {
-            while(!shutdown) {
-                if(task!=null) {
-                    task.start();
-                    task = null;
-                    P2LThreadPool.this.taskFinished(this);
-                } else {
-                    synchronized (this) {
-                        try {
-                            wait();
-                        } catch (InterruptedException e) { e.printStackTrace(); }
-                    }
-                }
-            }
-        }
-    }
-
-    @FunctionalInterface
-    public interface Task {
-        void run() throws Throwable;
-    }
-    @FunctionalInterface
-    public interface ProvidingTask<R> {
-        R run() throws Throwable;
-    }
-
-
-    public String debugString() {
-        return "P2LThreadPool{" +
-                "coreThreads=" + coreThreads +
-                ", maxThreads=" + maxThreads +
-                ", maxQueuedTasks=" + maxQueuedTasks +
-                ", pool.size=" + pool.size() +
-                ", queuedTasks.size=" + queuedTasks.size() +
-                ", isShutdown?=" + shutdown +
-                '}';
     }
 }

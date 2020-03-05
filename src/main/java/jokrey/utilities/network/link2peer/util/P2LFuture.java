@@ -513,14 +513,16 @@ public class P2LFuture<T> {
      */
     public static <T, F extends P2LFuture<T>> P2LFuture<Collection<T>> oneForAll(Collection<F> futures) {
         int origSize = futures.size();
-        AtomicInteger counter = new AtomicInteger(0);
+        AtomicInteger counter = new AtomicInteger(0); //required so that cancelations are properly handled
         LinkedList<T> collector = new LinkedList<>();
 
         P2LFuture<Collection<T>> allResults = new P2LFuture<>();
         for(P2LFuture<T> future:futures)
             future.callMeBack(e -> {
-                synchronized(collector) {
-                    if(e != null) collector.push(e);
+                if(e != null) {
+                    synchronized(collector) {
+                        collector.push(e);
+                    }
                 }
 
                 int numberOfCompletedFutures = counter.incrementAndGet();

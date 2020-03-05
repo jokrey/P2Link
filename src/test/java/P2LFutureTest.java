@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -246,5 +247,36 @@ public class P2LFutureTest {
         }));
         while (counter.get() < 2) sleep(10);
         assertEquals(counter.get(), 2);
+    }
+
+    @Test void p2lThreadPoolTest_manyTasks() {
+        int num = 500000;
+        int coreThreads = 1000;
+        int maxThreads = 1000;
+
+        AtomicInteger counter = new AtomicInteger(0);
+        List<P2LThreadPool.ProvidingTask<Integer>> tasks = new ArrayList<>(num);
+//        CopyOnWriteArrayList<Integer> list = new CopyOnWriteArrayList<>();
+        for(int i = 0; i<num;i++) {
+            int i_final = i;
+            P2LThreadPool.ProvidingTask<Integer> task = () -> {
+//                System.out.println("in task: "+i_final+" ");
+//                list.add(i_final);
+                return counter.getAndIncrement();
+            };
+            tasks.add(task);
+        }
+
+        P2LThreadPool pool = new P2LThreadPool(coreThreads, maxThreads);
+        List<P2LTask<Integer>> x = pool.execute(tasks);
+
+//        sleep(3000);
+//        for(int i = 0; i<num;i++) {
+//            if(!list.contains(i))
+//                System.out.println("task("+i+") not executed");
+//        }
+
+        P2LFuture.oneForAll(x).get();
+        assertEquals(num, counter.get());
     }
 }
