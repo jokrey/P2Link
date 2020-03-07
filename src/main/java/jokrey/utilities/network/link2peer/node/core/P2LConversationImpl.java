@@ -11,6 +11,8 @@ import jokrey.utilities.network.link2peer.util.TimeoutException;
 import java.io.IOException;
 import java.net.SocketAddress;
 
+import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
+
 /**
  * todo For few dropped packages the number of double resend packages is relatively high
  * todo Problem: Consider packets m0 and m1 and m2. client sends m0, server received m0 and sends m1, m1 is lost.
@@ -26,6 +28,7 @@ public class P2LConversationImpl implements P2LConversation {
     public static int DEFAULT_NUM_ATTEMPTS = 4;
     public static float DEFAULT_M = 1.25f;
     public static int DEFAULT_A = 25;
+    public static int DEFAULT_rM = 100;
 
     public final P2LNodeInternal parent;
     private final P2LMessageQueue conversationQueue;
@@ -39,6 +42,7 @@ public class P2LConversationImpl implements P2LConversation {
     private int maxAttempts = DEFAULT_NUM_ATTEMPTS; @Override public void setMaxAttempts(int maxAttempts) {this.maxAttempts = maxAttempts;}
     private float m = DEFAULT_M; @Override public void setM(float m) {this.m = m;}
     private int a = DEFAULT_A; @Override public void setA(int a) {this.a = a;}
+    private int rM = DEFAULT_rM; @Override public void setRM(int a) {this.rM = rM;}
     public P2LConversationImpl(P2LNodeInternal parent, P2LMessageQueue conversationQueue, P2LConnection con, SocketAddress peer, short conversationId, short type) {
         this.parent = parent;
         this.conversationQueue = conversationQueue;
@@ -125,6 +129,8 @@ public class P2LConversationImpl implements P2LConversation {
         ConversationHeader header = new ConversationHeader(null, type, conversationId, isServer ? (short) (step + 1) : step, false);
         P2LMessage msg = P2LMessage.from(header, encoded);
 
+//        System.out.println("P2LConversationImpl.answerExpectMsg - "+"init = " + init+", step = " + step+", isServer = " + isServer);
+
         for(int i=0;i<maxAttempts;i++) {
             //previous is the message we are currently answering to - so it has already been received - however it might be resend by the peer if the message sent below is lost
             //   it is important the message is handled so that the conversation handler sees that it is expected and does not initiate a new conversation on m0 resend..
@@ -135,9 +141,11 @@ public class P2LConversationImpl implements P2LConversation {
             parent.sendInternalMessage(peer, msg);
             lastMessageSentAt = System.currentTimeMillis();
 
-            P2LMessage result = next.getOrNull(calcWaitBeforeRetryTime());
+            P2LMessage result = next.getOrNull(calcWaitBeforeRetryTime() +
+                            rM*i//todo - do this? helped to reduce number of timeouts in catch up tests
+                    );
             if(previous != null) {
-                boolean wasCompleted = previous.cancelIfNotCompleted();
+                boolean wasCompleted = ! previous.cancelIfNotCompleted();
                 if(wasCompleted)
                     DebugStats.conversation_numDoubleReceived.getAndIncrement();
             }

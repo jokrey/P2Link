@@ -25,6 +25,7 @@ public interface P2LConversation {
     void setMaxAttempts(int maxRetries);
     void setM(float m);
     void setA(int a);
+    void setRM(int a); //retry multiplier
 
 
     P2LMessage initExpectMsg(MessageEncoder encoded) throws IOException;
