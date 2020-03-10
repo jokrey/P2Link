@@ -132,7 +132,7 @@ public class EstablishConnectionProtocol {
         short conversationId = conversationIdOverride==NO_CONVERSATION_ID?createConversationForInitialDirect(parent):conversationIdOverride;
         P2LConversation convo = parent.internalConvo(SL_DIRECT_CONNECTION_REQUEST, conversationId, to.getSocketAddress());
 
-        byte[] verifyNonce = convo.initExpect(toMessage(parent, convo));
+        byte[] verifyNonce = convo.initExpectData(toMessage(parent, convo));
 
 
         if(verifyNonce.length == 0) {
@@ -143,7 +143,7 @@ public class EstablishConnectionProtocol {
             convo.close();
             return true;
         } else {
-            P2LMessage peerLinkMessage = convo.answerExpectMsg(verifyNonce);
+            P2LMessage peerLinkMessage = convo.answerExpect(verifyNonce);
             convo.close();
 
             if(peerLinkMessage.getPayloadLength() > 0) {
@@ -168,7 +168,7 @@ public class EstablishConnectionProtocol {
             byte[] nonce = new byte[16]; //must be != 4
             secureRandom.nextBytes(nonce);
 
-            byte[] verifyNonce = convo.answerExpect(nonce);
+            byte[] verifyNonce = convo.answerExpectData(nonce);
 
             if (Arrays.equals(nonce, verifyNonce)) {
                 parent.graduateToEstablishedConnection(peer, initialRequestMessage.header.getConversationId());

@@ -60,7 +60,7 @@ public class BroadcastMessageProtocol {
 
     private static void asInitiatorWithHash(P2LNodeInternal parent, P2LMessage broadcastMessage, SocketAddress to) throws IOException {
         P2LConversation convo = parent.internalConvo(SC_BROADCAST_WITH_HASH, to);
-        boolean peerHashKnowledgeOfMessage = convo.initExpectMsg(broadcastMessage.getContentHash().raw()).nextBool();
+        boolean peerHashKnowledgeOfMessage = convo.initExpect(broadcastMessage.getContentHash().raw()).nextBool();
         if(!peerHashKnowledgeOfMessage) {
             convo.answerClose(packBroadcastMessage(broadcastMessage));
         } else {
@@ -73,7 +73,7 @@ public class BroadcastMessageProtocol {
         if(state.isKnown(brdMessageHash)) {
             convo.answerClose(new byte[] {1}); //indicates true
         } else {
-            P2LMessage raw = convo.answerExpectMsg(new byte[] {0}); //indicates false
+            P2LMessage raw = convo.answerExpect(new byte[] {0}); //indicates false
             P2LMessage receivedBroadcastMessage = unpackBroadcastMessage(raw);
             if(receivedBroadcastMessage == null || state.markAsKnown(brdMessageHash)) ////if message invalid or message was known - while receiving this message, this node has received it from somewhere else
                 return;

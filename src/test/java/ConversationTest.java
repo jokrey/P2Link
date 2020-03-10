@@ -1,4 +1,5 @@
 import jokrey.utilities.debug_analysis_helper.TimeDiffMarker;
+import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.core.ConversationAnswererChangeThisName;
@@ -10,8 +11,7 @@ import java.io.IOException;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * @author jokrey
@@ -22,17 +22,17 @@ public class ConversationTest {
         byte[][] rm = rand(5, 1000);
         testEnvConversation(true, 60, 100, false,
                 (convo, no) -> {//client
-                    byte[] m1 = convo.initExpect(rm[0]);
+                    byte[] m1 = convo.initExpectData(rm[0]);
                     assertArrayEquals(rm[1], m1);
-                    byte[] m3 = convo.answerExpect(rm[2]);
+                    byte[] m3 = convo.answerExpectData(rm[2]);
                     assertArrayEquals(rm[3], m3);
                     convo.answerClose(rm[4]);
                 },
                 (convo, m0) -> {//server
                     assertArrayEquals(rm[0], m0.asBytes());
-                    byte[] m2 = convo.answerExpect(rm[1]);
+                    byte[] m2 = convo.answerExpectData(rm[1]);
                     assertArrayEquals(rm[2], m2);
-                    byte[] m4 = convo.answerExpect(rm[3]);
+                    byte[] m4 = convo.answerExpectData(rm[3]);
                     assertArrayEquals(rm[4], m4);
                     convo.close(); //problem:: if the message send here does not arrive - what is the other side supposed to expect...?? How are retries from the other side handled?
                 });
@@ -54,17 +54,17 @@ public class ConversationTest {
         byte[][] rm = rand(5, 1000);
         testEnvConversation(false, 60, 100, false,
                 (convo, no) -> {//client
-                    byte[] m1 = convo.initExpect(rm[0]);
+                    byte[] m1 = convo.initExpectData(rm[0]);
                     assertArrayEquals(rm[1], m1);
-                    byte[] m3 = convo.answerExpect(rm[2]);
+                    byte[] m3 = convo.answerExpectData(rm[2]);
                     assertArrayEquals(rm[3], m3);
                     convo.answerClose(rm[4]);
                 },
                 (convo, m0) -> {//server
                     assertArrayEquals(rm[0], m0.asBytes());
-                    byte[] m2 = convo.answerExpect(rm[1]);
+                    byte[] m2 = convo.answerExpectData(rm[1]);
                     assertArrayEquals(rm[2], m2);
-                    byte[] m4 = convo.answerExpect(rm[3]);
+                    byte[] m4 = convo.answerExpectData(rm[3]);
                     assertArrayEquals(rm[4], m4);
                     convo.close(); //problem:: if the message send here does not arrive - what is the other side supposed to expect...?? How are retries from the other side handled?
                 });
@@ -76,7 +76,7 @@ public class ConversationTest {
         byte[][] rm = rand(2, 1000);
         testEnvConversation(true, 60, 100, false,
                 (convo, no) -> {//client
-                    byte[] m1 = convo.initExpect(rm[0]);
+                    byte[] m1 = convo.initExpectData(rm[0]);
                     assertArrayEquals(rm[1], m1);
                     convo.close();
                 },
@@ -92,7 +92,7 @@ public class ConversationTest {
         byte[][] rm = rand(2, 1000);
         testEnvConversation(true, 60, 100, false,
                 (convo, no) -> {//client
-                    byte[] m1 = convo.initExpectClose(rm[0]);
+                    byte[] m1 = convo.initExpectDataClose(rm[0]);
                     assertArrayEquals(rm[1], m1);
                 },
                 (convo, m0) -> {//server
@@ -104,7 +104,7 @@ public class ConversationTest {
         byte[][] rm = rand(2, 1000);
         testEnvConversation(true, 0, 1, false,
                 (convo, no) -> {//client
-                    byte[] m1 = convo.initExpectClose(rm[0]);
+                    byte[] m1 = convo.initExpectDataClose(rm[0]);
                     assertArrayEquals(rm[1], m1);
                 },
                 (convo, m0) -> {//server
@@ -124,6 +124,46 @@ public class ConversationTest {
                     convo.close();
                 });
     }
+
+
+    @Test void convTest_pause() throws IOException {
+        P2LNode[] nodes = IntermediateTests.generateNodes(2, 63880);
+        P2LNode x = nodes[0];
+        P2LNode y = nodes[1];
+
+        y.registerConversationFor(1, (convo, m0) -> {
+            if(! m0.asString().equals("hallo"))
+                return;
+            P2LMessage result = convo.initExpect(convo.encode("hallo"));
+            convo.pause();
+            int a1 = result.nextInt();
+            int a2 = result.nextInt();
+
+            int calculated = a1 + a2;
+            sleep(10000);
+
+            convo.answerClose(convo.encode(calculated));
+        });
+
+        P2LConversation convo = x.convo(1, y.getSelfLink());
+        String handshakeAnswer = convo.initExpect(convo.encode("hallo")).asString();
+        if(! handshakeAnswer.equals("hallo")) fail();
+
+        int result = convo.answerExpectAfterPause(convo.encode(1, 5)).nextInt();
+        convo.close();
+        if(result != 6) fail();
+
+        //  y: (a1, a2) = convo.initExpect("hallo")
+        //  x: result = convo.answerPause(convo.encode(1, 2), timeout=20minutes)
+        //  y: convo.pause()
+        //  y: calculated = a1 + a2 //takes 10 minutes
+        //  y: convo.answerClose(calculated)
+        //  x: result was set to calculated
+        //  x: convo.close()
+    }
+
+
+
 
 
 

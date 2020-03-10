@@ -28,7 +28,7 @@ public class RequestPeerLinksProtocol {
 //                    return peers;
 //                }));
         P2LConversation convo = parent.internalConvo(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS, to);
-        P2LMessage message = convo.initExpectCloseMsg(new byte[0]);
+        P2LMessage message = convo.initExpectClose(new byte[0]);
 //        convo.close();
 
         ArrayList<P2Link> peers = new ArrayList<>();

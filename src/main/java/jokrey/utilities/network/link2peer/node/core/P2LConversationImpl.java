@@ -77,19 +77,19 @@ public class P2LConversationImpl implements P2LConversation {
 
     private long lastMessageSentAt = 0;
     private P2LMessage lastMessageReceived = null;
-    @Override public P2LMessage initExpectMsg(MessageEncoder encoded) throws IOException {
+    @Override public P2LMessage initExpect(MessageEncoder encoded) throws IOException {
         if(step != -2) throw new IOException("cannot init twice");
         step = 0;
         return answerExpectMsg(encoded, true);
     }
-    @Override public P2LMessage initExpectCloseMsg(MessageEncoder encoded) throws IOException {
+    @Override public P2LMessage initExpectClose(MessageEncoder encoded) throws IOException {
         if(step != -2) throw new IOException("cannot init twice");
         step = 0;
         P2LMessage result = answerExpectMsg(encoded, true);
         step = -1;
         return result;
     }
-    @Override public P2LMessage answerExpectMsg(MessageEncoder encoded) throws IOException {
+    @Override public P2LMessage answerExpect(MessageEncoder encoded) throws IOException {
         return answerExpectMsg(encoded, false);
     }
 
@@ -179,7 +179,7 @@ public class P2LConversationImpl implements P2LConversation {
 
             P2LMessage result = fut.getOrNull(calcWaitBeforeRetryTime());
             if(previous != null) {
-                boolean wasCompleted = previous.cancelIfNotCompleted();
+                boolean wasCompleted = ! previous.cancelIfNotCompleted();
                 if(wasCompleted)
                     DebugStats.conversation_numDoubleReceived.getAndIncrement();
             }
@@ -196,5 +196,18 @@ public class P2LConversationImpl implements P2LConversation {
         }
 
         throw new TimeoutException();
+    }
+
+    @Override public P2LMessage answerExpectAfterPause(MessageEncoder encoded, int timeout) {
+        send with retries until pause ack received
+
+
+        wait for subsequent message until timeout
+
+        return null;
+    }
+
+    @Override public void pause() {
+
     }
 }
