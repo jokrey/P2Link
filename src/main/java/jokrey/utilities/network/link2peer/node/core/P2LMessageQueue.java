@@ -69,6 +69,7 @@ public class P2LMessageQueue {
     }
     synchronized P2LFuture<P2LMessage> receiptFutureFor(SocketAddress from, short messageType, short conversationId, short step) {
         if(from == null) return futureFor(messageType);
+//        System.out.println("receiptFutureFor - from = [" + from + "], messageType = [" + messageType + "], conversationId = [" + conversationId + "], step = [" + step + "]");
         return futureFor(new StepReceiptIdentifier(from, messageType, conversationId, step));
     }
 
@@ -97,8 +98,8 @@ public class P2LMessageQueue {
                     );
         TypeIdentifier answersTypeRequest = received.header.getStep()!=P2LMessageHeader.NO_STEP?null:new TypeIdentifier(received);
 
-//        if(received.header.isReceipt())
-//        System.out.println("handleNewMessage - answersRequest = " + answersRequest);
+//        if(received.header.isConversationPart())
+//            System.out.println("handleNewMessage - answersRequest = " + answersRequest);
 
         Deque<P2LFuture<P2LMessage>> waitingForMessage = waitingReceivers.get(answersRequest); //higher priority
         Deque<P2LFuture<P2LMessage>> waitingForMessageId = answersTypeRequest==null?null:waitingReceivers.get(answersTypeRequest);

@@ -91,6 +91,9 @@ public interface P2LMessageHeader {
     int getNumberOfParts();
 
 
+    default boolean isConversationPart() {
+        return getStep() != NO_STEP;
+    }
 
 
     /** Internal use only. */

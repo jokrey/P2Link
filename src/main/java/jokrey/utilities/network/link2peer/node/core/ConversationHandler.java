@@ -20,15 +20,17 @@ class ConversationHandler {
     void received(P2LNodeInternal parent, SocketAddress from, P2LMessage received) throws IOException {
         boolean hasBeenHandled = conversationQueue.handleNewMessage(received);
         if(!hasBeenHandled) {
-            if(!received.header.isReceipt() && received.header.getStep() == 0) {
+            if(!received.header.isReceipt() && received.header.getStep() == 0) {//todo - potentially only allow greater(->newer) conversation id's for a peer-type combination,  - circular conversation id problem
                 ConversationAnswererChangeThisName handler = conversationHandlers.get(received.header.getType());
                 if (handler != null) {
                     P2LConversationImpl servingConvo = parent.internalConvo(received.header.getType(), received.header.getConversationId(), from);
                     servingConvo.serverInit(received);
                     handler.converse(servingConvo, received);
                 }
-            } else if(received.header.requestReceipt()) // if this is the last message in a convo - but the convo does not (or no longer) exists
-                parent.sendInternalMessage(from, received.createReceipt());
+            } else {
+                if(received.header.requestReceipt()) // if this is the last message in a convo - but the convo does not (or no longer) exists
+                    parent.sendInternalMessage(from, received.createReceipt());
+            }
         }
     }
     void clean() {

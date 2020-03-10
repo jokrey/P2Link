@@ -70,7 +70,7 @@ public class IncomingHandler {
                 streamMessageHandler.receivedPart(message);
                 DebugStats.incomingHandler_numStreamParts.getAndIncrement();
             }
-        } else if(message.header.getStep() != NO_STEP) {
+        } else if(message.header.isConversationPart()) {
             conversationMessageHandler.received(parent, from, message);
         } else {
             if (message.header.requestReceipt())
