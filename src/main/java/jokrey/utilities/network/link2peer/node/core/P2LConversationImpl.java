@@ -113,7 +113,7 @@ public class P2LConversationImpl implements P2LConversation {
         for(int i=0;i<maxAttempts;i++) {
             //previous is the message we are currently answering to - so it has already been received - however it might be resend by the peer if the message sent below is lost
             //   it is important the message is handled so that the conversation handler sees that it is expected and does not initiate a new conversation on m0 resend..
-            P2LFuture<P2LMessage> previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) (step - 2));
+            P2LFuture<P2LMessage> previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) 0);
             P2LFuture<P2LMessage> next = conversationQueue.futureFor(peer, type, conversationId, step);
 
 
@@ -176,7 +176,7 @@ public class P2LConversationImpl implements P2LConversation {
         for(int i=0;i<maxAttempts;i++) {
             //previous is the message we are currently answering to - so it has already been received - however it might be resend by the peer if the message sent below is lost
             //   it is important the message is handled so that the conversation handler sees that it is expected and does not initiate a new conversation on m0 resend..
-            P2LFuture<P2LMessage> previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) (step - 2));
+            P2LFuture<P2LMessage> previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) 0);
             P2LFuture<P2LMessage> last = conversationQueue.receiptFutureFor(peer, type, conversationId, (short) (step - 1));
 
             lastMessageSentAt = System.currentTimeMillis();//used to calculate avRTT
@@ -260,7 +260,7 @@ public class P2LConversationImpl implements P2LConversation {
         for(int i=0;i<maxAttempts;i++) {
             //previous is the message we are currently answering to - so it has already been received - however it might be resend by the peer if the message sent below is lost
             //   it is important the message is handled so that the conversation handler sees that it is expected and does not initiate a new conversation on m0 resend..
-            P2LFuture<P2LMessage> previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) (step - 2));
+            P2LFuture<P2LMessage> previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) 0);
             P2LFuture<P2LMessage> ack = conversationQueue.receiptFutureFor(peer, type, conversationId, (short) (step - 1));
 
             lastMessageSentAt = System.currentTimeMillis();//used to calculate avRTT
@@ -341,7 +341,7 @@ public class P2LConversationImpl implements P2LConversation {
         stepHandler.makeAttemptFunc = () -> {
             //previous is the message we are currently answering to - so it has already been received - however it might be resend by the peer if the message sent below is lost
             //   it is important the message is handled so that the conversation handler sees that it is expected and does not initiate a new conversation on m0 resend..
-            stepHandler.previous = init ? null : conversationQueue.futureFor(peer, type, conversationId, (short) (step - 2));
+            stepHandler.previous = init ? null : conversationQueue.futureFor(peer, type, conversationId, (short) 0);
             P2LFuture<P2LMessage> next = conversationQueue.futureFor(peer, type, conversationId, step);
 
             next.callMeBack(calcWaitBeforeRetryTime(stepHandler.counter), stepHandler);
@@ -393,7 +393,7 @@ public class P2LConversationImpl implements P2LConversation {
 
         Retryer<Boolean> stepHandler = new Retryer<>();
         stepHandler.makeAttemptFunc = () -> {
-            stepHandler.previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) (step - 2));
+            stepHandler.previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) 0);
             P2LFuture<P2LMessage> last = conversationQueue.receiptFutureFor(peer, type, conversationId, (short) (step - 1));
 
             last.callMeBack(calcWaitBeforeRetryTime(stepHandler.counter), stepHandler); //HAS TO BE BEFORE SEND MESSAGE - For thread, deadlock and call cascade reasons
@@ -444,7 +444,6 @@ public class P2LConversationImpl implements P2LConversation {
         // requesting a receipt here is technically wrong.
         // this side can not distinguish between the other side having ended the conversation
         //        (which would be a dev. bug) and a pause. However. For correct conversations this is correct.
-        // ADDITIONALLY: this does not work in all situations. If the after pause message by the other side is sent, then the previous message will be automatically consumed and no receipt will ever be sent.
         P2LMessage msg = P2LMessage.from(header, encoded);
 
         step++;
@@ -453,7 +452,7 @@ public class P2LConversationImpl implements P2LConversation {
 
         Retryer<P2LMessage> stepHandler = new Retryer<>();
         stepHandler.makeAttemptFunc = () -> {
-            stepHandler.previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) (step - 2));
+            stepHandler.previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) 0);
             P2LFuture<P2LMessage> ack = conversationQueue.receiptFutureFor(peer, type, conversationId, (short) (step - 1));
 
             ack.callMeBack(calcWaitBeforeRetryTime(stepHandler.counter), stepHandler); //HAS TO BE BEFORE SEND MESSAGE - For thread, deadlock and call cascade reasons
