@@ -60,7 +60,7 @@ public class P2LMessageQueue {
 
     synchronized P2LFuture<P2LMessage> futureFor(SocketAddress from, short messageType, short conversationId, short step) {
         if(from == null) return futureFor(messageType);
-//        System.out.println("futureFor - from = [" + from + "], messageType = [" + messageType + "], conversationId = [" + conversationId + "], step = [" + step + "]");
+        System.out.println("futureFor - from = [" + from + "], messageType = [" + messageType + "], conversationId = [" + conversationId + "], step = [" + step + "]");
         return futureFor(new SenderTypeConversationIdStepIdentifier(from, messageType, conversationId, step));
     }
     synchronized P2LFuture<P2LMessage> receiptFutureFor(SocketAddress from, short messageType, short conversationId) {
@@ -69,7 +69,7 @@ public class P2LMessageQueue {
     }
     synchronized P2LFuture<P2LMessage> receiptFutureFor(SocketAddress from, short messageType, short conversationId, short step) {
         if(from == null) return futureFor(messageType);
-//        System.out.println("receiptFutureFor - from = [" + from + "], messageType = [" + messageType + "], conversationId = [" + conversationId + "], step = [" + step + "]");
+        System.out.println("receiptFutureFor - from = [" + from + "], messageType = [" + messageType + "], conversationId = [" + conversationId + "], step = [" + step + "]");
         return futureFor(new StepReceiptIdentifier(from, messageType, conversationId, step));
     }
 
@@ -81,58 +81,57 @@ public class P2LMessageQueue {
         return future;
     }
 
-    public synchronized boolean handleNewMessage(P2LMessage received) {
-        //todo - this seems dumb:
+    public boolean handleNewMessage(P2LMessage received) {
+        //todo - this seems dumb or overkill:
         HeaderIdentifier answersRequest =
                 (received.header.getStep() != P2LMessageHeader.NO_STEP) ?
-                    (
-                    received.header.isReceipt() ?
-                        new StepReceiptIdentifier(received)
-                        :
-                        new SenderTypeConversationIdStepIdentifier(received)
-                    ) : (
-                    received.header.isReceipt() ?
-                        new ReceiptIdentifier(received)
-                        :
-                        new SenderTypeConversationIdentifier(received)
-                    );
-        TypeIdentifier answersTypeRequest = received.header.getStep()!=P2LMessageHeader.NO_STEP?null:new TypeIdentifier(received);
-
-//        if(received.header.isConversationPart())
-//            System.out.println("handleNewMessage - answersRequest = " + answersRequest);
-
-        Deque<P2LFuture<P2LMessage>> waitingForMessage = waitingReceivers.get(answersRequest); //higher priority
-        Deque<P2LFuture<P2LMessage>> waitingForMessageId = answersTypeRequest==null?null:waitingReceivers.get(answersTypeRequest);
+                        (
+                                received.header.isReceipt() ?
+                                        new StepReceiptIdentifier(received)
+                                        :
+                                        new SenderTypeConversationIdStepIdentifier(received)
+                        ) : (
+                        received.header.isReceipt() ?
+                                new ReceiptIdentifier(received)
+                                :
+                                new SenderTypeConversationIdentifier(received)
+                );
+        TypeIdentifier answersTypeRequest = received.header.getStep() != P2LMessageHeader.NO_STEP ? null : new TypeIdentifier(received);
 
         P2LFuture<P2LMessage> toComplete;
-        while (true) {
-            toComplete = null;
-            if(waitingForMessage!=null && !waitingForMessage.isEmpty()) {
-                toComplete = waitingForMessage.pop();
-                if(waitingForMessage.isEmpty())
-                    waitingReceivers.remove(answersRequest, waitingForMessage);
-            }
-            if (toComplete == null && waitingForMessageId != null && !waitingForMessageId.isEmpty()) {
-                toComplete = waitingForMessageId.pop();
-                if(waitingForMessageId.isEmpty())
-                    waitingReceivers.remove(answersTypeRequest, waitingForMessageId);
-            }
+        synchronized (this) {
+            Deque<P2LFuture<P2LMessage>> waitingForMessage = waitingReceivers.get(answersRequest); //higher priority
+            Deque<P2LFuture<P2LMessage>> waitingForMessageId = answersTypeRequest == null ? null : waitingReceivers.get(answersTypeRequest);
 
-//            System.out.println("toComplete = " + toComplete);
-
-            if (toComplete == null) {
-                if(! received.header.isExpired() && answersTypeRequest != null) {
-                    unconsumedMessages_byId.computeIfAbsent(answersTypeRequest.messageType, (k) -> new LinkedList<>()).add(received);
-                    unconsumedMessages_byExactRequest.computeIfAbsent(answersRequest, (k) -> new LinkedList<>()).add(received);
+            while (true) {
+                toComplete = null;
+                if (waitingForMessage != null && !waitingForMessage.isEmpty()) {
+                    toComplete = waitingForMessage.pop();
+                    if (waitingForMessage.isEmpty())
+                        waitingReceivers.remove(answersRequest, waitingForMessage);
                 }
-                return false;
-            } else {
-                if(!toComplete.isCanceled() && (!toComplete.hasTimedOut() || toComplete.isWaiting())) {
-                    toComplete.setCompleted(received);
-                    return true;
+                if (toComplete == null && waitingForMessageId != null && !waitingForMessageId.isEmpty()) {
+                    toComplete = waitingForMessageId.pop();
+                    if (waitingForMessageId.isEmpty())
+                        waitingReceivers.remove(answersTypeRequest, waitingForMessageId);
+                }
+
+                if (toComplete == null) {
+                    if (!received.header.isExpired() && answersTypeRequest != null) {
+                        unconsumedMessages_byId.computeIfAbsent(answersTypeRequest.messageType, (k) -> new LinkedList<>()).add(received);
+                        unconsumedMessages_byExactRequest.computeIfAbsent(answersRequest, (k) -> new LinkedList<>()).add(received);
+                    }
+                    return false;
+                } else {
+                    if (!toComplete.isLikelyInactive()) {
+                        break; //end synchronized block and set completed.
+                    }
                 }
             }
         }
+
+        toComplete.setCompleted(received);
+        return true;
     }
 
 

@@ -19,6 +19,7 @@ class ConversationHandler {
 
     void received(P2LNodeInternal parent, SocketAddress from, P2LMessage received) throws IOException {
         boolean hasBeenHandled = conversationQueue.handleNewMessage(received);
+        System.out.println("received = " + received+" - hasBeenHandled="+hasBeenHandled);
         if(!hasBeenHandled) {
             if(!received.header.isReceipt() && received.header.getStep() == 0) {//todo - potentially only allow greater(->newer) conversation id's for a peer-type combination,  - circular conversation id problem
                 ConversationAnswererChangeThisName handler = conversationHandlers.get(received.header.getType());

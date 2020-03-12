@@ -9,7 +9,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
 import static org.junit.jupiter.api.Assertions.*;
@@ -278,5 +280,87 @@ public class P2LFutureTest {
 
         P2LFuture.oneForAll(x).get();
         assertEquals(num, counter.get());
+    }
+
+
+    @Test public void p2lAsyncTimeoutTest() {
+        {
+            System.out.println("t1(" + System.currentTimeMillis() + ") init");
+
+            P2LFuture<Integer> p2lF = new P2LFuture<>();
+            new Thread(() -> {
+                System.out.println("t2(" + System.currentTimeMillis() + ") init/waiting");
+                sleep(100);
+                p2lF.setCompleted(123);
+                System.out.println("t2(" + System.currentTimeMillis() + ") completed");
+            }).start();
+
+            P2LFuture<Boolean> bool = new P2LFuture<>();
+            p2lF.callMeBack(500, integer -> {
+                bool.setCompleted(true);
+            });
+            bool.waitForIt(5000);
+            int x = p2lF.getResult();
+            System.out.println("t1(" + System.currentTimeMillis() + ") - x = " + x);
+            assertEquals(123, x);
+        }
+
+        {
+            P2LFuture<Integer> p2lF = new P2LFuture<>();
+            new Thread(() -> {
+                System.out.println("t2(" + System.currentTimeMillis() + ") init/waiting");
+                sleep(1000);
+                p2lF.trySetCompleted(123);
+                System.out.println("t2(" + System.currentTimeMillis() + ") completed");
+            }).start();
+
+            P2LFuture<Boolean> bool = new P2LFuture<>();
+            p2lF.callMeBack(500, integer -> {
+                bool.setCompleted(true);
+            });
+            bool.waitForIt(); //DOES NOT COMPLETE EVER, IF IT DOES NOT WORK...
+            Integer x = p2lF.getResult();
+            System.out.println("t1(" + System.currentTimeMillis() + ") - x = " + x);
+            assertNull(p2lF.getResult());
+        }
+
+        {
+            P2LFuture<Integer> p2lF_0 = new P2LFuture<>();
+            P2LFuture<Integer> p2lF_1 = new P2LFuture<>();
+            P2LFuture<Integer> p2lF_2 = new P2LFuture<>();
+            P2LFuture<Integer> p2lF_3 = new P2LFuture<>();
+            new Thread(() -> {
+                System.out.println("t2(" + System.currentTimeMillis() + ") init/waiting");
+                sleep(1000);
+                p2lF_0.trySetCompleted(123);
+                p2lF_1.trySetCompleted(123);
+                p2lF_2.trySetCompleted(123);
+                p2lF_3.trySetCompleted(123);
+                System.out.println("t2(" + System.currentTimeMillis() + ") completed");
+            }).start();
+
+            AtomicInteger counter = new AtomicInteger();
+            p2lF_3.callMeBack(1500, integer -> {
+                if(integer != null) counter.getAndIncrement();
+            });
+            p2lF_0.callMeBack(10, integer -> {
+                if(integer != null) counter.getAndIncrement();
+            });
+            p2lF_2.callMeBack(1200, integer -> {
+                if(integer != null) counter.getAndIncrement();
+            });
+            p2lF_1.callMeBack(500, integer -> {
+                if(integer != null) counter.getAndIncrement();
+            });
+
+            sleep(2000);
+            assertEquals(2, counter.get());
+            assertNull(p2lF_0.getResult());
+            assertNull(p2lF_1.getResult());
+            assertEquals(123, p2lF_2.getResult().intValue());
+            assertEquals(123, p2lF_3.getResult().intValue());
+        }
+
+        AsyncTimeoutSchedulerThread.shutdown();//optional
     }
 }

@@ -2,6 +2,7 @@ package jokrey.utilities.network.link2peer.node.core;
 
 import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
 
@@ -45,10 +46,6 @@ import java.net.SocketAddress;
  *      server+client: answerExpect ping pong between client and server | answerExpectAfterPause ping pong
  *      server/client: answerClose(mx)
  *      client/server: close()
- *   5 (shortcut - closeWith | a better alternative to example 2)
- *      client: val m1 = initExpectClose(m0)
- *      server: init_thread(m0)
- *      server: closeWith(m1)
  *
  * FALSELY RESENT M0(init) package.
  *    The 'previous' functionality does catch a few of the falsely 'resent' issues,
@@ -57,6 +54,9 @@ import java.net.SocketAddress;
  *    If it is required that server code is only executed once for a given operation, then implement a short handshake protocol up front
  *       if the conversation is falsely restarted by a resent message on client side - then the server will compute and answer the with the first part of the handshake(m1)
  *       however on client side no-one is listening and the package is discarded - the server will attempt to resend 'maxAttempts' times, which is sad, but at least not recalculate anything important.
+ *
+ *
+ * NOT THREAD SAFE IN IT'S METHODS. i.e. CANNOT be used from different threads without further synchronization. Such further synchronization is out of the box for the async methods which can possibly operate on different threads.
  *
  * @author jokrey
  */
@@ -80,15 +80,88 @@ public interface P2LConversation {
     void setRM(int a); //retry multiplier
 
 
+    /**
+     * Only as first instruction to the convo on client(convo opening) side.
+     * Sends the first message to the server and starts the response thread there.
+     * Strictly requires a answerExpect or answerClose on the server side as a response.
+     * @param encoded message to send, its offset has to match {@link #getHeaderSize()}
+     * @return the message received from the server in response to this message
+     * @throws IOException if the message cannot be send
+     * @throws TimeoutException if there is no response after (maxAttempts * (m * avRTT + a) + triangularNumber(maxAttempts)*rM) milliseconds
+     */
     P2LMessage initExpect(MessageEncoder encoded) throws IOException, TimeoutException;
+    /**
+     * On server or client after a previous initExpect or answerExpect on the other side.
+     * Strictly requires a answerExpect or answerClose on the other side as a response.
+     * @param encoded message to send, its offset has to match {@link #getHeaderSize()}
+     * @return the message received from the other side in response to this message
+     * @throws IOException if the message cannot be send
+     * @throws TimeoutException if there is no response after (maxAttempts * (m * avRTT + a) + triangularNumber(maxAttempts)*rM) milliseconds
+     */
     P2LMessage answerExpect(MessageEncoder encoded) throws IOException, TimeoutException;
+    /**
+     * On server or client after a previous initExpect or answerExpect on the other side.
+     * Strictly requires a close() on the other side as a response and receipt that the message sent was correctly received.
+     * This operation can be the last on either convo side. No further calls to the conversation object shall be done after calling this method.
+     * @param encoded message to send, its offset has to match {@link #getHeaderSize()}
+     * @throws IOException if the message cannot be send
+     * @throws TimeoutException if there is no response after (maxAttempts * (m * avRTT + a) + triangularNumber(maxAttempts)*rM) milliseconds
+     */
     void answerClose(MessageEncoder encoded) throws IOException, TimeoutException;
-    void close() throws IOException, TimeoutException;
+    /**
+     * On server or client after a previous answerClose on the other side.
+     * This operation can be the last on either convo side. No further calls to the conversation object shall be done after calling this method.
+     * @throws IOException if the message cannot be send
+     * @throws TimeoutException if there is no response after (maxAttempts * (m * avRTT + a) + triangularNumber(maxAttempts)*rM) milliseconds
+     */
+    void close() throws IOException;
+    /**
+     * Attempts to call {@link #close()} if that fails, because an exception is thrown nothing is done.
+     * This is useful in async call cascades.
+     * @return whether close was successful.
+     */
+    default boolean tryClose() {
+        try {
+            close();
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
 
-    //SPECIAL:: ONLY USE AS FIRST CONVO INSTRUCTION ON CLIENT SIDE WITH RESPONSE BEING closeWith!!!
+    P2LFuture<P2LMessage> initExpectAsync(MessageEncoder encoded);
+    P2LFuture<P2LMessage> answerExpectAsync(MessageEncoder encoded);
+    P2LFuture<Boolean> answerCloseAsync(MessageEncoder encoded);
+    P2LFuture<P2LMessage> initExpectAsyncAfterPause(MessageEncoder encoded, int timeout);
+    P2LFuture<P2LMessage> answerExpectAsyncAfterPause(MessageEncoder encoded, int timeout);
+
+
+    /**
+     * SPECIAL:: ONLY USE AS FIRST CONVO INSTRUCTION ON CLIENT SIDE WITH RESPONSE BEING 'closeWith'!!!
+     *
+     * EXAMPLE (ultra short conversation shortcut - closeWith | a better alternative to example 2)
+     *    client: val m1 = initExpectClose(m0)
+     *    server: init_thread(m0)
+     *    server: closeWith(m1)
+     *
+     * @param encoded message to send, its offset has to match {@link #getHeaderSize()}
+     * @return the message received from the other side in response to this message
+     * @throws IOException if the message cannot be send
+     * @throws TimeoutException if there is no response after (maxAttempts * (m * avRTT + a) + triangularNumber(maxAttempts)*rM) milliseconds
+     */
     P2LMessage initExpectClose(MessageEncoder encoded) throws IOException, TimeoutException;
-    //SPECIAL:: ONLY USE AS FIRST CONVO INSTRUCTION ON SERVER SIDE!!!
-    void closeWith(MessageEncoder encoded) throws IOException, TimeoutException;
+    /**
+     * SPECIAL:: ONLY USE AS FIRST CONVO INSTRUCTION ON SERVER SIDE WITH THE OTHER SIDE HAVING INITIATED THE CONVERSATION WITH 'initExpectClose'!!!
+     *
+     * EXAMPLE (ultra short conversation shortcut - closeWith | a better alternative to example 2)
+     *    client: val m1 = initExpectClose(m0)
+     *    server: init_thread(m0)
+     *    server: closeWith(m1)
+     *
+     * @param encoded message to send, its offset has to match {@link #getHeaderSize()}
+     * @throws IOException if the message cannot be send
+     */
+    void closeWith(MessageEncoder encoded) throws IOException;
 
 
 
@@ -116,7 +189,7 @@ public interface P2LConversation {
     /** bytes using shortcut for {@link #answerClose(MessageEncoder)} */
     default void answerClose(byte[] bytes) throws IOException, TimeoutException { answerClose(MessageEncoder.from(getHeaderSize(), bytes)); }
     /** bytes using shortcut for {@link #initClose(MessageEncoder)} */
-    default void initClose(byte[] bytes) throws IOException, TimeoutException { initClose(MessageEncoder.from(getHeaderSize(), bytes)); }
+    @Deprecated default void initClose(byte[] bytes) throws IOException, TimeoutException { initClose(MessageEncoder.from(getHeaderSize(), bytes)); }
     /** bytes using shortcut for {@link #initExpectClose(MessageEncoder)} */
     default P2LMessage initExpectClose(byte[] bytes) throws IOException, TimeoutException { return initExpectClose(MessageEncoder.from(getHeaderSize(), bytes)); }
     /** bytes using shortcut for {@link #closeWith(MessageEncoder)} */
@@ -146,10 +219,6 @@ public interface P2LConversation {
     default MessageEncoder encoder(int initial_capacity) {return new MessageEncoder(getHeaderSize(), initial_capacity);}
 
 
-    /** {@link #initExpectAfterPause(MessageEncoder, int)}, with the timeout set to infinity({@link P2LFuture#ENDLESS_WAIT}) */
-    default P2LMessage initExpectAfterPause(MessageEncoder encoded) throws IOException, TimeoutException {
-        return answerExpectAfterPause(encoded, P2LFuture.ENDLESS_WAIT);
-    }
     /**
      * Can only be used by client as the very first statement.
      * (server pauses conversation [client pausing works analogous])
@@ -166,10 +235,11 @@ public interface P2LConversation {
      * @throws TimeoutException if there is no response after (maxAttempts * (m * avRTT + a) + triangularNumber(maxAttempts)*rM) milliseconds
      */
     P2LMessage initExpectAfterPause(MessageEncoder encoded, int timeout) throws IOException, TimeoutException;
-    /** {@link #answerExpectAfterPause(MessageEncoder, int)}, with the timeout set to infinity({@link P2LFuture#ENDLESS_WAIT}) */
-    default P2LMessage answerExpectAfterPause(MessageEncoder encoded) throws IOException, TimeoutException {
-        return answerExpectAfterPause(encoded,P2LFuture.ENDLESS_WAIT);
-    }
+//    DON'T EVEN ALLOW NOT HAVING A TIMEOUT - IT IS INSANITY
+//    /** {@link #initExpectAfterPause(MessageEncoder, int)}, with the timeout set to infinity({@link P2LFuture#ENDLESS_WAIT}) */
+//    default P2LMessage initExpectAfterPause(MessageEncoder encoded) throws IOException, TimeoutException {
+//        return answerExpectAfterPause(encoded, P2LFuture.ENDLESS_WAIT);
+//    }
     /**
      * Used to give the OTHER PARTY the possibility to pause the conversation and take some time to calculate the result (more than a gives and without unnecessarily retrying).
      * (client pauses conversation [server pausing works analogous])
@@ -187,6 +257,11 @@ public interface P2LConversation {
      * @throws TimeoutException if there is no response after (maxAttempts * (m * avRTT + a) + triangularNumber(maxAttempts)*rM) milliseconds
      */
     P2LMessage answerExpectAfterPause(MessageEncoder encoded, int timeout) throws IOException, TimeoutException;
+//    DON'T EVEN ALLOW NOT HAVING A TIMEOUT - IT IS INSANITY
+//    /** {@link #answerExpectAfterPause(MessageEncoder, int)}, with the timeout set to infinity({@link P2LFuture#ENDLESS_WAIT}) */
+//    default P2LMessage answerExpectAfterPause(MessageEncoder encoded) throws IOException, TimeoutException {
+//        return answerExpectAfterPause(encoded, P2LFuture.ENDLESS_WAIT);
+//    }
     /**
      * Used by the client or server of a conversation to acknowledge the receival of the message before a pause for calculation.
      * Always used by the party THAT DOES THE CALCULATION.
@@ -197,12 +272,27 @@ public interface P2LConversation {
      */
     void pause() throws IOException, TimeoutException;
 
+    /**
+     * Attempts to call {@link #pause()} if that fails, because an exception is thrown nothing is done.
+     * This is useful in async call cascades.
+     * This is safe, because ,,,, todo it isn't?!
+     * @return whether close was successful.
+     */
+    default boolean tryPause() {
+        try {
+            pause();
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
 
 
 
 
     /**
-     * Special, do not use.
+     * Special, for single safe transfer of one message. Feature overlap with {@link jokrey.utilities.network.link2peer.P2LNode#sendMessageWithRetries(P2Link, P2LMessage, int)}
+     *
      * Can be used to send commands to the server,
      * but they may come in multiple times and an alternative is to simply use a message listener without conversations...
      * Example(ONLY possible use):
@@ -216,5 +306,5 @@ public interface P2LConversation {
      * @throws IOException if the message cannot be send
      * @throws TimeoutException if there is no response after (maxAttempts * (m * avRTT + a) + triangularNumber(maxAttempts)*rM) milliseconds
      */
-    void initClose(MessageEncoder encoded) throws IOException, TimeoutException;
+    @Deprecated void initClose(MessageEncoder encoded) throws IOException, TimeoutException;
 }

@@ -130,13 +130,34 @@ public class P2LFuture<T> {
      *
      * @param callback callback receiving the result
      */
-    public synchronized void callMeBack(Consumer<T> callback) {
+    public synchronized P2LFuture<T> callMeBack(Consumer<T> callback) {
         //has to be synchronized, otherwise between pushing the callback and the isCompleted - it could be completed and never called....
         if (isCompleted())
             callback.accept(getResult());
         else {
             resultCallbacks.push(callback);
         }
+        return this;
+    }
+
+    /**
+     * After the timeout is reached this future is automatically canceled by a minimial impact helper thread that is static and therefore the same for this JVM instance.
+     * The helper thread can be shutdown manually using {@link AsyncTimeoutSchedulerThread#shutdown()}, otherwise it will remain in an idle wait state.
+     * Otherwise it functions exactly like the normal {@link #callMeBack(Consumer)}.
+     * @param timeout timeout in ms after which this future will be canceled. It is therefore the upper boundary for how long the callback will NOT be called, before it is(what a sentence, sorry it is late)
+     * @param callback callback receiving the result or null if the timeout is reached
+     */
+    public synchronized P2LFuture<T> callMeBack(int timeout, Consumer<T> callback) {
+        if(timeout <= 0) {
+            throw new IllegalArgumentException("negative or infinite timeout illegal for fear of a negative timeout call being a bug, please directly use callMeBack without specifying a timeout");
+//            callMeBack(callback);
+        } else if (isCompleted()) {
+            callback.accept(getResult());
+        } else {
+            resultCallbacks.push(callback);
+            AsyncTimeoutSchedulerThread.instance().add(timeout, this);
+        }
+        return this;
     }
 
     /**
@@ -187,8 +208,9 @@ public class P2LFuture<T> {
      * @throws CanceledException if the future was canceled
      * @throws TimeoutException if the result is not available after the default timeout set in the constructor
      */
-    public void waitForIt() {
-        get();
+    public P2LFuture<T> waitForIt() {
+        get(); //this has no additional performance impact because it merely returns a reference
+        return this;
     }
 
     /**
@@ -198,8 +220,9 @@ public class P2LFuture<T> {
      * @throws CanceledException if the future was canceled
      * @throws TimeoutException if the result is not available after the given timeout
      */
-    public void waitForIt(long timeToDaryInMs) {
-        get(timeToDaryInMs);
+    public P2LFuture<T> waitForIt(long timeToDaryInMs) {
+        get(timeToDaryInMs); //this has no additional performance impact because it merely returns a reference
+        return this;
     }
 
     /**
@@ -239,16 +262,35 @@ public class P2LFuture<T> {
      * Sets the result. Notifies all still blocking waiting threads to wake up.
      * Calls all unblocking waiters. Note that the callbacks are executed from this thread, i.e. if they hang this method will hang as well.
      *
-     * @param result cannot be null.
+     * @param result result of this future - cannot be null.
+     * @throws CanceledException if the future was canceled.
      * @throws AlreadyCompletedException if the result was already set.
+     * @throws NullPointerException if the given result is null
      */
     public void setCompleted(T result) {
-        if (result == null) throw new NullPointerException("result cannot be null");
+        if (result == null) throw new NullPointerException("result cannot be null - optionally try wrapping it in an Optional");
         synchronized (this) {
             if (isCanceled()) throw new CanceledException();
             if (isCompleted()) throw new AlreadyCompletedException();
             this.result = result;
             done();
+        }
+    }
+
+    /**
+     * Same as {@link #setCompleted(Object)}, but does not throw an exception if this future was previous completed or canceled.
+     * @param result result of this future - cannot be null.
+     * @return whether the result was accepted
+     * @throws NullPointerException if the given result is null
+     */
+    public boolean trySetCompleted(T result) {
+        if (result == null) throw new NullPointerException("result cannot be null - optionally try wrapping it in an Optional");
+        synchronized (this) {
+            if (isCanceled()) return false;
+            if (isCompleted()) return false;
+            this.result = result;
+            done();
+            return true;
         }
     }
 
@@ -274,7 +316,7 @@ public class P2LFuture<T> {
      * Like {@link #cancel()} except it won't even throw an exception
      * @return !isCompleted() && !isCanceled()
      */
-    public boolean cancelIfNotCompleted() {
+    public boolean cancelIfNotCompleted() { //todo rename to tryCancel()
         synchronized (this) {
             if(isCompleted()) return false;
             if(isCanceled()) return false;
@@ -627,6 +669,10 @@ public class P2LFuture<T> {
             }
             return last;
         });
+    }
+
+    public boolean isLikelyInactive() {
+        return isCanceled() || (hasTimedOut() && !isWaiting());
     }
 }
 
