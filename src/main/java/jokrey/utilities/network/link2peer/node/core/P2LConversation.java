@@ -186,6 +186,8 @@ public interface P2LConversation {
     default P2LMessage initExpect(byte[] bytes) throws IOException, TimeoutException { return initExpect(MessageEncoder.from(getHeaderSize(), bytes)); }
     /** bytes using shortcut for {@link #answerExpect(MessageEncoder)} */
     default P2LMessage answerExpect(byte[] bytes) throws IOException, TimeoutException { return answerExpect(MessageEncoder.from(getHeaderSize(), bytes)); }
+    /** bytes using shortcut for {@link #answerExpectAfterPause(MessageEncoder, int)} */
+    default P2LMessage answerExpectAfterPause(byte[] bytes, int timeout) throws IOException, TimeoutException { return answerExpectAfterPause(MessageEncoder.from(getHeaderSize(), bytes), timeout); }
     /** bytes using shortcut for {@link #answerClose(MessageEncoder)} */
     default void answerClose(byte[] bytes) throws IOException, TimeoutException { answerClose(MessageEncoder.from(getHeaderSize(), bytes)); }
     /** bytes using shortcut for {@link #initClose(MessageEncoder)} */

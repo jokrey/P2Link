@@ -102,7 +102,7 @@ public class P2LConversationImplV2 implements P2LConversation {
             parent.sendInternalMessage(peer, received.createReceipt());
         }
         if(received.header.getStep() == step || (pausedDoubleExpectMode && received.header.getStep() == step+1)) {
-            latest.setCompleted(received);
+            latest.trySetCompleted(received);
         } else {
             DebugStats.conversation_numDoubleReceived.getAndIncrement();
         }
@@ -226,8 +226,8 @@ public class P2LConversationImplV2 implements P2LConversation {
         parent.sendInternalMessage(peer, msg);
     }
     @Override public void initClose(MessageEncoder encoded) throws IOException {
-        if(isServer) throw new IllegalStateException("init only possible on client side, server does this automatically, use closeWith or answerClose");
         if(step != -2) throw new IllegalStateException("cannot init twice");
+        if(isServer) throw new IllegalStateException("init only possible on client side, server does this automatically, use closeWith or answerClose");
         step = 0;
         answerClose(encoded);
     }
