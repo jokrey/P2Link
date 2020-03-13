@@ -11,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 
-//TODO
 class ConversationHandlerV2 {
     private final Map<Short, ConversationAnswererChangeThisName> conversationHandlers = new ConcurrentHashMap<>();
     void registerConversationHandlerFor(int type, ConversationAnswererChangeThisName handler) {
@@ -27,7 +26,6 @@ class ConversationHandlerV2 {
         } else {
             SenderTypeConversationIdentifier id = new SenderTypeConversationIdentifier(received);
             P2LConversationImplV2 convo = activeConversations.get(id);
-            System.out.println(parent.getSelfLink() + " - received("+id+") = " + received+" - convo="+convo);
             if(convo != null) //if the convo does not exist, then the received message will be considered old.
                 convo.notifyReceived(received);
             else if(received.header.requestReceipt()) //i.e. our close message was lost and the other node has resent its last message
@@ -37,7 +35,7 @@ class ConversationHandlerV2 {
         }
     }
     void clean() {
-//        activeConversations.clear(); todo - how do we clean dormant active conversations
+//        activeConversations.clear(); todo - how do we clean dormant active conversations?! Do they exist? Don't they time out?
     }
 
     P2LConversation getConvoFor(P2LNodeInternal parent, P2LConnection con, SocketAddress to, short type, short conversationId) {
@@ -45,7 +43,6 @@ class ConversationHandlerV2 {
                 k -> new P2LConversationImplV2(parent, this, con, to, type, conversationId));
     }
     void remove(P2LConversationImplV2 convo) {
-        System.out.println(convo.parent.getSelfLink() + " remove - "+convo);
         activeConversations.remove(new SenderTypeConversationIdentifier(convo.peer, convo.type, convo.conversationId));
     }
 }

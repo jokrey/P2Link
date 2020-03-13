@@ -285,9 +285,9 @@ public class ConversationTest {
     }
 
     @Test void convTest_initPauseFromClientContinue2mPingPongAfter() throws IOException {
-        testEnvConversation(true, 0, 1, false, false,
+        testEnvConversation(true, 60, 100, false, false,
                 (convo, no) -> {//client
-                    P2LMessage m1 = convo.initExpectAfterPause(convo.encode(1, 5), 10_000);
+                    P2LMessage m1 = convo.initExpectAfterPause(convo.encode(1, 5), 30_000);
                     int result = m1.nextInt();
                     if(result != 6) fail();
 
@@ -387,8 +387,8 @@ public class ConversationTest {
                     assertEquals(0, m0);
                     System.out.println("m0 = " + m0);
                     P2LFuture<?> futi_s1 = convo.answerExpectAsync(convo.encode(1)).callMeBack(msg2 -> {
-                        convo.tryClose();
                         int m2 = msg2.nextInt();
+                        convo.tryClose();
                         assertEquals(2, m2);
                         System.out.println("m2 = " + m2);
                         serverCompletedFut.setCompleted(true);
@@ -465,7 +465,7 @@ public class ConversationTest {
 
             TimeDiffMarker.println("convo");
             
-            assertTrue(bool.get(20_000));
+            assertTrue(bool.get(30_000));
             assertFalse(serverCompletedMultipleTimes.isCompleted());
 
             TimeDiffMarker.println("convo");

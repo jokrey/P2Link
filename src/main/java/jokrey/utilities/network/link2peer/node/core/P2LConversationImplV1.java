@@ -12,12 +12,12 @@ import java.net.SocketAddress;
 import java.util.function.Consumer;
 
 /**
- * todo For few dropped packages the number of double resend packages is relatively high
- * todo Problem: Consider packets m0 and m1 and m2. client sends m0, server received m0 and sends m1, m1 is lost.
- * todo          Since m1 is the ack for m0 -> client resends m0, roughly exactly when m0 arrieves the server realizes that it has not received m2 and resends m1.
- * todo          Despite only m1 being lost m0 is resent
- * todo   This problem may very well be unsolvable, but it should be kept in mind
- * todo     - OPTION: it could be possible to have the server never resend, UNLESS the client resends...
+ * to-do For few dropped packages the number of double resend packages is relatively high
+ * to-do Problem: Consider packets m0 and m1 and m2. client sends m0, server received m0 and sends m1, m1 is lost.
+ * to-do          Since m1 is the ack for m0 -> client resends m0, roughly exactly when m0 arrieves the server realizes that it has not received m2 and resends m1.
+ * to-do          Despite only m1 being lost m0 is resent
+ * to-do   This problem may very well be unsolvable, but it should be kept in mind
+ * to-do     - OPTION: it could be possible to have the server never resend, UNLESS the client resends...
  */
 public class P2LConversationImplV1 implements P2LConversation {
     public static int DEFAULT_NUM_ATTEMPTS = 4;
@@ -75,7 +75,7 @@ public class P2LConversationImplV1 implements P2LConversation {
 
     private int calcWaitBeforeRetryTime(int numPreviousRetries) {
         return ( con.avRTT == -1? 500 :(int) (con.avRTT * m + a) )
-                + rM*numPreviousRetries;//todo - do this? helped to reduce number of timeouts in catch up tests
+                + rM*numPreviousRetries;//to-do - do this? helped to reduce number of timeouts in catch up tests
     }
 
     private boolean isServer = false;
@@ -250,7 +250,7 @@ public class P2LConversationImplV1 implements P2LConversation {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
         //does not request a receipt, but expects to receive a receipt. - resends shall not trigger automatic receipt resends(compare to close, where that is desired)
-        ConversationHeader header = new ConversationHeader(null, type, conversationId, step, true); //todo - requesting a receipt here is technically wrong. this side can not distinguish between the other side having ended the conversation (which would be a dev. bug) and a pause. However. For correct conversations this is correct.
+        ConversationHeader header = new ConversationHeader(null, type, conversationId, step, true); //to-do - requesting a receipt here is technically wrong. this side can not distinguish between the other side having ended the conversation (which would be a dev. bug) and a pause. However. For correct conversations this is correct.
         P2LMessage msg = P2LMessage.from(header, encoded);
 
         step++;
@@ -440,7 +440,7 @@ public class P2LConversationImplV1 implements P2LConversation {
 
         //does not request a receipt, but expects to receive a receipt. - resends shall not trigger automatic receipt resends(compare to close, where that is desired)
         ConversationHeader header = new ConversationHeader(null, type, conversationId, step, true);
-        //todo -
+        //to-do -
         // requesting a receipt here is technically wrong.
         // this side can not distinguish between the other side having ended the conversation
         //        (which would be a dev. bug) and a pause. However. For correct conversations this is correct.
@@ -533,7 +533,7 @@ public class P2LConversationImplV1 implements P2LConversation {
 
         private void fail(IOException e) {
             e.printStackTrace();
-            //todo - how do we handle? - is this sufficient?!:
+            //to-do - how do we handle? - is this sufficient?!:
             finalResultFuture.cancel();
         }
     }
