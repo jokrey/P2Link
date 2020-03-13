@@ -285,7 +285,7 @@ public class ConversationTest {
     }
 
     @Test void convTest_initPauseFromClientContinue2mPingPongAfter() throws IOException {
-        testEnvConversation(true, 60, 100, false, false,
+        testEnvConversation(true, 0, 1, false, false,
                 (convo, no) -> {//client
                     P2LMessage m1 = convo.initExpectAfterPause(convo.encode(1, 5), 10_000);
                     int result = m1.nextInt();

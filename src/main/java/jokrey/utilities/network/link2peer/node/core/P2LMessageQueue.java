@@ -84,7 +84,7 @@ public class P2LMessageQueue {
     public boolean handleNewMessage(P2LMessage received) {
         //todo - this seems dumb or overkill:
         HeaderIdentifier answersRequest =
-                (received.header.getStep() != P2LMessageHeader.NO_STEP) ?
+                (received.header.isConversationPart()) ?
                         (
                                 received.header.isReceipt() ?
                                         new StepReceiptIdentifier(received)

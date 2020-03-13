@@ -9,22 +9,25 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 
-class ConversationHandler {
+class ConversationHandlerV1 {
+    private IncomingHandler incomingHandler;
+    ConversationHandlerV1(IncomingHandler incomingHandler) {
+        this.incomingHandler = incomingHandler;
+    }
+
     private final Map<Short, ConversationAnswererChangeThisName> conversationHandlers = new ConcurrentHashMap<>();
-    public void registerConversationFor(int type, ConversationAnswererChangeThisName handler) {
+    public void registerConversationHandlerFor(int type, ConversationAnswererChangeThisName handler) {
         conversationHandlers.put(toShort(type), handler);
     }
-    
-    final P2LMessageQueue conversationQueue = new P2LMessageQueue();
 
     void received(P2LNodeInternal parent, SocketAddress from, P2LMessage received) throws IOException {
-        boolean hasBeenHandled = conversationQueue.handleNewMessage(received);
+        boolean hasBeenHandled = incomingHandler.messageQueue.handleNewMessage(received);
         System.out.println("received = " + received+" - hasBeenHandled="+hasBeenHandled);
         if(!hasBeenHandled) {
             if(!received.header.isReceipt() && received.header.getStep() == 0) {//todo - potentially only allow greater(->newer) conversation id's for a peer-type combination,  - circular conversation id problem
                 ConversationAnswererChangeThisName handler = conversationHandlers.get(received.header.getType());
                 if (handler != null) {
-                    P2LConversationImpl servingConvo = parent.internalConvo(received.header.getType(), received.header.getConversationId(), from);
+                    P2LConversationImplV1 servingConvo = (P2LConversationImplV1) parent.internalConvo(received.header.getType(), received.header.getConversationId(), from);
                     servingConvo.serverInit(received);
                     handler.converse(servingConvo, received);
                 }
@@ -34,7 +37,9 @@ class ConversationHandler {
             }
         }
     }
-    void clean() {
-        conversationQueue.clean();
+    void clean() { }
+
+    public P2LConversation getConvoFor(P2LNodeImpl parent, P2LConnection con, SocketAddress to, short type, short conversationId) {
+        return new P2LConversationImplV1(parent, incomingHandler.messageQueue, con, to, type, conversationId);
     }
 }

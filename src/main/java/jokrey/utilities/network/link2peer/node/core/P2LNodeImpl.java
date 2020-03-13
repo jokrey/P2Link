@@ -135,13 +135,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
 
 
     @Override public void registerInternalConversationFor(int type, ConversationAnswererChangeThisName handler) {
-        incomingHandler.conversationMessageHandler.registerConversationFor(type, handler);
+        incomingHandler.conversationMessageHandler.registerConversationHandlerFor(type, handler);
     }
 
-    @Override public P2LConversationImpl internalConvo(int type, int conversationId, SocketAddress to) {
-        return new P2LConversationImpl(this, incomingHandler.conversationMessageHandler.conversationQueue,
-                establishedConnections.get(to), to,
-                toShort(conversationId), toShort(type));
+    @Override public P2LConversation internalConvo(int type, int conversationId, SocketAddress to) {
+        return incomingHandler.conversationMessageHandler.getConvoFor(this, establishedConnections.get(to), to, toShort(type), toShort(conversationId));
     }
 
     //DIRECT MESSAGING:

@@ -15,7 +15,6 @@ import java.net.SocketException;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.*;
-import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_STEP;
 
 /**
  * Protocol:
@@ -27,14 +26,15 @@ import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessage
  */
 public class IncomingHandler {
     DatagramSocket serverSocket;
-    private P2LNodeInternal parent;
+    P2LNodeInternal parent;
 
     final P2LMessageQueue messageQueue = new P2LMessageQueue();
     final P2LMessageQueue brdMessageQueue = new P2LMessageQueue();
     final BroadcastMessageProtocol.BroadcastState broadcastState = new BroadcastMessageProtocol.BroadcastState();
     final LongMessageHandler longMessageHandler = new LongMessageHandler();
     final StreamMessageHandler streamMessageHandler = new StreamMessageHandler();
-    final ConversationHandler conversationMessageHandler = new ConversationHandler();
+//    final ConversationHandlerV1 conversationMessageHandler = new ConversationHandlerV1(this);
+    final ConversationHandlerV2 conversationMessageHandler = new ConversationHandlerV2();
 
     final P2LThreadPool handleReceivedMessagesPool = new P2LThreadPool(4, 64);
 
@@ -113,25 +113,25 @@ public class IncomingHandler {
     IncomingHandler(P2LNodeInternal parentG) throws IOException {
         this.parent = parentG;
 
-        conversationMessageHandler.registerConversationFor(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS, (convo, no) ->
+        conversationMessageHandler.registerConversationHandlerFor(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS, (convo, no) ->
                 RequestPeerLinksProtocol.asAnswerer(parent, convo));
-        conversationMessageHandler.registerConversationFor(SL_WHO_AM_I,
+        conversationMessageHandler.registerConversationHandlerFor(SL_WHO_AM_I,
                 WhoAmIProtocol::asAnswerer);
-        conversationMessageHandler.registerConversationFor(SC_BROADCAST_WITHOUT_HASH, (convo, m0) -> {
+        conversationMessageHandler.registerConversationHandlerFor(SC_BROADCAST_WITHOUT_HASH, (convo, m0) -> {
             if(parent.isConnectedTo(convo.getPeer()))
                 BroadcastMessageProtocol.asAnswererWithoutHash(parent, convo, m0, brdMessageQueue, broadcastState);
         });
-        conversationMessageHandler.registerConversationFor(SC_BROADCAST_WITH_HASH, (convo, m0) -> {
+        conversationMessageHandler.registerConversationHandlerFor(SC_BROADCAST_WITH_HASH, (convo, m0) -> {
             if(parent.isConnectedTo(convo.getPeer()))
                 BroadcastMessageProtocol.asAnswererWithHash(parent, convo, m0, brdMessageQueue, broadcastState);
         });
-        conversationMessageHandler.registerConversationFor(SL_REQUEST_DIRECT_CONNECT_TO, ((convo, m0) -> {
+        conversationMessageHandler.registerConversationHandlerFor(SL_REQUEST_DIRECT_CONNECT_TO, ((convo, m0) -> {
             EstablishConnectionProtocol.asAnswererRequestReverseConnection(parent, convo, m0);
         }));
-        conversationMessageHandler.registerConversationFor(SL_RELAY_REQUEST_DIRECT_CONNECT, ((convo, m0) -> {
+        conversationMessageHandler.registerConversationHandlerFor(SL_RELAY_REQUEST_DIRECT_CONNECT, ((convo, m0) -> {
             EstablishConnectionProtocol.asAnswererRelayRequestReverseConnection(parent, convo, m0);
         }));
-        conversationMessageHandler.registerConversationFor(SL_DIRECT_CONNECTION_REQUEST, ((convo, m0) -> {
+        conversationMessageHandler.registerConversationHandlerFor(SL_DIRECT_CONNECTION_REQUEST, ((convo, m0) -> {
             EstablishConnectionProtocol.asAnswererDirect(parent, convo, m0);
         }));
 

@@ -35,7 +35,7 @@ public interface P2LNodeInternal extends P2LNode {
 
     void registerInternalConversationFor(int type, ConversationAnswererChangeThisName handler);
 
-    P2LConversationImpl internalConvo(int type, int conversationId, SocketAddress to);
+    P2LConversation internalConvo(int type, int conversationId, SocketAddress to);
 
     void notifyUserBroadcastMessageReceived(P2LMessage message);
     void notifyUserMessageReceived(P2LMessage message);
@@ -52,10 +52,10 @@ public interface P2LNodeInternal extends P2LNode {
         validateMsgTypeNotInternal(type);
         registerInternalConversationFor(type, handler);
     }
-    default P2LConversationImpl internalConvo(int type, SocketAddress to) {
+    default P2LConversation internalConvo(int type, SocketAddress to) {
         return internalConvo(type, createUniqueConversationId(), to);
     }
-    default P2LConversationImpl convo(int type, SocketAddress to) {
+    default P2LConversation convo(int type, SocketAddress to) {
         validateMsgTypeNotInternal(type);
         return internalConvo(type, to);
     }
