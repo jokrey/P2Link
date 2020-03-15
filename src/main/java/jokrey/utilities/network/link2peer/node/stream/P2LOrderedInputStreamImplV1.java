@@ -11,6 +11,8 @@ import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.LinkedList;
 
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_STEP;
+
 /**
  * TODO - should itself decide when to send receipts, the current system allows an exploit where many small packages request receipts
  *
@@ -23,7 +25,7 @@ import java.util.LinkedList;
  */
 public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
     public P2LOrderedInputStreamImplV1(P2LNodeInternal parent, SocketAddress to, short type, short conversationId) {
-        super(parent, to, type, conversationId);
+        super(parent, to, type, conversationId, NO_STEP);
     }
 
     private int earliestIndexMissing = 0;//todo wrap around feature (i.e. infinite stream)
@@ -125,7 +127,7 @@ public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
 
         boolean eof = isClosed() || eofReached();
         try {
-            parent.sendInternalMessage(from, P2LOrderedStreamReceipt.encode(type, conversationId, eof, latestIndexReceived, getMissingPartIndices()));
+            parent.sendInternalMessage(from, P2LOrderedStreamReceipt.encode(type, conversationId, NO_STEP, eof, latestIndexReceived, getMissingPartIndices()));
         } catch (IOException e) {
             e.printStackTrace();
         }

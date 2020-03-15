@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.Arrays;
 
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_STEP;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 
 /**
@@ -58,9 +59,9 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
         this(parent, to, (con==null?P2LMessage.CUSTOM_RAW_SIZE_LIMIT:con.remoteBufferSize), type, conversationId);
     }
     public P2LOrderedOutputStreamImplV1(P2LNodeInternal parent, SocketAddress to, int bufferSizeWithoutHeader, short type, short conversationId) {
-        super(parent, to, null, type, conversationId);
+        super(parent, to, null, type, conversationId, NO_STEP);
 
-        headerSize = new StreamPartHeader(null, toShort(type), toShort(conversationId), 0, false, false).getSize();
+        headerSize = new StreamPartHeader(null, toShort(type), toShort(conversationId), NO_STEP,0, false, false).getSize();
         unsendBuffer = new byte[bufferSizeWithoutHeader - headerSize];
     }
 
@@ -125,7 +126,7 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
         if (!hasUnconfirmedParts() || requestRecentlyMade()) return;
         lastReceiptRequest = System.currentTimeMillis();
         if (isClosed()) {
-            StreamPartHeader header = new StreamPartHeader(null, toShort(type), toShort(conversationId), -1, true, false);
+            StreamPartHeader header = new StreamPartHeader(null, toShort(type), toShort(conversationId), NO_STEP, -1, true, false);
             parent.sendInternalMessage(to, new P2LMessage(header, null, header.generateRaw(0), 0));
         } else{
             send(earliestUnconfirmedPartIndex, true);
@@ -174,7 +175,7 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
         boolean eof = eofAtIndex == partIndexToSend;
         boolean thisPartIsLastInUnconfirmedBuffer = partIndexToSend + 1 >= earliestUnconfirmedPartIndex + unconfirmedSendPackages.length;
         boolean requestReceipt = forceRequestReceipt || eof || thisPartIsLastInUnconfirmedBuffer; //eof always requests a receipt, because the close method will not
-        StreamPartHeader header = new StreamPartHeader(null, toShort(type), toShort(conversationId), partIndexToSend, requestReceipt, eof);
+        StreamPartHeader header = new StreamPartHeader(null, toShort(type), toShort(conversationId), NO_STEP, partIndexToSend, requestReceipt, eof);
         if(requestReceipt)
             lastReceiptRequest=System.currentTimeMillis();
         header.writeTo(chunk.content); //if request receipt was changed...

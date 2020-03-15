@@ -11,19 +11,23 @@ import jokrey.utilities.network.link2peer.util.SyncHelp;
 import java.io.IOException;
 import java.net.SocketAddress;
 
-import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 import static jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputStreamImplV1.DEFAULT_BATCH_DELAY;
 import static jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputStreamImplV1.RECEIPT_DELAY_MULTIPLIER;
 
 /**
+ * Why is a time based receipt better?:
+ *   We don't want a receipt for EVERY package, only for a batch
+ *   We could request a receipt with the last package, but what if it is dropped
+ *   We could send a receipt after n packages, but we don't know the current batch size
+ *
  * @author jokrey
  */
 public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
     private int receiptPackageMaxSize;
     long receipt_delay_ms;
-    protected P2LFragmentInputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId) {
-        super(parent, to, con, type, conversationId);
-        int headerSize = new StreamReceiptHeader(null, toShort(type), toShort(conversationId),false).getSize();
+    protected P2LFragmentInputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId, short step) {
+        super(parent, to, con, type, conversationId, step);
+        int headerSize = new StreamReceiptHeader(null, type, conversationId, step,false).getSize();
         receiptPackageMaxSize = con==null?1024:con.remoteBufferSize - headerSize;
         long batch_delay_ms = con==null? DEFAULT_BATCH_DELAY :Math.max(con.avRTT, DEFAULT_BATCH_DELAY);
         receipt_delay_ms = batch_delay_ms * RECEIPT_DELAY_MULTIPLIER;//con==null?50:con.avRTT/2;
@@ -115,7 +119,7 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
 
     private synchronized void sendReceipt(int receiptPackageMaxSize) throws IOException {
         System.out.println("SEND RECEIPT("+receiptPackageMaxSize+", "+P2LMessage.CUSTOM_RAW_SIZE_LIMIT+") receipt.latestReceived = " + highestEndReceived+", receipt.missingRanges("+missingRanges.size()+") = " + missingRanges);
-        parent.sendInternalMessage(from, P2LFragmentStreamReceipt.encode(type, conversationId, isClosed(), (int) highestEndReceived, missingRanges, receiptID++, receiptPackageMaxSize));
+        parent.sendInternalMessage(from, P2LFragmentStreamReceipt.encode(type, conversationId, step, isClosed(), (int) highestEndReceived, missingRanges, receiptID++, receiptPackageMaxSize));
     }
 
     @Override public boolean isClosed() {

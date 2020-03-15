@@ -255,9 +255,10 @@ public interface P2LMessageHeader {
 
         if(isStreamPart) {
             if(isReceipt)
-                return new StreamReceiptHeader(sender, type, conversationId, isStreamEof);
-            else
-                return new StreamPartHeader(sender, type, conversationId, partIndex, requestReceipt, isStreamEof);
+                return new StreamReceiptHeader(sender, type, conversationId, step, isStreamEof);
+            else {
+                return new StreamPartHeader(sender, type, conversationId, step, partIndex, requestReceipt, isStreamEof);
+            }
         }
 
         if(isReceipt) {
@@ -341,8 +342,8 @@ public interface P2LMessageHeader {
     static int getPartIndexFieldOffset(boolean conversationIdFieldPresent, boolean expirationFieldPresent, boolean stepFieldPresent, boolean isLongPart, boolean isStreamPart, boolean isReceipt) {
         if(!isLongPart&&(!isStreamPart||isReceipt)) return -1;
         if(conversationIdFieldPresent && expirationFieldPresent && stepFieldPresent) return MIN_SIZE+2+2+2;
-        if(conversationIdFieldPresent && (expirationFieldPresent || stepFieldPresent)) return MIN_SIZE+2+2;
-        if(expirationFieldPresent) return MIN_SIZE+2;
+        if(atLeastTwo(conversationIdFieldPresent, expirationFieldPresent, stepFieldPresent)) return MIN_SIZE+2+2;
+        if(conversationIdFieldPresent || expirationFieldPresent || stepFieldPresent) return MIN_SIZE+2;
         return MIN_SIZE;
     }
     default int getLongNumPartsFieldOffset() {
@@ -522,5 +523,8 @@ public interface P2LMessageHeader {
         @Override public String toString() {
             return "ReceiptIdentifier{from=" + super.from + ", messageType=" + super.messageType + ", conversationId=" + super.conversationId + '}';
         }
+    }
+    static boolean atLeastTwo(boolean a, boolean b, boolean c) {
+        return a && (b || c) || (b && c);
     }
 }

@@ -5,9 +5,9 @@ import jokrey.utilities.network.link2peer.P2Link;
 /**
  * @author jokrey
  */
-public class StreamReceiptHeader extends ConversationIdHeader {
-    public StreamReceiptHeader(P2Link sender, short type, short conversationId, boolean eofIndicator) {
-        super(sender, type, conversationId, eofIndicator);
+public class StreamReceiptHeader extends ConversationHeader {
+    public StreamReceiptHeader(P2Link sender, short type, short conversationId, short step, boolean eofIndicator) {
+        super(sender, type, conversationId, step, eofIndicator);
 
         //TODO - eofIndicator == REQUEST RECEIPT IS A WEIRD INTERNAL HACK THAT WILL WORK BUT IS A BIT WEIRD SO KEEP THAT IN MIND PLEASE
     }

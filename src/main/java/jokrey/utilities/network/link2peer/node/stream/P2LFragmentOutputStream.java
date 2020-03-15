@@ -15,18 +15,20 @@ public abstract class P2LFragmentOutputStream implements P2LOutputStream {
     protected final P2LNodeInternal parent;
     protected final SocketAddress to;
     protected final P2LConnection con;
-    protected final short type, conversationId;
+    protected final short type, conversationId, step;
     protected FragmentRetriever source;
-    protected P2LFragmentOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId) {
+    protected P2LFragmentOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId, short step) {
         this.parent = parent;
         this.to = to;
         this.con = con;
         this.type = type;
         this.conversationId = conversationId;
+        this.step = step;
     }
     @Override public SocketAddress getRawFrom() { return to; }
     @Override public short getType() { return type; }
     @Override public short getConversationId() { return conversationId; }
+    @Override public short getStep() { return step; }
 
 
     public void setSource(FragmentRetriever source) {
@@ -39,7 +41,7 @@ public abstract class P2LFragmentOutputStream implements P2LOutputStream {
         setSource(getRetrieverFor(storage));
     }
 
-    public abstract void send() throws InterruptedException;
+    public abstract void send();
 
 
     public static FragmentRetriever getRetrieverFor(TransparentBytesStorage storage) {
@@ -87,8 +89,7 @@ public abstract class P2LFragmentOutputStream implements P2LOutputStream {
             return realStartIndex == Math.min(realEndIndex, retriever.currentMaxEnd());
         }
 
-        @Override
-        public String toString() {
+        @Override public String toString() {
             return "Fragment{" +
                     "retriever=" + retriever +
                     ", realStartIndex=" + realStartIndex +
@@ -96,8 +97,7 @@ public abstract class P2LFragmentOutputStream implements P2LOutputStream {
                     '}';
         }
 
-        @Override
-        public boolean equals(Object o) {
+        @Override public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Fragment fragment = (Fragment) o;
@@ -106,8 +106,7 @@ public abstract class P2LFragmentOutputStream implements P2LOutputStream {
                     Objects.equals(retriever, fragment.retriever);
         }
 
-        @Override
-        public int hashCode() {
+        @Override public int hashCode() {
             return Objects.hash(retriever, realStartIndex, realEndIndex);
         }
     }

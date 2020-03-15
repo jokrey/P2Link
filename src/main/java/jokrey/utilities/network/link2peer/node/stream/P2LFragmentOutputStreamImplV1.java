@@ -16,14 +16,40 @@ import java.util.ArrayList;
 import java.util.ListIterator;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
-import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
-
 /**
  *
  *
  * todo - this could(!) benefit from a 'x to 1' thread engine (because the batch send stuff needs to happen in intermediate steps..
  *        essentially a scheduler for tasks on a single thread (uses less threads and does the synchronization between tasks)
  *          enqueue tasks with a priority (one off tasks, continuous tasks), allow tasks to say whether they would like to be woken up
+ *
+ *
+ * Fragment vs Continuous:
+ *   All data available without buffering
+ *      Can query and resend any slice of data
+ *      (Also means that the data should not be altered during sending, or rather the change would be reflected)
+ *   Data does not need to be consumed in order
+ *      it can be written out instantly in any order (due to offset)
+ *   (Fixed length, Fixed chunkSize)  - For now
+ *   64bit(32 for now) offset, chunkSize can be read from first package(does not matter which - since fixed)
+ *   Length fixed would allow: Requery from receiver side (it knows packages are missing)
+ *     After twice av round trip time
+ *     Otherwise the sender would have to resend after twice av round trip time without receipt and send last package
+ * ADDITIONALLY REQUIRED:
+ *   Delay/max num packages sent simultaneously (defaults to
+ *   Based on percentage of received packages (should be above 80% (???))
+ *   When to send the next package batch? Av-round-trip-time / 4 (???)
+ *   MTU IS FIXED (Due to requirements of buffer size being small to mitigate ddos attack)
+ *   Requery/Resend of packages
+ *   After twice av round trip time (Defaults to 500,but dynamically adjusted (sliding average - but outlier detection, i.e. not + /2,but instead a slow down change factor)
+ *
+ * Question: Should sender resend after x ms, or should receiver resendReceipt after x ms
+ *    SENDER RESEND!!
+ *    Receiver does not necessarily know that something is missing
+ *
+ * Analyse: empty packages (NOT SURE IF STILL UP TO DATE)
+ *   Problematic request receipt for all packages resend after stream is complete
+ *   INSTEAD: For all short batches: request receipt with last short batch
  *
  * @author jokrey
  */
@@ -38,9 +64,9 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
     private long batch_delay_ms;
 
     private final BatchSizeCalculator batchSizeCalculator;
-    protected P2LFragmentOutputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId) {
-        super(parent, to, con, type, conversationId);
-        int headerSize = new StreamPartHeader(null, toShort(type), toShort(conversationId), 0, false, false).getSize();
+    protected P2LFragmentOutputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId, short step) {
+        super(parent, to, con, type, conversationId, step);
+        int headerSize = new StreamPartHeader(null, type, conversationId, step,0, false, false).getSize();
         packageSize = con==null?1024:con.remoteBufferSize - headerSize;
         batch_delay_ms = con==null? DEFAULT_BATCH_DELAY :Math.max(con.avRTT, DEFAULT_BATCH_DELAY);
 
@@ -270,7 +296,7 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
         boolean lastPackage = packageContent.realEndIndex == source.totalNumBytes();
 //        System.out.println("lastPackage = " + lastPackage);
 //        System.out.println("packageContent.asString() = " + new String(packageContent.getContent(), StandardCharsets.UTF_8));
-        StreamPartHeader header = new StreamPartHeader(null, toShort(type), toShort(conversationId), (int) (packageContent.realStartIndex), false, lastPackage);
+        StreamPartHeader header = new StreamPartHeader(null, type, conversationId, step, (int) (packageContent.realStartIndex), false, lastPackage);
 //        System.out.println("content.length = " + content.length);
         return header.generateMessage(packageContent.content());
     }

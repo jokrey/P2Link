@@ -18,18 +18,20 @@ public abstract class P2LOrderedOutputStream extends OutputStream implements P2L
     protected final P2LNodeInternal parent;
     protected final SocketAddress to;
     protected final P2LConnection con;
-    protected final short type, conversationId;
+    protected final short type, conversationId, step;
 
-    protected P2LOrderedOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId) {
+    protected P2LOrderedOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId, short step) {
         this.parent = parent;
         this.to = to;
         this.con = con;
         this.type = type;
         this.conversationId = conversationId;
+        this.step = step;
     }
     @Override public SocketAddress getRawFrom() { return to; }
     @Override public short getType() { return type; }
     @Override public short getConversationId() { return conversationId; }
+    @Override public short getStep() { return step; }
 
     /**
      * Writes a single byte of data. This method is non blocking.
@@ -64,10 +66,6 @@ public abstract class P2LOrderedOutputStream extends OutputStream implements P2L
 
     //MUST BE REIMPLEMENTED HERE; BECAUSE THE DEFAULT IMPLEMENTATION IS OVERRIDEN BY THE NO-OP DEFINITION IN OUTPUTSTREAM - THIS IS BULLSHIT
     public void close() throws IOException {
-        try {
-            close(0);
-        } catch (InterruptedException e) {
-            throw new IOException(e);
-        }
+        close(0);
     }
 }

@@ -16,16 +16,18 @@ import java.net.SocketAddress;
 public abstract class P2LOrderedInputStream extends InputStream implements P2LInputStream {
     protected final P2LNodeInternal parent;
     protected final SocketAddress from;
-    protected final short type, conversationId;
-    protected P2LOrderedInputStream(P2LNodeInternal parent, SocketAddress from, short type, short conversationId) {
+    protected final short type, conversationId, step;
+    protected P2LOrderedInputStream(P2LNodeInternal parent, SocketAddress from, short type, short conversationId, short step) {
         this.parent = parent;
         this.from = from;
         this.type = type;
         this.conversationId = conversationId;
+        this.step = step;
     }
     @Override public SocketAddress getRawFrom() { return from; }
     @Override public short getType() { return type; }
     @Override public short getConversationId() { return conversationId; }
+    @Override public short getStep() { return step; }
 
     /**
      * Reads a single byte (represented as an integer between 0-255) from the stream.

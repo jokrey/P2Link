@@ -30,6 +30,7 @@ import java.util.function.Function;
 
 import static jokrey.utilities.network.link2peer.P2LMessage.MAX_EXPIRATION_TIMEOUT;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_CONVERSATION_ID;
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_STEP;
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.rand;
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
 import static org.junit.jupiter.api.Assertions.*;
@@ -734,10 +735,10 @@ class IntermediateTests {
             int numBytesThisPacket;
             int remaining = send.length-numBytesSend;
             if(i+1==packetCount) {
-                h = new StreamPartHeader(null, (short) 1, NO_CONVERSATION_ID, i, false, true);
+                h = new StreamPartHeader(null, (short) 1, NO_CONVERSATION_ID, NO_STEP, i, false, true);
                 numBytesThisPacket = remaining;
             } else {
-                h = new StreamPartHeader(null, (short) 1, NO_CONVERSATION_ID, i, false, false);
+                h = new StreamPartHeader(null, (short) 1, NO_CONVERSATION_ID, NO_STEP, i, false, false);
                 numBytesThisPacket = Math.min(remaining, rand(0, remaining/Math.max(1, (packetCount/4)) +2));
             }
             byte[] thisPacket = Arrays.copyOfRange(send, numBytesSend, numBytesSend+numBytesThisPacket);

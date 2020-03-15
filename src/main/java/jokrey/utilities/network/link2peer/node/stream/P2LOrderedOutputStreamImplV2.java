@@ -18,9 +18,9 @@ public class P2LOrderedOutputStreamImplV2 extends P2LOrderedOutputStream impleme
     private final TransparentBytesStorage buffer = new ByteArrayStorage(P2LHeuristics.ORDERED_STREAM_V2_MAX_BUFFER_SIZE);
     private long firstBufferIndexRepresents = 0;
 
-    protected P2LOrderedOutputStreamImplV2(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId) {
-        super(parent, to, con, type, conversationId);
-        underlyingFragmentStream = new P2LFragmentOutputStreamImplV1(parent, to, con, type, conversationId);
+    protected P2LOrderedOutputStreamImplV2(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId, short step) {
+        super(parent, to, con, type, conversationId, step);
+        underlyingFragmentStream = new P2LFragmentOutputStreamImplV1(parent, to, con, type, conversationId, step);
         underlyingFragmentStream.setSource(this);
     }
 

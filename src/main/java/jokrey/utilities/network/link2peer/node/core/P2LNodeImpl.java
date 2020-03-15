@@ -20,8 +20,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.validateMsgTypeNotInternal;
-import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_CONVERSATION_ID;
-import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.*;
 
 /**
  *
@@ -33,6 +32,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     private final IncomingHandler incomingHandler;
     private final P2LThreadPool outgoingPool = new P2LThreadPool(4, 64);
 
+    /**
+     * If the self link is not known, it has to be EXPLICITLY queried and SET as public link using the who am I protocol
+     *  (because it is difficult to distinguish a local network ip from a public one
+     *  Otherwise establishing connections will only be possible as a hidden node that requires relaying by the public node (a node will favor public links over hidden links in querying connections)
+     */
     private P2Link selfLink;
     P2LNodeImpl(P2Link selfLink) throws IOException {
         this(selfLink, Integer.MAX_VALUE);
@@ -195,28 +199,27 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
     @Override public P2LOrderedInputStream createInputStream(SocketAddress from, int messageType, int conversationId) {
         validateMsgTypeNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.createInputStream(this, from, establishedConnections.get(from), toShort(messageType), toShort(conversationId));
+        return incomingHandler.streamMessageHandler.createInputStream(this, from, establishedConnections.get(from), toShort(messageType), toShort(conversationId), NO_STEP);
     }
     @Override public boolean registerCustomInputStream(SocketAddress from, int messageType, int conversationId, P2LInputStream inputStream) {
         validateMsgTypeNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.createCustomInputStream(from, toShort(messageType), toShort(conversationId), inputStream);
+        return incomingHandler.streamMessageHandler.createCustomInputStream(from, toShort(messageType), toShort(conversationId), NO_STEP, inputStream);
     }
     @Override public P2LOrderedOutputStream createOutputStream(SocketAddress to, int messageType, int conversationId) {
         validateMsgTypeNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.createOutputStream(this, to, establishedConnections.get(to), toShort(messageType), toShort(conversationId));
+        return incomingHandler.streamMessageHandler.createOutputStream(this, to, establishedConnections.get(to), toShort(messageType), toShort(conversationId), NO_STEP);
     }
     @Override public boolean registerCustomOutputStream(SocketAddress to, int messageType, int conversationId, P2LOutputStream outputStream) {
         validateMsgTypeNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.registerCustomOutputStream(to, toShort(messageType), toShort(conversationId), outputStream);
+        return incomingHandler.streamMessageHandler.registerCustomOutputStream(to, toShort(messageType), toShort(conversationId), NO_STEP, outputStream);
     }
-    @Override public P2LFragmentInputStream createFragmentInputStream(SocketAddress from, int messageType, int conversationId) {
-        validateMsgTypeNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.createFragmentInputStream(this, from, establishedConnections.get(from), toShort(messageType), toShort(conversationId));
+    @Override public P2LFragmentInputStream createFragmentInputStream(SocketAddress from, short type, short conversationId, short step) {
+        return incomingHandler.streamMessageHandler.createFragmentInputStream(this, from, establishedConnections.get(from), type, conversationId, step);
     }
-    @Override public P2LFragmentOutputStream createFragmentOutputStream(SocketAddress to, int messageType, int conversationId) {
-        validateMsgTypeNotInternal(messageType);
-        return incomingHandler.streamMessageHandler.createFragmentOutputStream(this, to, establishedConnections.get(to), toShort(messageType), toShort(conversationId));
+    @Override public P2LFragmentOutputStream createFragmentOutputStream(SocketAddress from, short type, short conversationId, short step) {
+        return incomingHandler.streamMessageHandler.createFragmentOutputStream(this, from, establishedConnections.get(from), type, conversationId, step);
     }
+
     @Override public void unregister(P2LInputStream stream) {
         incomingHandler.streamMessageHandler.unregister(stream);
     }

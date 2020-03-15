@@ -3,6 +3,8 @@ package jokrey.utilities.network.link2peer.node.core;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
+import jokrey.utilities.network.link2peer.node.stream.P2LFragmentInputStream;
+import jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputStream;
 import jokrey.utilities.network.link2peer.node.stream.P2LInputStream;
 import jokrey.utilities.network.link2peer.node.stream.P2LOutputStream;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
@@ -13,6 +15,8 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.validateMsgTypeNotInternal;
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_STEP;
+import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 
 public interface P2LNodeInternal extends P2LNode {
     void graduateToEstablishedConnection(P2LConnection peer, int conversationId);
@@ -42,6 +46,17 @@ public interface P2LNodeInternal extends P2LNode {
 
     P2Link toEstablished(SocketAddress address);
     P2LConnection getConnection(InetSocketAddress socketAddress);
+
+    P2LFragmentInputStream createFragmentInputStream(SocketAddress from, short type, short conversationId, short step);
+    default P2LFragmentInputStream createFragmentInputStream(SocketAddress from, int messageType, int conversationId) {
+        validateMsgTypeNotInternal(messageType);
+        return createFragmentInputStream(from, toShort(messageType), toShort(conversationId), NO_STEP);
+    }
+    P2LFragmentOutputStream createFragmentOutputStream(SocketAddress from, short type, short conversationId, short step);
+    default P2LFragmentOutputStream createFragmentOutputStream(SocketAddress from, int messageType, int conversationId) {
+        validateMsgTypeNotInternal(messageType);
+        return createFragmentOutputStream(from, toShort(messageType), toShort(conversationId), NO_STEP);
+    }
 
     void unregister(P2LInputStream stream);
     void unregister(P2LOutputStream stream);
