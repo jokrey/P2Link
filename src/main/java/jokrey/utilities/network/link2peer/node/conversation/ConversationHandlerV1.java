@@ -1,6 +1,9 @@
-package jokrey.utilities.network.link2peer.node.core;
+package jokrey.utilities.network.link2peer.node.conversation;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.node.core.IncomingHandler;
+import jokrey.utilities.network.link2peer.node.core.P2LConnection;
+import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -20,7 +23,7 @@ class ConversationHandlerV1 {
         conversationHandlers.put(toShort(type), handler);
     }
 
-    void received(P2LNodeInternal parent, SocketAddress from, P2LMessage received) throws IOException {
+    public void received(P2LNodeInternal parent, SocketAddress from, P2LMessage received) throws IOException {
         boolean hasBeenHandled = incomingHandler.messageQueue.handleNewMessage(received);
         System.out.println("received = " + received+" - hasBeenHandled="+hasBeenHandled);
         if(!hasBeenHandled) {
@@ -37,9 +40,9 @@ class ConversationHandlerV1 {
             }
         }
     }
-    void clean() { }
+    public void clean() { }
 
-    public P2LConversation getConvoFor(P2LNodeImpl parent, P2LConnection con, SocketAddress to, short type, short conversationId) {
+    public P2LConversation getConvoFor(P2LNodeInternal parent, P2LConnection con, SocketAddress to, short type, short conversationId) {
         return new P2LConversationImplV1(parent, incomingHandler.messageQueue, con, to, type, conversationId);
     }
 }

@@ -1,11 +1,16 @@
-package jokrey.utilities.network.link2peer.node.core;
+package jokrey.utilities.network.link2peer.node.conversation;
 
 import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.node.DebugStats;
+import jokrey.utilities.network.link2peer.node.core.P2LConnection;
+import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.node.message_headers.ConversationHeader;
+import jokrey.utilities.network.link2peer.node.stream.P2LFragmentInputStream;
+import jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputStream;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
+import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -18,6 +23,9 @@ import java.util.function.Consumer;
  * todo          Despite only m1 being lost m0 is resent
  * todo   This problem may very well be unsolvable, but it should be kept in mind
  * todo     - OPTION: it could be possible to have the server never resend, UNLESS the client resends...
+ *
+ * todo - long message intermediate receipts / stream usage for long messages
+ * todo - 
  */
 public class P2LConversationImplV2 implements P2LConversation {
     public static int DEFAULT_NUM_ATTEMPTS = 4;
@@ -104,6 +112,7 @@ public class P2LConversationImplV2 implements P2LConversation {
         if(received.header.getStep() == step || (pausedDoubleExpectMode && received.header.getStep() == step+1)) {
             latest.trySetCompleted(received);
         } else {
+            System.out.println(parent.getSelfLink()+" - received unexpected message step: "+received.header.getStep()+", expected: "+step);
             DebugStats.conversation_numDoubleReceived.getAndIncrement();
         }
     }
@@ -112,20 +121,21 @@ public class P2LConversationImplV2 implements P2LConversation {
 
     private long lastMessageSentAt = 0;
     //ONLY ON CLIENT as first convo call, requires an answerExpect on the other side after
-    @Override public P2LMessage initExpect(MessageEncoder encoded) throws IOException {
+    @Override public P2LMessage initExpect(MessageEncoder message) throws IOException {
         if(isServer) throw new IllegalStateException("not client (server init is automatic, use 'answerExpect')");
         if(step != -2) throw new IllegalStateException("cannot init twice");
         step = 0;
-        return answerExpect(encoded);
+        return answerExpect(message);
     }
     //requires and answerExpect or initExpect on the other side before, and an answerExpect or answerClose after
-    @Override public P2LMessage answerExpect(MessageEncoder encoded) throws IOException {
+    @Override public P2LMessage answerExpect(MessageEncoder message) throws IOException {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
+        if(message.contentSize() > con.remoteBufferSize*3) System.err.println("message requires more than three packages - should use long message functionality");
         pausedMode = false;
 
         ConversationHeader header = new ConversationHeader(null, type, conversationId, step, false);
-        P2LMessage msg = P2LMessage.from(header, encoded);
+        P2LMessage msg = P2LMessage.from(header, message);
 
         step++;
 
@@ -165,19 +175,20 @@ public class P2LConversationImplV2 implements P2LConversation {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
         //if this message is lost answerClose will resent, but the message will not be handled by a handler - requestReceipt hits and a receipt equal to this will be sent
-        parent.sendInternalMessage(peer, latest.get().createReceipt());
+        parent.sendInternalMessage(peer, latest.getResult().createReceipt());
         step = -1;
         handler.remove(this);
     }
 
     //requires a close on the other side
-    @Override public void answerClose(MessageEncoder encoded) throws IOException {
+    @Override public void answerClose(MessageEncoder message) throws IOException {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
+        if(message.contentSize() > con.remoteBufferSize*3) System.err.println("message requires more than three packages - should use long message functionality");
         pausedMode = false;
         //always requests receipt, but only receives it through that if the remote was not waiting for it. Otherwise answerExpect returns and sends close
         ConversationHeader header = new ConversationHeader(null, type, conversationId, step, true);
-        P2LMessage msg = P2LMessage.from(header, encoded);
+        P2LMessage msg = P2LMessage.from(header, message);
 
         latest.cancelIfNotCompleted();
         latest = new P2LFuture<>();
@@ -208,28 +219,29 @@ public class P2LConversationImplV2 implements P2LConversation {
 
 
     //DIRECT CLOSE
-    @Override public P2LMessage initExpectClose(MessageEncoder encoded) throws IOException {
+    @Override public P2LMessage initExpectClose(MessageEncoder message) throws IOException {
         if(step != -2) throw new IllegalStateException("cannot init twice");
         step = 0;
-        P2LMessage result = answerExpect(encoded);
+        P2LMessage result = answerExpect(message);
         step = -1;
         handler.remove(this);
         return result;
     }
-    @Override public void closeWith(MessageEncoder encoded) throws IOException {
+    @Override public void closeWith(MessageEncoder message) throws IOException {
         if(!isServer) throw new IllegalStateException("can only be used when server");
         if(step != 1) throw new IllegalStateException("can only be used as first instruction");
+        if(message.contentSize() > con.remoteBufferSize*3) System.err.println("message requires more than three packages - should use long message functionality");
         ConversationHeader header = new ConversationHeader(null, type, conversationId, step, false);
-        P2LMessage msg = P2LMessage.from(header, encoded);
+        P2LMessage msg = P2LMessage.from(header, message);
         step = -1;
         handler.remove(this);
         parent.sendInternalMessage(peer, msg);
     }
-    @Override public void initClose(MessageEncoder encoded) throws IOException {
+    @Override public void initClose(MessageEncoder message) throws IOException {
         if(step != -2) throw new IllegalStateException("cannot init twice");
         if(isServer) throw new IllegalStateException("init only possible on client side, server does this automatically, use closeWith or answerClose");
         step = 0;
-        answerClose(encoded);
+        answerClose(message);
     }
 
 
@@ -238,19 +250,20 @@ public class P2LConversationImplV2 implements P2LConversation {
 
     //PAUSE
 
-    @Override public P2LMessage initExpectAfterPause(MessageEncoder encoded, int timeout) throws IOException {
+    @Override public P2LMessage initExpectAfterPause(MessageEncoder message, int timeout) throws IOException {
         if(isServer) throw new IllegalStateException("not client (server init is automatic, use 'answerExpect')");
         if(step != -2) throw new IllegalStateException("cannot init twice");
         step = 0;
-        return answerExpectAfterPause(encoded, timeout);
+        return answerExpectAfterPause(message, timeout);
     }
-    @Override public P2LMessage answerExpectAfterPause(MessageEncoder encoded, int timeout) throws IOException {
+    @Override public P2LMessage answerExpectAfterPause(MessageEncoder message, int timeout) throws IOException {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
+        if(message.contentSize() > con.remoteBufferSize*3) System.err.println("message requires more than three packages - should use long message functionality");
         pausedMode = false;
         //does not request a receipt, but expects to receive a receipt. - resends shall not trigger automatic receipt resends(compare to close, where that is desired)
         ConversationHeader header = new ConversationHeader(null, type, conversationId, step, false);
-        P2LMessage msg = P2LMessage.from(header, encoded);
+        P2LMessage msg = P2LMessage.from(header, message);
 
         long stepBeganAt = System.currentTimeMillis();
 
@@ -309,8 +322,167 @@ public class P2LConversationImplV2 implements P2LConversation {
 
 
 
+    //STREAMED MESSAGE IMPLEMENTATION
 
+    @Override public void initExpectLong(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+        if(isServer) throw new IllegalStateException("not client (server init is automatic, use 'answerExpect')");
+        if(step != -2) throw new IllegalStateException("cannot init twice");
+        step = 0;
+        answerExpectLong(message, messageTarget, timeout);
+    }
+    @Override public void answerExpectLong(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+        if(step == -2) throw new IllegalStateException("please init");
+        if(step == -1) throw new IllegalStateException("already closed");
+        pausedMode = false;
 
+        long stepBeganAt = System.currentTimeMillis();
+
+        P2LFragmentInputStream in = parent.createFragmentInputStream(peer, type, conversationId, (short) (step+1));
+        in.writeResultsTo(messageTarget);
+        P2LFuture<Boolean> receivedAnyResponse = new P2LFuture<>();
+        in.addFragmentReceivedListener((fragmentOffset, receivedRaw, dataOff, dataLen, eof) -> receivedAnyResponse.trySetCompleted(true));
+
+        ConversationHeader header = new ConversationHeader(null, type, conversationId, step, false);
+        P2LMessage msg = P2LMessage.from(header, message);
+
+        step++;
+
+        for(int i=0;i<maxAttempts;i++) {
+            parent.sendInternalMessage(peer, msg);
+            Boolean result = receivedAnyResponse.getOrNull(calcWaitBeforeRetryTime(i));
+            if(result!=null) {
+                latest.cancelIfNotCompleted();
+                latest = new P2LFuture<>(new ConversationHeader(null, type, conversationId, step, false).generateMessage(new byte[0]));//in case the next message is close..
+                int adjustedTimeout = (int) (timeout - (System.currentTimeMillis() - stepBeganAt));
+                if(adjustedTimeout <= 0) adjustedTimeout = 1;
+                boolean success = in.waitForFullyReceived(adjustedTimeout);
+                step++;
+                if(success) {
+                    in.close();
+                    System.out.println("success = " + success);
+                    return;
+                } else break;
+            }
+        }
+
+        in.close();
+        handler.remove(this);
+        throw new TimeoutException();
+    }
+
+    @Override public P2LMessage longAnswerExpect(TransparentBytesStorage messageSource, int timeout) throws IOException {
+        if(step == -2) throw new IllegalStateException("please init");
+        if(step == -1) throw new IllegalStateException("already closed");
+        pausedMode = false;
+        long stepBeganAt = System.currentTimeMillis();
+        P2LFragmentOutputStream out = parent.createFragmentOutputStream(peer, type, conversationId, step); //not using step. Should not be a problem, maybe.
+        out.setSource(messageSource);
+
+        step++;
+        latest.cancelIfNotCompleted();
+        latest = new P2LFuture<>();
+
+        out.send();
+        boolean success = out.close(timeout);
+        if(success) {
+            int elapsed = (int) (System.currentTimeMillis() - stepBeganAt);
+            int adjustedTimeout = timeout - elapsed;
+            if (adjustedTimeout > 0 || latest.isCompleted()) {
+                //TODO - what if this message is lost??
+                P2LMessage result = latest.getOrNull(adjustedTimeout); //todo - technically this message could/should be included in the last receipt - would require 1 packet less.
+                if (result != null) {
+                    step++;
+                    return result;
+                }
+            }
+        }
+
+        handler.remove(this);
+        throw new TimeoutException();
+    }
+
+    @Override public void longAnswerClose(TransparentBytesStorage messageSource, int timeout) throws IOException {
+        if(step == -2) throw new IllegalStateException("please init");
+        if(step == -1) throw new IllegalStateException("already closed");
+        pausedMode = false;
+        long ctmUpTop = System.currentTimeMillis();
+        P2LFragmentOutputStream out = parent.createFragmentOutputStream(peer, type, conversationId, step); //not using step. Should not be a problem, maybe.
+        out.setSource(messageSource);
+
+        latest.cancelIfNotCompleted();
+        latest = new P2LFuture<>();
+
+        out.send();
+        boolean success = out.close(timeout);
+        if(success) {
+            //todo retry here, though...
+            int elapsed = (int) (System.currentTimeMillis() - ctmUpTop);
+            int adjustedTimeout = timeout - elapsed;
+            if (adjustedTimeout > 0 || latest.isCompleted()) {
+                System.out.println("waiting for: step = " + step);
+//                P2LMessage result = latest.getOrNull(adjustedTimeout); //NOT REQUIRED, BECAUSE THE STREAM HAD A RECEIPT WHICH IS SUFFICIENT - todo other side still sending useless close package(cannot really be avoided without coding this specific exception)
+//                if (result != null) {
+                    step=-1;
+                    handler.remove(this);
+                    return;
+//                }
+            }
+        }
+
+        handler.remove(this);
+        throw new TimeoutException();
+    }
+    @Override public void longInitExpectLong(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+        if(isServer) throw new IllegalStateException("not client (server init is automatic, use 'answerExpect')");
+        if(step != -2) throw new IllegalStateException("cannot init twice");
+        step = 0;
+        longAnswerExpectLong(messageSource, messageTarget, timeout);
+    }
+    @Override public void longAnswerExpectLong(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+        throw new UnsupportedOperationException("cannot optimize - fragment stream does not yet offer this functionality - if it is strictly required do PR");
+    }
+
+    @Override public void initExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+        if(isServer) throw new IllegalStateException("not client (server init is automatic, use 'answerExpect')");
+        if(step != -2) throw new IllegalStateException("cannot init twice");
+        step = 0;
+        answerExpectLongAfterPause(message, messageTarget, timeout);
+    }
+
+    @Override public void answerExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+        pausedMode = false;
+        long stepBeganAt = System.currentTimeMillis();
+        P2LFragmentInputStream in = parent.createFragmentInputStream(peer, type, conversationId, (short) (step+1));
+        in.writeResultsTo(messageTarget);
+
+        ConversationHeader header = new ConversationHeader(null, type, conversationId, step, false);
+        P2LMessage msg = P2LMessage.from(header, message);
+
+        latest.cancelIfNotCompleted();
+        latest = new P2LFuture<>();
+        for(int i=0;i<maxAttempts;i++) {
+            parent.sendInternalMessage(peer, msg);
+
+            P2LMessage result = latest.getOrNull(calcWaitBeforeRetryTime(i));
+            if(result!=null) {
+                int adjustedTimeout = (int) (timeout - (System.currentTimeMillis() - stepBeganAt));
+                if(adjustedTimeout <= 0) adjustedTimeout = 1;
+                boolean success = in.waitForFullyReceived(adjustedTimeout);
+                step++;
+                latest = new P2LFuture<>(new ConversationHeader(null, type, conversationId, step, false).generateMessage(new byte[0]));//in case the next message is close..
+                step++;
+                if(success) {
+                    in.close();
+                    System.out.println("success = " + success+", step="+step);
+                    return;
+                } else break;
+            }
+        }
+
+        in.close();
+        handler.remove(this);
+        throw new TimeoutException();
+    }
 
 
 
@@ -322,18 +494,21 @@ public class P2LConversationImplV2 implements P2LConversation {
 
 
     //SAME STUFF, BUT ASYNC IMPLEMENTATIONS
-    @Override public P2LFuture<P2LMessage> initExpectAsync(MessageEncoder encoded)  {
+
+    @Override public P2LFuture<P2LMessage> initExpectAsync(MessageEncoder message)  {
         if(isServer) throw new IllegalStateException("not client (server init is automatic, use 'answerExpect')");
         if(step != -2) throw new IllegalStateException("cannot init twice");
         step = 0;
-        return answerExpectAsync(encoded);
+        return answerExpectAsync(message);
     }
-    @Override public P2LFuture<P2LMessage> answerExpectAsync(MessageEncoder encoded) {
+    @Override public P2LFuture<P2LMessage> answerExpectAsync(MessageEncoder message) {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
+        if(message.contentSize() > con.remoteBufferSize*3) System.err.println("message requires more than three packages - should use long message functionality");
+        pausedMode = false;
 
         ConversationHeader header = new ConversationHeader(null, type, conversationId, step, false);
-        P2LMessage msg = P2LMessage.from(header, encoded);
+        P2LMessage msg = P2LMessage.from(header, message);
 
         step++;
 
@@ -367,12 +542,14 @@ public class P2LConversationImplV2 implements P2LConversation {
     }
 
 
-    @Override public P2LFuture<Boolean> answerCloseAsync(MessageEncoder encoded) {
+    @Override public P2LFuture<Boolean> answerCloseAsync(MessageEncoder message) {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
+        if(message.contentSize() > con.remoteBufferSize*3) System.err.println("message requires more than three packages - should use long message functionality");
+        pausedMode = false;
 
         ConversationHeader header = new ConversationHeader(null, type, conversationId, step, true);
-        P2LMessage msg = P2LMessage.from(header, encoded);
+        P2LMessage msg = P2LMessage.from(header, message);
 
         latest.cancelIfNotCompleted();
         Retryer<Boolean> stepHandler = new Retryer<>();
@@ -401,19 +578,21 @@ public class P2LConversationImplV2 implements P2LConversation {
         return stepHandler.finalResultFuture;
     }
 
-    @Override public P2LFuture<P2LMessage> initExpectAsyncAfterPause(MessageEncoder encoded, int timeout) {
+    @Override public P2LFuture<P2LMessage> initExpectAsyncAfterPause(MessageEncoder message, int timeout) {
         if(isServer) throw new IllegalStateException("not client (server init is automatic, use 'answerExpect')");
         if(step != -2) throw new IllegalStateException("cannot init twice");
         step = 0;
-        return answerExpectAsyncAfterPause(encoded, timeout);
+        return answerExpectAsyncAfterPause(message, timeout);
     }
-    @Override public P2LFuture<P2LMessage> answerExpectAsyncAfterPause(MessageEncoder encoded, int timeout) {
+    @Override public P2LFuture<P2LMessage> answerExpectAsyncAfterPause(MessageEncoder message, int timeout) {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
+        if(message.contentSize() > con.remoteBufferSize*3) System.err.println("message requires more than three packages - should use long message functionality");
+        pausedMode = false;
 
         //does not request a receipt, but expects to receive a receipt. - resends shall not trigger automatic receipt resends(compare to close, where that is desired)
         ConversationHeader header = new ConversationHeader(null, type, conversationId, step, false);
-        P2LMessage msg = P2LMessage.from(header, encoded);
+        P2LMessage msg = P2LMessage.from(header, message);
 
         long stepBeganAt = System.currentTimeMillis();
 
@@ -509,10 +688,10 @@ public class P2LConversationImplV2 implements P2LConversation {
         }
     }
 
-    interface RunnableThatThrowsIOException {
+    private interface RunnableThatThrowsIOException {
         void run() throws IOException;
     }
-    interface ResultHandler {
+    private interface ResultHandler {
         /**@return whether the result was accepted */
         boolean handle(P2LMessage result) throws IOException;
     }

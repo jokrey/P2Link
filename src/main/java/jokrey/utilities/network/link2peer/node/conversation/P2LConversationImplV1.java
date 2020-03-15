@@ -1,11 +1,15 @@
-package jokrey.utilities.network.link2peer.node.core;
+package jokrey.utilities.network.link2peer.node.conversation;
 
 import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.node.DebugStats;
+import jokrey.utilities.network.link2peer.node.core.P2LConnection;
+import jokrey.utilities.network.link2peer.node.core.P2LMessageQueue;
+import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.node.message_headers.ConversationHeader;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
+import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -303,16 +307,27 @@ public class P2LConversationImplV1 implements P2LConversation {
     }
 
 
-
-
-
-
-
-
-
-
-
-
+    @Override public void initExpectLong(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+    @Override public void answerExpectLong(MessageEncoder encode, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+    @Override public P2LMessage longAnswerExpect(TransparentBytesStorage messageSource, int timeout) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+    @Override public void longAnswerClose(TransparentBytesStorage messageSource, int timeout) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+    @Override public void longAnswerExpectLong(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+    @Override public void initExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+    @Override public void answerExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+        throw new UnsupportedOperationException();
+    }
 
 
 

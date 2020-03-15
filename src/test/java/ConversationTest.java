@@ -2,18 +2,17 @@ import jokrey.utilities.debug_analysis_helper.TimeDiffMarker;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.node.DebugStats;
-import jokrey.utilities.network.link2peer.node.core.ConversationAnswererChangeThisName;
-import jokrey.utilities.network.link2peer.node.core.P2LConversation;
+import jokrey.utilities.network.link2peer.node.conversation.ConversationAnswererChangeThisName;
+import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
+import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Consumer;
 
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
 import static org.junit.jupiter.api.Assertions.*;
@@ -149,7 +148,7 @@ public class ConversationTest {
 
                     System.out.println("client received handshakeAnswer = "+handshakeAnswer+" - client expectAfterPause:");
 
-                    int result = convo.answerExpectAfterPause(convo.encode(1, 5), 10_000).nextInt();
+                    int result = convo.answerExpectAfterPause(convo.encode(1, 5), 20_000).nextInt();
                     System.out.println("client received result, client will close:");
                     convo.close();
                     if(result != 6) fail();
@@ -180,7 +179,7 @@ public class ConversationTest {
     @Test void convTest_pauseFromServer() throws IOException {
         testEnvConversation(true, 60, 100, false, false,
                 (convo, no) -> {//client
-                    P2LMessage m1 = convo.initExpect(convo.encode(1));
+                    P2LMessage m1 = convo.initExpect(convo.encode(0));
                     convo.pause();
 
                     int a1 = m1.nextInt();
@@ -192,8 +191,8 @@ public class ConversationTest {
                     convo.answerClose(convo.encode(calculated));
                 },
                 (convo, m0) -> {//server
-                    int result = convo.answerExpectAfterPause(convo.encode(m0.nextInt()+1, 4), 10_000).nextInt();
-                    if(result != 6) fail();
+                    int m2_result = convo.answerExpectAfterPause(convo.encode(m0.nextInt()+2, 4), 20_000).nextInt();
+                    if(m2_result != 6) fail();
 
                     convo.close();
                 });
@@ -204,7 +203,7 @@ public class ConversationTest {
                 (convo, no) -> {//client
                     P2LMessage m1 = convo.initExpect(convo.encode("sup?"));
 
-                    P2LMessage m3 = convo.answerExpectAfterPause(convo.encode(m1.nextInt()+2, 5), 10_000);
+                    P2LMessage m3 = convo.answerExpectAfterPause(convo.encode(m1.nextInt()+2, 5), 20_000);
                     int result = m3.nextInt();
                     if(result != 6) fail();
 
@@ -330,7 +329,7 @@ public class ConversationTest {
                     convo.answerClose(convo.encode(success));
                 },
                 (convo, m0) -> {//server
-                    P2LMessage m2 = convo.answerExpectAfterPause(convo.encode(m0.nextInt()+1, 4), 10_000);
+                    P2LMessage m2 = convo.answerExpectAfterPause(convo.encode(m0.nextInt()+1, 4), 20_000);
                     int result = m2.nextInt();
                     if(result != 6) fail();
 
@@ -376,6 +375,8 @@ public class ConversationTest {
 
         { //ASYNC/NO_WAIT_THREAD_MAINTAINING EXAMPLE
             P2LNode[] nodes = IntermediateTests.generateNodes(2, 62880);
+            nodes[0].establishConnection(nodes[1].getSelfLink());
+
             List<P2LFuture<?>> intermediateFutures = new ArrayList<>();
             try {
                 P2LFuture<Boolean> serverCompletedFut = new P2LFuture<>();
@@ -428,6 +429,150 @@ public class ConversationTest {
 
 
 
+    @Test void convTest_longMessage() throws IOException {
+        testEnvConversation(true, 5, 10, false, false,
+                (convo, no) -> {//client
+                    P2LMessage m1 = convo.initExpect(convo.encode(0));
+
+                    ByteArrayStorage m3 = new ByteArrayStorage();
+                    convo.answerExpectLong(convo.encode(2), m3, 10000);
+
+                    System.out.println("m3 size = "+m3.contentSize());
+
+                    P2LMessage m5 = convo.answerExpect(convo.encode(4));
+                    System.out.println("m5 = " + m5);
+                    convo.close();
+                },
+                (convo, m0) -> {//server
+                    P2LMessage m2 = convo.answerExpect(convo.encode(1));
+
+                    ByteArrayStorage m3 = new ByteArrayStorage();
+                    for(int i=0;i<1000;i++)
+                        m3.append(rand(1000));
+                    P2LMessage m4 = convo.longAnswerExpect(m3, 10000);
+                    System.out.println("m4 = " + m4);
+
+                    convo.answerClose(convo.encode(5));
+                });
+    }
+
+    @Test void convTest_longMessagesInSuccession() throws IOException {
+        testEnvConversation(true, 0, 1, false, false,
+                (convo, no) -> {//client
+                    P2LMessage m1 = convo.initExpect(convo.encode(0));
+
+                    ByteArrayStorage m3 = new ByteArrayStorage();
+                    convo.answerExpectLong(convo.encode(2), m3, 10000);
+
+                    ByteArrayStorage m5 = new ByteArrayStorage();
+                    convo.answerExpectLong(convo.encode(4), m5, 10000);
+
+                    convo.answerClose(convo.encode(6));
+                },
+                (convo, m0) -> {//server
+                    P2LMessage m2 = convo.answerExpect(convo.encode(1));
+
+                    ByteArrayStorage m3 = new ByteArrayStorage();
+                    for(int i=0;i<1000;i++)
+                        m3.append(rand(1000));
+                    P2LMessage m4 = convo.longAnswerExpect(m3, 10000);
+                    System.out.println("m4 = " + m4);
+
+                    ByteArrayStorage m5 = new ByteArrayStorage();
+                    for(int i=0;i<1000;i++)
+                        m5.append(rand(1000));
+                    P2LMessage m6 = convo.longAnswerExpect(m5, 10000);
+                    System.out.println("m6 = " + m6);
+
+                    convo.close();
+                });
+    }
+
+    @Test void convTest_answerLongMessageWithLongMessage() throws IOException {
+        throw new UnsupportedOperationException("not currently operational - due to missing bi directional fragment stream");
+    }
+    @Test void convTest_initWithLongMessage() throws IOException {
+        testEnvConversation(true, 0, 1, false, false,
+                (convo, no) -> {//client
+                    ByteArrayStorage m1 = new ByteArrayStorage();
+                    convo.initExpectLong(convo.encode(0), m1, 10000);
+
+                    convo.answerClose(convo.encode(2));
+                },
+                (convo, m0) -> {//server
+                    ByteArrayStorage m1 = new ByteArrayStorage();
+                    for(int i=0;i<1000;i++)
+                        m1.append(rand(1000));
+                    P2LMessage m2 = convo.longAnswerExpect(m1, 10000);
+                    System.out.println("m2 = " + m2);
+
+                    convo.close();
+                });
+    }
+    @Test void convTest_closeWithLongMessage() throws IOException {
+        testEnvConversation(true, 5, 10, false, false,
+                (convo, no) -> {//client
+                    ByteArrayStorage m1 = new ByteArrayStorage();
+                    convo.initExpectLong(convo.encode(0), m1, 10000);
+                    convo.close();
+                },
+                (convo, m0) -> {//server
+                    ByteArrayStorage m1 = new ByteArrayStorage();
+                    for(int i=0;i<1000;i++)
+                        m1.append(rand(1000));
+                    convo.longAnswerClose(m1, 10000);
+                });
+    }
+    @Test void convTest_longMessageWithPause_closeAfter() throws IOException {
+        testEnvConversation(true, 5, 10, false, false,
+                (convo, no) -> {//client
+                    ByteArrayStorage m1 = new ByteArrayStorage();
+                    convo.initExpectLongAfterPause(convo.encode(0), m1, 10000);
+                    convo.close();
+                },
+                (convo, m0) -> {//server
+                    convo.pause();
+                    ByteArrayStorage m1 = new ByteArrayStorage();
+                    for(int i=0;i<1000;i++)
+                        m1.append(rand(1000));
+
+                    sleep(4500);
+
+                    convo.longAnswerClose(m1, 10000);
+                });
+    }
+    @Test void convTest_longMessageWithPause_pingPongBeforeAndAfter() throws IOException {
+        testEnvConversation(true, 5, 10, false, false,
+                (convo, no) -> {//client
+                    ByteArrayStorage m1 = new ByteArrayStorage();
+                    convo.initExpectLong(convo.encode(0), m1, 10000);
+                    ByteArrayStorage m3 = new ByteArrayStorage();
+                    convo.answerExpectLongAfterPause(convo.encode(0), m3, 10000);
+                    P2LMessage m5 = convo.answerExpect(convo.encode(4));
+                    System.out.println("m5 = " + m5);
+                    convo.close();
+                },
+                (convo, m0) -> {//server
+                    ByteArrayStorage m1 = new ByteArrayStorage();
+                    for(int i=0;i<1000;i++)
+                        m1.append(rand(1000));
+                    convo.longAnswerExpect(m1, 10000);
+
+                    convo.pause();
+
+                    sleep(4500);
+                    ByteArrayStorage m3 = new ByteArrayStorage();
+                    for(int i=0;i<1000;i++)
+                        m3.append(rand(1000));
+
+                    P2LMessage m4 = convo.longAnswerExpect(m3, 10000);
+                    System.out.println("m4 = " + m4);
+
+                    convo.answerClose(convo.encode(5));
+                });
+    }
+
+
 
     private static void testEnvConversation(boolean connect, int dropPercentage, int attempts, boolean resetDebug, boolean firstServerAnswerIsCloseOrCloseWith,
                                             ConversationAnswererChangeThisName clientLogic, ConversationAnswererChangeThisName serverLogic) throws IOException {
@@ -452,10 +597,12 @@ public class ConversationTest {
             /*m0*/
             nodes[1].registerConversationFor(25, (convo, m0) -> {
                 convo.setMaxAttempts(attempts);
-                serverLogic.converse(convo, m0);
-                if(!firstServerAnswerIsCloseOrCloseWith && bool.isCompleted())
-                    serverCompletedMultipleTimes.setCompleted(true);
-                bool.setCompleted(true);
+                try {
+                    serverLogic.converse(convo, m0);
+                    if (!firstServerAnswerIsCloseOrCloseWith && bool.isCompleted())
+                        serverCompletedMultipleTimes.setCompleted(true);
+                    bool.setCompleted(true);
+                } catch (Exception e) {e.printStackTrace();bool.cancel();}
             });
 
             TimeDiffMarker.setMark("convo");
@@ -465,7 +612,7 @@ public class ConversationTest {
 
             TimeDiffMarker.println("convo");
             
-            assertTrue(bool.get(30_000));
+            assertTrue(bool.get(50_000));
             assertFalse(serverCompletedMultipleTimes.isCompleted());
 
             TimeDiffMarker.println("convo");

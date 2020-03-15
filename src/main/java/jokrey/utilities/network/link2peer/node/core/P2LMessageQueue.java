@@ -58,7 +58,7 @@ public class P2LMessageQueue {
         return future;
     }
 
-    synchronized P2LFuture<P2LMessage> futureFor(SocketAddress from, short messageType, short conversationId, short step) {
+    public synchronized P2LFuture<P2LMessage> futureFor(SocketAddress from, short messageType, short conversationId, short step) {
         if(from == null) return futureFor(messageType);
         System.out.println("futureFor - from = [" + from + "], messageType = [" + messageType + "], conversationId = [" + conversationId + "], step = [" + step + "]");
         return futureFor(new SenderTypeConversationIdStepIdentifier(from, messageType, conversationId, step));
@@ -67,7 +67,7 @@ public class P2LMessageQueue {
         if(from == null) return futureFor(messageType);
         return futureFor(new ReceiptIdentifier(from, messageType, conversationId));
     }
-    synchronized P2LFuture<P2LMessage> receiptFutureFor(SocketAddress from, short messageType, short conversationId, short step) {
+    public synchronized P2LFuture<P2LMessage> receiptFutureFor(SocketAddress from, short messageType, short conversationId, short step) {
         if(from == null) return futureFor(messageType);
         System.out.println("receiptFutureFor - from = [" + from + "], messageType = [" + messageType + "], conversationId = [" + conversationId + "], step = [" + step + "]");
         return futureFor(new StepReceiptIdentifier(from, messageType, conversationId, step));

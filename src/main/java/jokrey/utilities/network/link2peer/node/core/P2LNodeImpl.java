@@ -5,6 +5,8 @@ import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
+import jokrey.utilities.network.link2peer.node.conversation.ConversationAnswererChangeThisName;
+import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
 import jokrey.utilities.network.link2peer.node.protocols.*;
 import jokrey.utilities.network.link2peer.node.stream.*;
 import jokrey.utilities.network.link2peer.util.P2LFuture;

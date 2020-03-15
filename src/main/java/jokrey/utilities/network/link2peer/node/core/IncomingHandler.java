@@ -3,6 +3,7 @@ package jokrey.utilities.network.link2peer.node.core;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.DebugStats;
+import jokrey.utilities.network.link2peer.node.conversation.ConversationHandlerV2;
 import jokrey.utilities.network.link2peer.node.protocols.*;
 import jokrey.utilities.network.link2peer.node.stream.StreamMessageHandler;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
@@ -28,7 +29,7 @@ public class IncomingHandler {
     DatagramSocket serverSocket;
     P2LNodeInternal parent;
 
-    final P2LMessageQueue messageQueue = new P2LMessageQueue();
+    public final P2LMessageQueue messageQueue = new P2LMessageQueue();
     final P2LMessageQueue brdMessageQueue = new P2LMessageQueue();
     final BroadcastMessageProtocol.BroadcastState broadcastState = new BroadcastMessageProtocol.BroadcastState();
     final LongMessageHandler longMessageHandler = new LongMessageHandler();

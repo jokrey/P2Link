@@ -3,6 +3,8 @@ package jokrey.utilities.network.link2peer.node.core;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
+import jokrey.utilities.network.link2peer.node.conversation.ConversationAnswererChangeThisName;
+import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
 import jokrey.utilities.network.link2peer.node.stream.P2LFragmentInputStream;
 import jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputStream;
 import jokrey.utilities.network.link2peer.node.stream.P2LInputStream;

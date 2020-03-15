@@ -1,7 +1,9 @@
-package jokrey.utilities.network.link2peer.node.core;
+package jokrey.utilities.network.link2peer.node.conversation;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.node.DebugStats;
+import jokrey.utilities.network.link2peer.node.core.P2LConnection;
+import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.SenderTypeConversationIdentifier;
 
 import java.io.IOException;
@@ -11,15 +13,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 
-class ConversationHandlerV2 {
+public class ConversationHandlerV2 {
     private final Map<Short, ConversationAnswererChangeThisName> conversationHandlers = new ConcurrentHashMap<>();
-    void registerConversationHandlerFor(int type, ConversationAnswererChangeThisName handler) {
+    public void registerConversationHandlerFor(int type, ConversationAnswererChangeThisName handler) {
         conversationHandlers.put(toShort(type), handler);
     }
 
     private final Map<SenderTypeConversationIdentifier, P2LConversationImplV2> activeConversations = new ConcurrentHashMap<>();
 
-    void received(P2LNodeInternal parent, SocketAddress from, P2LMessage received) throws IOException {
+    public void received(P2LNodeInternal parent, SocketAddress from, P2LMessage received) throws IOException {
         if(!received.header.isReceipt() && received.header.getStep() == 0) {
             P2LConversationImplV2 convo = (P2LConversationImplV2) parent.internalConvo(received.header.getType(), received.header.getConversationId(), from);
             convo.notifyServerInit(conversationHandlers.get(received.header.getType()), received); //if was previous active, then the conversation can at least log that this is a double receival.
@@ -34,11 +36,11 @@ class ConversationHandlerV2 {
                 DebugStats.conversation_numDoubleReceived.getAndIncrement();
         }
     }
-    void clean() {
+    public void clean() {
 //        activeConversations.clear(); todo - how do we clean dormant active conversations?! Do they exist? Don't they time out?
     }
 
-    P2LConversation getConvoFor(P2LNodeInternal parent, P2LConnection con, SocketAddress to, short type, short conversationId) {
+    public P2LConversation getConvoFor(P2LNodeInternal parent, P2LConnection con, SocketAddress to, short type, short conversationId) {
         return activeConversations.computeIfAbsent(new SenderTypeConversationIdentifier(to, type, conversationId),
                 k -> new P2LConversationImplV2(parent, this, con, to, type, conversationId));
     }

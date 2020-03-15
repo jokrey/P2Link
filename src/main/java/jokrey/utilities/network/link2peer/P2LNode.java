@@ -1,8 +1,8 @@
 package jokrey.utilities.network.link2peer;
 
-import jokrey.utilities.network.link2peer.node.core.ConversationAnswererChangeThisName;
+import jokrey.utilities.network.link2peer.node.conversation.ConversationAnswererChangeThisName;
 import jokrey.utilities.network.link2peer.node.core.NodeCreator;
-import jokrey.utilities.network.link2peer.node.core.P2LConversation;
+import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
 import jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes;
 import jokrey.utilities.network.link2peer.node.stream.*;
 import jokrey.utilities.network.link2peer.util.P2LFuture;

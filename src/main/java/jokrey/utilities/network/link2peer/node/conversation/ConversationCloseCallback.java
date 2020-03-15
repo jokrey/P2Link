@@ -1,4 +1,4 @@
-package jokrey.utilities.network.link2peer.node.core;
+package jokrey.utilities.network.link2peer.node.conversation;
 
 import java.io.IOException;
 
