@@ -6,6 +6,17 @@ import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 /**
+ * Link requirements
+ *       String representations
+ *              For broadcast messages
+ *              For relaying connections to other peers so they may establish connections to it
+ *              For establishing connections
+ *           String representation must:
+ *              Allow dns and ip addresses
+ *              Contain ports
+ *              Allow being 'light peer links' - i.e. links to a relay server with an id
+ *                    Hidden links are automatically created when a hidden node(i.e. a node that does not know its own public ip) connects
+ *
  * @author jokrey
  */
 public class P2Link {

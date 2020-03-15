@@ -25,7 +25,28 @@ import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessage
  *   using only that it can become a node to which other nodes can connect
  *
  * Types of connection establishing:
- * direct - the answerer node has a public link and can be directly accessed
+ *  - Both pub links (simple connect + send own public link, public link of peer known)
+ *  - Requester is hidden, answerer is public
+ *      Simple connect, answerer serves as relay server for requester from now on
+ *   - requester is public, answerer is hidden
+ *      Requester asks relay server(always the one that the node hidden link was obtained from), to send answerer a CONNECT_TO_ME request with requersters public link
+ *  - requester is hidden, answerer is hidden
+ *      Requester asks relay server for direct information - simultaneously the relay server send the hole information of the answerer to the requester
+ *      Requester attempts connection + answerer attempts connection
+ *
+ *
+ * P2L:
+ *     NAS Problem
+ *         Clients that do not know their public ip cannot send it to other nodes (so that they use it when being asked about their peers)
+ *         Instead they will tell the peer that they don't know
+ *              The peer will then check the source ip of the packet and use that
+ *              However if both nodes are in the same private network - this does not work
+ *                  If a third peer is not in the same private network the ip would not be resolvable to them
+ *                  If the second peer were to send a packet to that third peer, the third peer would see a different source ip (the public ip of the router/nat)
+ *                  So in a way a single node can have multiple links(if it itself does not know its own public ip)
+ *                  (connection denied, already connected - since source packet ip should be the same either way)
+ *
+ * Node will ask who am i to every new peer and send who they think the other one is
  */
 public class EstablishConnectionProtocol {
     private static final SecureRandom secureRandom = new SecureRandom();

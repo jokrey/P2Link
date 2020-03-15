@@ -22,6 +22,15 @@ import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTyp
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.SC_BROADCAST_WITH_HASH;
 
 /**
+ * todo
+ *   Size limit p2p
+ *     Allows a fixed size byte string of which nodes have been already contacted
+ *     Can that be used to exclude certain peers?
+ *   From fixed size network to limit size network:
+ *     Problem: how does one get a unique id - 0 <= id <= size
+ *     Solution: master node algorithm
+ *           Request from peer the highest known id, send broadcast, until a broadcast anouncing own id is received - assume own id is valid, if one is received.. Contact that node directly
+ *
  * @author jokrey
  */
 public class BroadcastMessageProtocol {
