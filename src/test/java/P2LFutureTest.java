@@ -128,7 +128,7 @@ public class P2LFutureTest {
         new Thread(() -> {
             p2lF1.setCompleted(1);
             sleep(1000);
-            p2lF2.setCompleted(3);
+            p2lF2.trySetCompleted(3); //supposed to fail
         }).start();
 
         assertThrows(TimeoutException.class, () -> combine.get(100));
