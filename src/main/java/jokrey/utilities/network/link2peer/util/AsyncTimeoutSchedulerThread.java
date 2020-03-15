@@ -1,12 +1,6 @@
 package jokrey.utilities.network.link2peer.util;
 
-import jokrey.utilities.simple.data_structure.pairs.Pair;
-
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
 import java.util.TreeMap;
-import java.util.function.Function;
 
 /**
  * @author jokrey

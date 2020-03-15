@@ -16,7 +16,8 @@ import java.util.ArrayList;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.*;
+import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.SC_BROADCAST_WITHOUT_HASH;
+import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.SC_BROADCAST_WITH_HASH;
 
 /**
  * @author jokrey

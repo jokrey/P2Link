@@ -1,19 +1,18 @@
 package jokrey.utilities.network.link2peer;
 
-import jokrey.utilities.bitsandbytes.BitHelper;
-import jokrey.utilities.encoder.as_union.li.LIPosition;
 import jokrey.utilities.encoder.as_union.li.bytes.LIbae;
 import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
 import jokrey.utilities.encoder.tag_based.implementation.paired.length_indicator.type.transformer.LITypeToBytesTransformer;
 import jokrey.utilities.encoder.type_transformer.bytes.TypeToBytesTransformer;
-import jokrey.utilities.network.link2peer.node.message_headers.*;
+import jokrey.utilities.network.link2peer.node.message_headers.CustomExpirationHeader;
+import jokrey.utilities.network.link2peer.node.message_headers.MinimalHeader;
+import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader;
+import jokrey.utilities.network.link2peer.node.message_headers.ReceiptHeader;
 import jokrey.utilities.network.link2peer.util.Hash;
-import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 import jokrey.utilities.transparent_storage.bytes.wrapper.SubBytesStorage;
 
 import java.net.DatagramPacket;
 import java.net.SocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
