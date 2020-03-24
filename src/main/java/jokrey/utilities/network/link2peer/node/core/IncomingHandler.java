@@ -68,7 +68,7 @@ public class IncomingHandler {
                 streamMessageHandler.receivedReceipt(message);
                 DebugStats.incomingHandler_numStreamReceipts.getAndIncrement();
             } else {
-                streamMessageHandler.receivedPart(message);
+                streamMessageHandler.receivedPart(parent, message);
                 DebugStats.incomingHandler_numStreamParts.getAndIncrement();
             }
         } else if(message.header.isConversationPart()) {

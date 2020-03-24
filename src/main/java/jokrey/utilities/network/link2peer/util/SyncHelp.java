@@ -36,7 +36,7 @@ public class SyncHelp {
             return false;
         }
     }
-    public static boolean waitUntil(Object monitor, Supplier<Boolean> condition, long timeout_ms, Runnable intermediateAction, long intermediateEvery) {
+    public static boolean waitUntil(Object monitor, Supplier<Boolean> condition, long timeout_ms, long intermediateEvery, Runnable intermediateAction) {
         if(condition.get()) return true;
         if(intermediateEvery<=0) throw new IllegalArgumentException("intermediate delay cannot be endless (<=0)");
         try {

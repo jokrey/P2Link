@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Consumer;
 
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
 import static org.junit.jupiter.api.Assertions.*;
@@ -238,7 +239,7 @@ public class ConversationTest {
         testEnvConversation(true, 60, 100, false, false,
                 (convo, no) -> {//client
                     convo.initExpectAsync(convo.encode("sup?")).callMeBack(m1 -> {
-                        convo.answerExpectAsyncAfterPause(convo.encode(m1.nextInt()+2, 5), 10_000).callMeBack(m3 -> {
+                        convo.answerExpectAsyncAfterPause(convo.encode(m1.nextInt()+2, 5)).callMeBack(m3 -> {
                             int result = m3.nextInt();
                             if(result != 6) fail();
 
@@ -554,8 +555,7 @@ public class ConversationTest {
                 },
                 (convo, m0) -> {//server
                     ByteArrayStorage m1 = new ByteArrayStorage();
-                    for(int i=0;i<1000;i++)
-                        m1.append(rand(1000));
+                    for(int i=0;i<1000;i++) m1.append(rand(1000));
                     convo.longAnswerExpect(m1, 10000);
 
                     convo.pause();
@@ -573,6 +573,108 @@ public class ConversationTest {
     }
 
 
+    @Test
+    void convTest_m0_m1L_m2L_close_ASYNC_LONG() throws IOException {
+        P2LFuture<Boolean> clientDone = new P2LFuture<>();
+        P2LFuture<Boolean> serverDone = new P2LFuture<>();
+        testEnvConversation(true, 5, 10, false, false,
+                (convo, no) -> {//client
+                    ByteArrayStorage m1 = new ByteArrayStorage();
+                    convo.initExpectLongAsync(convo.encode("sup?"), m1).callMeBack(success -> {
+                        if(success==null || !success) fail();
+                        assertEquals(1_000_000, m1.contentSize());
+
+                        ByteArrayStorage m2 = new ByteArrayStorage();
+                        for(int i=0;i<1000;i++) m2.append(rand(1000));
+                        convo.longAnswerCloseAsync(m2).callMeBack(clientDone::setCompleted);
+                    });
+
+                    assertTrue(clientDone.get(10000));
+                    assertTrue(serverDone.get(10000));
+                    System.out.println("clientDone: "+clientDone.getResult());
+                    System.out.println("serverDone: "+serverDone.getResult());
+                },
+                (convo, m0) -> {//server
+                    ByteArrayStorage m1 = new ByteArrayStorage();
+                    for(int i=0;i<1000;i++) m1.append(rand(1000));
+                    ByteArrayStorage m2 = new ByteArrayStorage();
+                    convo.longAnswerExpectLongAsync(m1, m2).callMeBack(success -> {
+                        if(success==null || !success) fail();
+                        assertEquals(1_000_000, m1.contentSize());
+                        convo.tryClose();
+                        serverDone.setCompleted(true);
+                    });
+                });
+    }
+
+    @Test
+    void convTest_m0_m1L_m2_m3L_close_ASYNC_LONG() throws IOException {
+        P2LFuture<Boolean> clientDone = new P2LFuture<>();
+        P2LFuture<Boolean> serverDone = new P2LFuture<>();
+        testEnvConversation(true, 5, 10, false, false,
+                (convo, no) -> {//client
+                    ByteArrayStorage m1 = new ByteArrayStorage();
+                    convo.initExpectLongAsync(convo.encode("m0"), m1).callMeBack(success -> {
+                        if(success==null || !success) fail();
+                        assertEquals(1_000_000, m1.contentSize());
+
+                        ByteArrayStorage m3 = new ByteArrayStorage();
+                        convo.answerExpectLongAsync(convo.encode("m2"), m3).callMeBack(success2 -> {
+                            if(success2==null || !success2) fail();
+                            assertEquals(500_000, m3.contentSize());
+                            convo.tryClose();
+                            clientDone.setCompleted(true);
+                        });
+                    });
+
+                    assertTrue(clientDone.get(10000));
+                    assertTrue(serverDone.get(10000));
+                    System.out.println("clientDone: "+clientDone.getResult());
+                    System.out.println("serverDone: "+serverDone.getResult());
+                },
+                (convo, m0) -> {//server
+                    ByteArrayStorage m1 = new ByteArrayStorage();
+                    for(int i=0;i<1000;i++) m1.append(rand(1000));
+                    convo.longAnswerExpectAsync(m1).callMeBack(m2 -> {
+                        assertEquals(1_000_000, m1.contentSize());
+                        ByteArrayStorage m3 = new ByteArrayStorage();
+                        for(int i=0;i<500;i++) m3.append(rand(1000));
+                        convo.longAnswerCloseAsync(m3).callMeBack(serverDone::setCompleted);
+                    });
+                });
+    }
+
+    @Test void convTest_longMessageWithPause_closeAfter_ASYNC() throws IOException {
+        P2LFuture<Boolean> clientDone = new P2LFuture<>();
+        P2LFuture<Boolean> serverDone = new P2LFuture<>();
+        testEnvConversation(true, 5, 10, false, false,
+                (convo, no) -> {//client
+                    ByteArrayStorage m1 = new ByteArrayStorage();
+                    convo.initExpectLongAsyncAfterPause(convo.encode(0), m1).callMeBack(success -> {
+                        if(success == null || !success) fail();
+                        convo.tryClose();
+                        clientDone.setCompleted(true);
+                    });
+
+                    assertTrue(clientDone.get(10000));
+                    assertTrue(serverDone.get(10000));
+                    System.out.println("clientDone: "+clientDone.getResult());
+                    System.out.println("serverDone: "+serverDone.getResult());
+                },
+                (convo, m0) -> {//server
+                    convo.pause();
+                    ByteArrayStorage m1 = new ByteArrayStorage();
+                    for(int i=0;i<1000;i++)
+                        m1.append(rand(1000));
+
+                    sleep(4500);
+
+                    convo.longAnswerCloseAsync(m1).callMeBack(success -> {
+                        if(success == null || !success) fail();
+                        serverDone.setCompleted(true);
+                    });
+                });
+    }
 
     private static void testEnvConversation(boolean connect, int dropPercentage, int attempts, boolean resetDebug, boolean firstServerAnswerIsCloseOrCloseWith,
                                             ConversationAnswererChangeThisName clientLogic, ConversationAnswererChangeThisName serverLogic) throws IOException {

@@ -69,8 +69,14 @@ public class P2LFuture<T> {
     private volatile boolean isGetWaiting = false;
     private volatile boolean isCanceled = false;
     private volatile boolean hasTimedOut = false;
-    private final Stack<Consumer<T>> resultCallbacks = new LinkedStack<>();
+    private final LinkedList<Consumer<T>> resultCallbacks = new LinkedList<>();
     private T result = null;
+
+    public static <E> P2LFuture<E> canceled() {
+        P2LFuture<E> canceled = new P2LFuture<>();
+        canceled.cancel();
+        return canceled;
+    }
 
     /**
      * @return whether anyone is waiting for the future in a blocking fashion
@@ -135,7 +141,16 @@ public class P2LFuture<T> {
         if (isCompleted())
             callback.accept(getResult());
         else {
-            resultCallbacks.push(callback);
+            resultCallbacks.addLast(callback);
+        }
+        return this;
+    }
+    public synchronized P2LFuture<T> callMeBackFirst(Consumer<T> callback) {
+        //has to be synchronized, otherwise between pushing the callback and the isCompleted - it could be completed and never called....
+        if (isCompleted())
+            callback.accept(getResult());
+        else {
+            resultCallbacks.addFirst(callback);
         }
         return this;
     }
@@ -154,7 +169,7 @@ public class P2LFuture<T> {
         } else if (isCompleted()) {
             callback.accept(getResult());
         } else {
-            resultCallbacks.push(callback);
+            resultCallbacks.addLast(callback);
             AsyncTimeoutSchedulerThread.instance().add(timeout, this);
         }
         return this;
@@ -331,7 +346,7 @@ public class P2LFuture<T> {
             notifyAll();
 
         Consumer<T> unblockingWaiter;
-        while ((unblockingWaiter = resultCallbacks.pop()) != null) //at this point no more waiters are added, since the result is already set - however it would work anyways
+        while ((unblockingWaiter = resultCallbacks.pollFirst()) != null) //at this point no more waiters are added, since the result is already set - however it would work anyways
             unblockingWaiter.accept(getResult()); //if the result was set in the meantime - this will respect that
     }
     private void timeout() {
@@ -395,8 +410,8 @@ public class P2LFuture<T> {
      * @param task a given task to be executed after the future completes
      * @return this future
      */
-    public P2LFuture<T> whenCompleted(Runnable task) {
-        callMeBack(t -> { if(t != null) task.run(); });
+    public P2LFuture<T> whenCompleted(Consumer<T> task) {
+        callMeBack(t -> { if(t != null) task.accept(t); });
         return this;
     }
     /**

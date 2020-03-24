@@ -3,6 +3,8 @@ package jokrey.utilities.network.link2peer.util;
 import java.util.TreeMap;
 
 /**
+ * TODO - this thread might become 'crowded' and drop in performance if the callbacks in the scheduled cancel operations take too long
+ *
  * @author jokrey
  */
 public class AsyncTimeoutSchedulerThread {

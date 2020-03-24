@@ -7,6 +7,7 @@ import jokrey.utilities.network.link2peer.node.P2LHeuristics;
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.node.message_headers.StreamPartHeader;
+import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.SyncHelp;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 
@@ -107,6 +108,10 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
             return confirmation;
         }
         return !hasUnconfirmedParts();
+    }
+
+    @Override public P2LFuture<Boolean> closeAsync() {
+        throw new UnsupportedOperationException();
     }
 
     @Override public boolean isClosed() {

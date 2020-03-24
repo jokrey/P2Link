@@ -2,11 +2,14 @@ package jokrey.utilities.network.link2peer.node.stream;
 
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
+import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 
+import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * TODO this entire functionality is just a basic concept at this point
@@ -64,6 +67,12 @@ public abstract class P2LFragmentInputStream implements P2LInputStream {
     @Override public short getType() { return type; }
     @Override public short getConversationId() { return conversationId; }
     @Override public short getStep() { return step; }
+
+    @Override public void close() throws IOException {
+        listeners.clear();
+    }
+
+
     //    private HashMap<Integer, Integer> mappingOfStartToEndIndexOfMissingRanges = new HashMap<>(P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE);
 //    private int latestReceivedEndIndex = 0;
 //
@@ -106,6 +115,27 @@ public abstract class P2LFragmentInputStream implements P2LInputStream {
     }
     public void writeResultsTo(TransparentBytesStorage storage) {
         addFragmentReceivedListener((start, part, off, len, eof) -> {if(part!=null)storage.set(start, part, off, len);});
+    }
+
+    public P2LFuture<Boolean> createAllReceivedFuture() {
+        P2LFuture<Boolean> future = new P2LFuture<>();
+        future.callMeBack(result -> {
+            if(result == null) { //i.e. canceled from method caller / new owner of object
+                try {
+                    close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        addFragmentReceivedListener((fragmentOffset, receivedRaw, dataOff, dataLen, eof) -> {
+            if(isFullyReceived())
+                future.setCompleted(true);
+        });
+        if(isFullyReceived()) {
+            return new P2LFuture<>(true);
+        }
+        return future;
     }
 
     protected void fireReceived(long fragmentOffset, byte[] receivedRaw, int dataOff, int dataLen, boolean eof) {

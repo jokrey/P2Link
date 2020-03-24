@@ -64,20 +64,21 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
             boolean wasMissing = markReceived(startOffset, endOffset);
             if (wasMissing) {
                 if(thisMessageWasTheOneThatToldUsItWasFinallyOver) {
-                    fireReceived(message.header.getPartIndex(), message.content, message.header.getSize(), message.getPayloadLength(), true);
                     eofAt = endOffset;
+                    fireReceived(message.header.getPartIndex(), message.content, message.header.getSize(), message.getPayloadLength(), true);
                 } else
                     fireReceived(message.header.getPartIndex(), message.content, message.header.getSize(), message.getPayloadLength(), false);
                 DebugStats.fragmentStream1_validReceived.getAndIncrement();
             } else {
                 DebugStats.fragmentStream1_doubleReceived.getAndIncrement();
+
+                if(thisMessageWasTheOneThatToldUsItWasFinallyOver) {
+                    eofAt = endOffset;
+                    fireReceived(endOffset, new byte[0], 0, 0, true);
+                }
             }
 //            System.err.println("wasMissing = " + wasMissing);
 
-            if(thisMessageWasTheOneThatToldUsItWasFinallyOver) {
-                eofAt = endOffset;
-                fireReceived(endOffset, new byte[0], 0, 0, true);
-            }
 //            System.err.println("eof = " + eofAt);
             if(isFullyReceived())
                 SyncHelp.notify(this);
@@ -95,6 +96,8 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
                 lastReceiptSendAt = System.currentTimeMillis();
                 numPackagesReceivedInLastBatch=0;
             }
+
+//            if(isFullyReceived()) parent.unregister(this); //todo - yes, BUT the output stream on the other side might re request the acknowledgement, so we need to handle that somehow
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -109,6 +112,7 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
 
     private boolean forceClosedByThis = false;
     @Override public void close() throws IOException {
+        super.close();
         if(!isClosed()) {
             forceClosedByThis=true;
             sendReceipt(1024);//curtsy

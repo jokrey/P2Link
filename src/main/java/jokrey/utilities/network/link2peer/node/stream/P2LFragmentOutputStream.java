@@ -2,6 +2,7 @@ package jokrey.utilities.network.link2peer.node.stream;
 
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
+import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 
@@ -42,6 +43,7 @@ public abstract class P2LFragmentOutputStream implements P2LOutputStream {
     }
 
     public abstract void send();
+    public abstract P2LFuture<Boolean> sendAsync();
 
 
     public static FragmentRetriever getRetrieverFor(TransparentBytesStorage storage) {
@@ -61,6 +63,7 @@ public abstract class P2LFragmentOutputStream implements P2LOutputStream {
             @Override public void adviceEarliestRequiredIndex(long index) { }
         };
     }
+
     interface FragmentRetriever {
         byte[] sub(Fragment fragment);
         Fragment sub(long start, long end);

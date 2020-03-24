@@ -5,7 +5,9 @@ import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.HeaderIdentifier;
 import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.SenderTypeConversationIdStepIdentifier;
+import jokrey.utilities.network.link2peer.node.message_headers.StreamReceiptHeader;
 
+import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -15,12 +17,17 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class StreamMessageHandler {
     private final ConcurrentHashMap<HeaderIdentifier, P2LInputStream> inputStreams = new ConcurrentHashMap<>();
-    public void receivedPart(P2LMessage message) {
+    public void receivedPart(P2LNodeInternal parent, P2LMessage message) throws IOException {
         P2LInputStream stream = getInputStream(message);
         if(stream != null)
             stream.received(message);
-        else
-            System.out.println("received message for unknown in stream"); //todo - default handling?
+        else {
+            //todo - this default handling is technically a ddos issue - since the sender ip can be spoofed and we will send this package to anyone.
+            //todo - also we will send a package for a received package without knowledge of whether that is valid.
+            System.out.println("received message for unknown in stream");
+            P2LMessage defaultReceipt = new StreamReceiptHeader(null, message.header.getType(), message.header.getConversationId(), message.header.getStep(), true).generateMessage(new byte[0]);
+            parent.sendInternalMessage(message.header.getSender().getSocketAddress(), defaultReceipt);
+        }
         //potentially a delayed package, after a new stream of the same type and conversation id has been created (very, very unlikely in context)
     }
     private P2LInputStream getInputStream(P2LMessage m) {
@@ -69,11 +76,12 @@ public class StreamMessageHandler {
     }
     public boolean registerCustomOutputStream(SocketAddress from, short type, short conversationId, short step, P2LOutputStream outputStream) {
         if(from == null) throw new NullPointerException();
-        HeaderIdentifier identifier = new SenderTypeConversationIdStepIdentifier(from, type, step, conversationId);
+        HeaderIdentifier identifier = new SenderTypeConversationIdStepIdentifier(from, type, conversationId, step);
         return outputStreams.putIfAbsent(identifier, outputStream) == null;
     }
 
     public void unregister(P2LOutputStream stream) {
+        System.out.println("unregister: " + stream);
         outputStreams.remove(new SenderTypeConversationIdStepIdentifier(stream.getRawFrom(), stream.getType(), stream.getConversationId(), stream.getStep()));
     }
     /** TODO -  Problem: if unregister is instantly called on close - if the close receipt fails the output stream may never know it had succeeded. */

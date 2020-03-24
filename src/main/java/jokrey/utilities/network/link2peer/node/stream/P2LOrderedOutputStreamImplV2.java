@@ -4,6 +4,7 @@ import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
+import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 
@@ -90,6 +91,10 @@ public class P2LOrderedOutputStreamImplV2 extends P2LOrderedOutputStream impleme
     @Override public boolean close(int timeout_ms) {
         closedAt = firstBufferIndexRepresents + buffer.contentSize();
         return underlyingFragmentStream.close(timeout_ms);
+    }
+    @Override public P2LFuture<Boolean> closeAsync() {
+        closedAt = firstBufferIndexRepresents + buffer.contentSize();
+        return underlyingFragmentStream.closeAsync();
     }
     @Override public boolean isClosed() {
         return underlyingFragmentStream.isClosed();

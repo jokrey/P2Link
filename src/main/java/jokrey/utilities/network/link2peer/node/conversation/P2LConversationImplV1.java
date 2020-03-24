@@ -307,25 +307,27 @@ public class P2LConversationImplV1 implements P2LConversation {
     }
 
 
-    @Override public void initExpectLong(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+    @Override public void initExpectLong(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout)  {
         throw new UnsupportedOperationException();
     }
-    @Override public void answerExpectLong(MessageEncoder encode, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+    @Override public void answerExpectLong(MessageEncoder encode, TransparentBytesStorage messageTarget, int timeout)  {
         throw new UnsupportedOperationException();
     }
-    @Override public P2LMessage longAnswerExpect(TransparentBytesStorage messageSource, int timeout) throws IOException {
+    @Override public P2LMessage longAnswerExpect(TransparentBytesStorage messageSource, int timeout)  {
         throw new UnsupportedOperationException();
     }
-    @Override public void longAnswerClose(TransparentBytesStorage messageSource, int timeout) throws IOException {
+    @Override public void longAnswerClose(TransparentBytesStorage messageSource, int timeout)  {
         throw new UnsupportedOperationException();
     }
-    @Override public void longAnswerExpectLong(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+
+
+    @Override public void longAnswerExpectLong(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout)  {
         throw new UnsupportedOperationException();
     }
-    @Override public void initExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+    @Override public void initExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout)  {
         throw new UnsupportedOperationException();
     }
-    @Override public void answerExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException {
+    @Override public void answerExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout)  {
         throw new UnsupportedOperationException();
     }
 
@@ -440,16 +442,45 @@ public class P2LConversationImplV1 implements P2LConversation {
         return stepHandler.finalResultFuture;
     }
 
-    @Override public P2LFuture<P2LMessage> initExpectAsyncAfterPause(MessageEncoder encoded, int timeout) {
+    @Override public P2LFuture<P2LMessage> initExpectAsyncAfterPause(MessageEncoder encoded) {
         if(isServer) throw new IllegalStateException("not client (server init is automatic, use 'answerExpect')");
         if(step != -2) throw new IllegalStateException("cannot init twice");
         step = 0;
-        return answerExpectAsyncAfterPause(encoded, timeout, true);
+        return answerExpectAsyncAfterPause(encoded, true);
     }
-    @Override public P2LFuture<P2LMessage> answerExpectAsyncAfterPause(MessageEncoder encoded, int timeout) {
-        return answerExpectAsyncAfterPause(encoded, timeout, false);
+    @Override public P2LFuture<P2LMessage> answerExpectAsyncAfterPause(MessageEncoder encoded) {
+        return answerExpectAsyncAfterPause(encoded, false);
     }
-    private P2LFuture<P2LMessage> answerExpectAsyncAfterPause(MessageEncoder encoded, int timeout, boolean init)  {
+
+    @Override public P2LFuture<Boolean> initExpectLongAsync(MessageEncoder message, TransparentBytesStorage messageTarget) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override public P2LFuture<Boolean> answerExpectLongAsync(MessageEncoder message, TransparentBytesStorage messageTarget) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override public P2LFuture<P2LMessage> longAnswerExpectAsync(TransparentBytesStorage messageSource) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override public P2LFuture<Boolean> longAnswerCloseAsync(TransparentBytesStorage messageSource) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override public P2LFuture<Boolean> longAnswerExpectLongAsync(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override public P2LFuture<Boolean> initExpectLongAsyncAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override public P2LFuture<Boolean> answerExpectLongAsyncAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget) {
+        throw new UnsupportedOperationException();
+    }
+
+    private P2LFuture<P2LMessage> answerExpectAsyncAfterPause(MessageEncoder encoded, boolean init)  {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
 
@@ -462,8 +493,6 @@ public class P2LConversationImplV1 implements P2LConversation {
         P2LMessage msg = P2LMessage.from(header, encoded);
 
         step++;
-
-        long stepBeganAt = System.currentTimeMillis();
 
         Retryer<P2LMessage> stepHandler = new Retryer<>();
         stepHandler.makeAttemptFunc = () -> {
@@ -483,20 +512,22 @@ public class P2LConversationImplV1 implements P2LConversation {
             }
             if (result != null && result.validateIsReceiptFor(msg)) {
                 lastMessageReceived = result;
-                int adjustedTimeout = (int) (timeout - (System.currentTimeMillis() - stepBeganAt));
-                if(adjustedTimeout <= 0) adjustedTimeout = 1;
                 con.updateAvRTT((int) (System.currentTimeMillis() - lastMessageSentAt));
                 step++;
                 DebugStats.conversation_numValid.getAndIncrement();
 
                 P2LFuture<P2LMessage> next = conversationQueue.futureFor(peer, type, conversationId, (short) (step - 1));
 
-                next.callMeBack(adjustedTimeout, actualMessage -> { //will throw the same timeout exception timeout is reached, -1 means timeout is never reached
-                    lastMessageReceived = actualMessage;
-                    //cannot update avRTT, since we have no idea when this result message was sent on the other side(somewhere between lastMessageSent and now)
-                    DebugStats.conversation_numValid.getAndIncrement();
+                next.callMeBack(actualMessage -> { //will throw the same timeout exception timeout is reached, -1 means timeout is never reached
+                    if(actualMessage == null) {
+                        stepHandler.finalResultFuture.cancel();
+                    } else {
+                        lastMessageReceived = actualMessage;
+                        //cannot update avRTT, since we have no idea when this result message was sent on the other side(somewhere between lastMessageSent and now)
+                        DebugStats.conversation_numValid.getAndIncrement();
 
-                    stepHandler.finalResultFuture.setCompleted(actualMessage);
+                        stepHandler.finalResultFuture.setCompleted(actualMessage);
+                    }
                 });
                 return true;
             } else {

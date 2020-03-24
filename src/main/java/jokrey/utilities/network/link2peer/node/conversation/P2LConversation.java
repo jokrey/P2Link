@@ -319,22 +319,34 @@ public interface P2LConversation {
 
     void initExpectLong(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
     void answerExpectLong(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
+//    P2LMessage longInitExpect(TransparentBytesStorage messageSource, int timeout) throws IOException; //LONG INIT NOT POSSIBLE
     P2LMessage longAnswerExpect(TransparentBytesStorage messageSource, int timeout) throws IOException;
     void longAnswerClose(TransparentBytesStorage messageSource, int timeout) throws IOException;
-
+//    void longInitExpectLong(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException; //LONG INIT NOT POSSIBLE
+    void longAnswerExpectLong(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException;
     void initExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
     void answerExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
 
-    void longInitExpectLong(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException;
-    void longAnswerExpectLong(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException;
 
 
 
-
-
+    // important rule for using async methods: Before the next async method in the conversation chain is called, the former one HAS TO HAVE COMPLETED
+    //     ensure using either p2lfuture.get() - or p2lfuture.callmeback
+    //todo  unless otherwise noted canceling the returned future will cancel the entire conversation (asap)
     P2LFuture<P2LMessage> initExpectAsync(MessageEncoder message);
     P2LFuture<P2LMessage> answerExpectAsync(MessageEncoder message);
     P2LFuture<Boolean> answerCloseAsync(MessageEncoder message);
-    P2LFuture<P2LMessage> initExpectAsyncAfterPause(MessageEncoder message, int timeout);
-    P2LFuture<P2LMessage> answerExpectAsyncAfterPause(MessageEncoder message, int timeout);
+    P2LFuture<P2LMessage> initExpectAsyncAfterPause(MessageEncoder message);
+    P2LFuture<P2LMessage> answerExpectAsyncAfterPause(MessageEncoder message);
+
+    P2LFuture<Boolean> initExpectLongAsync(MessageEncoder message, TransparentBytesStorage messageTarget);
+    P2LFuture<Boolean> answerExpectLongAsync(MessageEncoder message, TransparentBytesStorage messageTarget);
+//    P2LFuture<P2LMessage> longInitExpectAsync(TransparentBytesStorage messageSource); //LONG INIT NOT POSSIBLE
+    P2LFuture<P2LMessage> longAnswerExpectAsync(TransparentBytesStorage messageSource);
+    P2LFuture<Boolean> longAnswerCloseAsync(TransparentBytesStorage messageSource);
+//    P2LFuture<Boolean> longInitExpectLongAsync(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget); //LONG INIT NOT POSSIBLE
+    P2LFuture<Boolean> longAnswerExpectLongAsync(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget);
+    P2LFuture<Boolean> initExpectLongAsyncAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget);
+    P2LFuture<Boolean> answerExpectLongAsyncAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget);
+
 }

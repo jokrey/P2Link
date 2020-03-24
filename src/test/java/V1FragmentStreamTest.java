@@ -17,8 +17,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import static jokrey.utilities.network.link2peer.P2LMessage.MAX_UDP_PACKET_SIZE;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_CONVERSATION_ID;
 import static jokrey.utilities.network.link2peer.util.P2LFuture.ENDLESS_WAIT;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * @author jokrey
@@ -81,7 +80,7 @@ public class V1FragmentStreamTest {
         try {
             P2LFuture<Boolean> connectionEstablished = nodes[0].establishConnection(nodes[1].getSelfLink());
 
-            //utilizing the thread, while it waits - async for DA win
+            //utilizing the thread, while it waits - async for da WIN
             byte[] toSend = new byte[numBytesToSend];
             ThreadLocalRandom.current().nextBytes(toSend);
 
@@ -97,10 +96,14 @@ public class V1FragmentStreamTest {
             TransparentBytesStorage target = new ByteArrayStorage(toSend.length);
             in.writeResultsTo(target);
 
+            P2LFuture<Boolean> allReceived = in.createAllReceivedFuture();
+            assertNull(allReceived.getResult());
+
             out.send();
             out.close();
             TimeDiffMarker.println("send data");
 
+            assertTrue(allReceived.getResult());
             assertTrue(in.isFullyReceived());
 
             assertArrayEquals(source.getContent(), target.getContent());
