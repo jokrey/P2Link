@@ -6,7 +6,7 @@ import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -23,7 +23,7 @@ class ConversationHandlerV1 {
         conversationHandlers.put(toShort(type), handler);
     }
 
-    public void received(P2LNodeInternal parent, SocketAddress from, P2LMessage received) throws IOException {
+    public void received(P2LNodeInternal parent, InetSocketAddress from, P2LMessage received) throws IOException {
         boolean hasBeenHandled = incomingHandler.messageQueue.handleNewMessage(received);
         System.out.println("received = " + received+" - hasBeenHandled="+hasBeenHandled);
         if(!hasBeenHandled) {
@@ -42,7 +42,7 @@ class ConversationHandlerV1 {
     }
     public void clean() { }
 
-    public P2LConversation getConvoFor(P2LNodeInternal parent, P2LConnection con, SocketAddress to, short type, short conversationId) {
+    public P2LConversation getConvoFor(P2LNodeInternal parent, P2LConnection con, InetSocketAddress to, short type, short conversationId) {
         return new P2LConversationImplV1(parent, incomingHandler.messageQueue, con, to, type, conversationId);
     }
 }

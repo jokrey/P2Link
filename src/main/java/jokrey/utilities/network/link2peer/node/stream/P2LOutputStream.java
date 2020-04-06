@@ -4,7 +4,7 @@ import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 
 /**
  * Indicators of a good stream (in order of importance):
@@ -21,7 +21,7 @@ public interface P2LOutputStream extends AutoCloseable {
     /** Internal use only. */
     void receivedReceipt(P2LMessage rawReceipt);
     /** Internal use only. */
-    SocketAddress getRawFrom();
+    InetSocketAddress getRawFrom();
     /** Internal use only. */
     short getType();
     /** Internal use only. */

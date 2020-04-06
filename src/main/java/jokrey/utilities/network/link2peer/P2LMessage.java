@@ -12,11 +12,12 @@ import jokrey.utilities.network.link2peer.util.Hash;
 import jokrey.utilities.transparent_storage.bytes.wrapper.SubBytesStorage;
 
 import java.net.DatagramPacket;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 
+import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.SL_NAT_HOLE_PACKET;
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.isInternalMessageId;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_CONVERSATION_ID;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
@@ -79,9 +80,9 @@ public class P2LMessage extends MessageEncoder {
         this.contentHash = contentHash;
     }
 
-    /** @return a udp datagram packet from the internal data - it can be decoded on the receiver side using {@link #fromPacket(P2Link, DatagramPacket)}
+    /** @return a udp datagram packet from the internal data - it can be decoded on the receiver side using {@link #fromPacket(InetSocketAddress, DatagramPacket)}
      * @param to receiver of the created datagram packet*/
-    public DatagramPacket toPacket(SocketAddress to) {
+    public DatagramPacket toPacket(InetSocketAddress to) {
         int actualLength = requiredRawSize();
 
         //todo: the following is automatically done by new Datagram packet(kind of)
@@ -106,7 +107,7 @@ public class P2LMessage extends MessageEncoder {
     }
 
     /** @return Decodes a udp datagram packet into a p2l message */
-    public static P2LMessage fromPacket(P2Link sender, DatagramPacket packet) {
+    public static P2LMessage fromPacket(InetSocketAddress sender, DatagramPacket packet) {
         byte[] raw = packet.getData();
 
         P2LMessageHeader header = P2LMessageHeader.from(raw, sender);
@@ -346,19 +347,19 @@ public class P2LMessage extends MessageEncoder {
             return createRawSendMessage(type, NO_CONVERSATION_ID, expiresAfter, sizeCounter, total);
         }
 
-        public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, Object payload) {
+        public static P2LMessage createBroadcast(InetSocketAddress sender, int brdMsgType, Object payload) {
             return createBroadcast(sender, brdMsgType, trans.transform(payload));
         }
-        public static P2LMessage createBroadcast(P2Link sender, short brdMsgType, byte[] payload) {
+        public static P2LMessage createBroadcast(InetSocketAddress sender, short brdMsgType, byte[] payload) {
             return new MinimalHeader(sender, toShort(brdMsgType), false).generateMessage(payload);
         }
-        public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, byte[] payload) {
+        public static P2LMessage createBroadcast(InetSocketAddress sender, int brdMsgType, byte[] payload) {
             return createBroadcast(sender, toShort(brdMsgType), payload);
         }
-        public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, short expiresAfter, Object payload) {
+        public static P2LMessage createBroadcast(InetSocketAddress sender, int brdMsgType, short expiresAfter, Object payload) {
             return createBroadcast(sender, brdMsgType, expiresAfter, trans.transform(payload));
         }
-        public static P2LMessage createBroadcast(P2Link sender, int brdMsgType, short expiresAfter, byte[] payload) {
+        public static P2LMessage createBroadcast(InetSocketAddress sender, int brdMsgType, short expiresAfter, byte[] payload) {
             return new CustomExpirationHeader(sender, toShort(brdMsgType), expiresAfter, false).generateMessage(payload);
         }
 
@@ -384,6 +385,11 @@ public class P2LMessage extends MessageEncoder {
                 raw_i+=part.getPayloadLength();
             }
             return new P2LMessage(reassembledHeader, null, raw, totalByteSize);
+        }
+
+        public static P2LMessage createNatHolePacket() {
+            P2LMessageHeader header = new MinimalHeader(null, SL_NAT_HOLE_PACKET, false);
+            return header.generateMessage(new byte[0]);
         }
     }
 }

@@ -1,6 +1,6 @@
 package jokrey.utilities.network.link2peer.node.message_headers;
 
-import jokrey.utilities.network.link2peer.P2Link;
+import java.net.InetSocketAddress;
 
 /**
  * @author jokrey
@@ -8,10 +8,10 @@ import jokrey.utilities.network.link2peer.P2Link;
 public class LongMessagePartHeader extends FullShortMessageHeader {
     private final int index, size;
     private final short step;
-    public LongMessagePartHeader(P2Link sender, short type, short conversationId, short expiresAfter, short step, int index, int size) {
+    public LongMessagePartHeader(InetSocketAddress sender, short type, short conversationId, short expiresAfter, short step, int index, int size) {
         this(sender, type, conversationId, expiresAfter, step, index, size, false);
     }
-    public LongMessagePartHeader(P2Link sender, short type, short conversationId, short expiresAfter, short step,
+    public LongMessagePartHeader(InetSocketAddress sender, short type, short conversationId, short expiresAfter, short step,
                                  int index, int size, boolean requestReceipt) {
         super(sender, type, conversationId, expiresAfter, requestReceipt);
         this.index = index;

@@ -3,6 +3,7 @@ package jokrey.utilities.network.link2peer.node.core;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
 
+import java.net.InetSocketAddress;
 import java.util.Objects;
 
 /**
@@ -10,15 +11,17 @@ import java.util.Objects;
  */
 public class P2LConnection {
     public final P2Link link;
+    public final InetSocketAddress address;
     public final int remoteBufferSize;
     public int avRTT;
     public int fragmentStreamVar = -1;
 
-    public P2LConnection(P2Link link, int remoteBufferSize) {
-        this(link, remoteBufferSize, -1);
+    public P2LConnection(P2Link link, InetSocketAddress address, int remoteBufferSize) {
+        this(link, address, remoteBufferSize, -1);
     }
-    public P2LConnection(P2Link link, int remoteBufferSize, int avRTT) {
+    public P2LConnection(P2Link link, InetSocketAddress address, int remoteBufferSize, int avRTT) {
         this.link=link;
+        this.address=address;
         this.remoteBufferSize = remoteBufferSize;
         this.avRTT = avRTT;
     }

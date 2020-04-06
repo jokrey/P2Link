@@ -1,15 +1,15 @@
 package jokrey.utilities.network.link2peer.node.message_headers;
 
-import jokrey.utilities.network.link2peer.P2Link;
+import java.net.InetSocketAddress;
 
 /**
  * @author jokrey
  */
 public class ReceiptHeader extends ConversationHeader {
-    public ReceiptHeader(P2Link sender, short type, short conversationId, short step) {
+    public ReceiptHeader(InetSocketAddress sender, short type, short conversationId, short step) {
         this(sender, type, conversationId, step, false);
     }
-    public ReceiptHeader(P2Link sender, short type, short conversationId, short step, boolean requestReceipt) {
+    public ReceiptHeader(InetSocketAddress sender, short type, short conversationId, short step, boolean requestReceipt) {
         super(sender, type, conversationId, step, requestReceipt);
     }
 

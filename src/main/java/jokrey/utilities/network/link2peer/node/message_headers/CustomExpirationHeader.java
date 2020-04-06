@@ -1,6 +1,6 @@
 package jokrey.utilities.network.link2peer.node.message_headers;
 
-import jokrey.utilities.network.link2peer.P2Link;
+import java.net.InetSocketAddress;
 
 /**
  * @author jokrey
@@ -8,7 +8,7 @@ import jokrey.utilities.network.link2peer.P2Link;
 public class CustomExpirationHeader extends MinimalHeader {
     private final short expiresAfter;
     private final long createdAtCtm;
-    public CustomExpirationHeader(P2Link sender, short type, short expiresAfter, boolean requestReceipt) {
+    public CustomExpirationHeader(InetSocketAddress sender, short type, short expiresAfter, boolean requestReceipt) {
         super(sender, type, requestReceipt);
         this.expiresAfter = expiresAfter;
         createdAtCtm = System.currentTimeMillis();

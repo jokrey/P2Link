@@ -12,7 +12,7 @@ import jokrey.utilities.network.link2peer.util.TimeoutException;
 import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 import java.util.function.Consumer;
 
 /**
@@ -32,7 +32,7 @@ public class P2LConversationImplV1 implements P2LConversation {
     public final P2LNodeInternal parent;
     private final P2LMessageQueue conversationQueue;
     private final P2LConnection con;
-    public final SocketAddress peer;
+    public final InetSocketAddress peer;
     private final short type, conversationId;
     private final int headerSize;
 
@@ -56,21 +56,23 @@ public class P2LConversationImplV1 implements P2LConversation {
         if(rM < 0) throw new IllegalArgumentException("cannot be negative");
         this.rM = rM;
     }
-    public P2LConversationImplV1(P2LNodeInternal parent, P2LMessageQueue conversationQueue, P2LConnection con, SocketAddress peer, short type, short conversationId) {
+    public P2LConversationImplV1(P2LNodeInternal parent, P2LMessageQueue conversationQueue, P2LConnection con, InetSocketAddress peer, short type, short conversationId) {
         this.parent = parent;
         this.conversationQueue = conversationQueue;
         this.type = type;
         this.conversationId = conversationId;
         this.peer = peer;
         if(con == null)
-            this.con = new P2LConnection(null, 1024, -1);
+            this.con = new P2LConnection(null, peer,1024, -1);
         else
             this.con = con;
 
-        headerSize = new ConversationHeader(null, type, conversationId, step, false).getSize();
+        headerSize = new ConversationHeader(peer, type, conversationId, step, false).getSize();
     }
 
-    @Override public SocketAddress getPeer() { return peer; }
+    @Override public InetSocketAddress getPeer() { return peer; }
+    @Override public short getConversationId() { return conversationId; }
+    @Override public short getType() { return type; }
     @Override public int getAvRTT() { return con.avRTT; }
     @Override public int getHeaderSize() { return headerSize; }
     @Override public int getMaxPayloadSizePerPackage() {

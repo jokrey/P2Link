@@ -3,6 +3,7 @@ import jokrey.utilities.encoder.tag_based.implementation.paired.length_indicator
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
+import jokrey.utilities.network.link2peer.P2Link.Local;
 import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
 import jokrey.utilities.network.link2peer.node.core.NodeCreator;
@@ -10,6 +11,7 @@ import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.node.message_headers.StreamPartHeader;
 import jokrey.utilities.network.link2peer.node.protocols.EstablishConnectionProtocol;
+import jokrey.utilities.network.link2peer.node.protocols.RelayedConnectionProtocol;
 import jokrey.utilities.network.link2peer.util.CanceledException;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
@@ -37,39 +39,45 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class IntermediateTests {
     @Test void establishConnectionProtocolTest() throws IOException {
-        P2LNode node1 = P2LNode.create(P2Link.createLocalLink(53189).toDirect()); //creates server thread
-        P2LNode node2 = P2LNode.create(P2Link.createLocalLink(53188).toDirect()); //creates server thread
+        P2LNode node1 = P2LNode.create(Local.forTest(53189)); //creates server thread
+        P2LNode node2 = P2LNode.create(Local.forTest(53188)); //creates server thread
+        try {
+            boolean connected = node2.establishConnection(node1.getSelfLink()).get(1000);
+            assertTrue(connected);
 
-        boolean connected = node2.establishConnection(node1.getSelfLink()).get(1000);
-        assertTrue(connected);
-
-        assertTrue(node2.isConnectedTo(node1.getSelfLink()));
-        assertTrue(node1.isConnectedTo(node2.getSelfLink()));
-
-        close(node1, node2);
+            assertTrue(node2.isConnectedTo(node1.getSelfLink()));
+            assertTrue(node1.isConnectedTo(node2.getSelfLink()));
+        } finally {
+            close(node1, node2);
+        }
     }
 
     @Test void establishConnectionProtocolTest_RELAY() throws IOException {
-        P2LNode relayServer = P2LNode.create(P2Link.createLocalLink(5319).toDirect()); //creates server thread
+        P2LNode relayServer = P2LNode.create(Local.forTest(5319)); //creates server thread
+        P2LNode node1 = P2LNode.create(Local.forTest(53101)); //creates server thread
+        P2LNode node2 = P2LNode.create(Local.forTest(53102)); //creates server thread
+        try {
+            node1.establishConnection(relayServer.getSelfLink()).waitForIt();
 
-        P2LNode node1 = P2LNode.create(P2Link.createLocalLink(53189)); //creates server thread
-        P2LNode node2 = P2LNode.create(P2Link.createLocalLink(53188)); //creates server thread
+            P2Link node1LinkAsKnownTo2 = ((Local) node1.getSelfLink()).withRelay(((Local) relayServer.getSelfLink()).unsafeAsDirect());
 
-        P2Link node1LinkAsKnownTo2 = node1.getSelfLink().toHidden(relayServer.getSelfLink());
+            boolean connected = node2.establishConnection(node1LinkAsKnownTo2).get(2000);
+            assertTrue(connected);
 
-        boolean connected = node2.establishConnection(node1LinkAsKnownTo2).get(1000);
-        assertTrue(connected);
+            sleep(100);
 
-        assertTrue(node2.isConnectedTo(node1.getSelfLink()));
-        assertTrue(node1.isConnectedTo(node2.getSelfLink()));
-
-        close(node1, node2);
+            assertTrue(node2.isConnectedTo(node1.getSelfLink()));
+            assertTrue(node1.isConnectedTo(node2.getSelfLink()));
+        } finally {
+            close(relayServer, node1, node2);
+        }
     }
 
 
 
 
     @Test void garnerConnectionProtocolTest() throws IOException {
+        DebugStats.MSG_PRINTS_ACTIVE = true;
         {
             P2LNode[] nodes = generateNodes(10, 60300);
 
@@ -89,7 +97,7 @@ class IntermediateTests {
 
             assertEquals(4, newConnections.size());
 
-            assertEquals(4, nodes[0].getEstablishedConnections().size());
+            assertEquals(4, nodes[0].getEstablishedConnections().length);
 
             close(nodes);
         }
@@ -111,11 +119,11 @@ class IntermediateTests {
 
             printPeers(nodes);
 
-            assertEquals(4, nodes[0].getEstablishedConnections().size());
-            assertEquals(4, nodes[1].getEstablishedConnections().size());
-            assertEquals(2, nodes[2].getEstablishedConnections().size());
-            assertEquals(2, nodes[3].getEstablishedConnections().size());
-            assertEquals(2, nodes[4].getEstablishedConnections().size());
+            assertEquals(4, nodes[0].getEstablishedConnections().length);
+            assertEquals(4, nodes[1].getEstablishedConnections().length);
+            assertEquals(2, nodes[2].getEstablishedConnections().length);
+            assertEquals(2, nodes[3].getEstablishedConnections().length);
+            assertEquals(2, nodes[4].getEstablishedConnections().length);
 
             close(nodes);
         }
@@ -134,11 +142,11 @@ class IntermediateTests {
 
             printPeers(nodes);
 
-            assertEquals(4, nodes[0].getEstablishedConnections().size());
-            assertEquals(4, nodes[1].getEstablishedConnections().size());
-            assertEquals(2, nodes[2].getEstablishedConnections().size());
-            assertEquals(2, nodes[3].getEstablishedConnections().size());
-            assertEquals(2, nodes[4].getEstablishedConnections().size());
+            assertEquals(4, nodes[0].getEstablishedConnections().length);
+            assertEquals(4, nodes[1].getEstablishedConnections().length);
+            assertEquals(2, nodes[2].getEstablishedConnections().length);
+            assertEquals(2, nodes[3].getEstablishedConnections().length);
+            assertEquals(2, nodes[4].getEstablishedConnections().length);
 
             close(nodes);
         }
@@ -153,8 +161,8 @@ class IntermediateTests {
 
         int p1 = 54189;
         int p2 = 54188;
-        P2Link l1 = P2Link.createLocalLink(p1).toDirect();
-        P2Link l2 = P2Link.createLocalLink( p2).toDirect();
+        P2Link l1 = Local.forTest(p1);
+        P2Link l2 = Local.forTest( p2);
         P2LNode node1 = P2LNode.create(l1); //creates server thread
         P2LNode node2 = P2LNode.create(l2); //creates server thread
 
@@ -163,12 +171,11 @@ class IntermediateTests {
         boolean connected = node1.establishConnection(node2.getSelfLink()).get(1000);
         assertTrue(connected);
 
-        P2Link node1LinkVisibleToNode2 = node1.whoAmI(node2.getSelfLink().getSocketAddress()).get(1000);
-        P2Link node2LinkVisibleToNode1 = node2.whoAmI(node1.getSelfLink().getSocketAddress()).get(1000);
+        P2Link node1LinkVisibleToNode2 = node1.whoAmI(node2.getSelfLink().resolve()).get(1000);
+        P2Link node2LinkVisibleToNode1 = node2.whoAmI(node1.getSelfLink().resolve()).get(1000);
 
         node1.addMessageListener(message -> {
-            assertEquals(node2LinkVisibleToNode1.getStringRepresentation(), message.header.getSender().getStringRepresentation());
-            assertEquals(node2LinkVisibleToNode1, message.header.getSender());
+            assertEquals(node2LinkVisibleToNode1.resolve(), message.header.getSender());
             assertArrayEquals(idvMsgToSend, message.asBytes());
             nodesAndNumberOfReceivedMessages.compute(l1, (link, counter) -> counter == null? 1 : counter+1);
         });
@@ -176,8 +183,7 @@ class IntermediateTests {
             throw new IllegalStateException("this should not be called here");
         });
         node2.addMessageListener(message -> {
-            assertEquals(node1LinkVisibleToNode2.getStringRepresentation(), message.header.getSender().getStringRepresentation());
-            assertEquals(node1LinkVisibleToNode2, message.header.getSender());
+            assertEquals(node1LinkVisibleToNode2.resolve(), message.header.getSender());
             assertArrayEquals(idvMsgToSend, message.asBytes());
             nodesAndNumberOfReceivedMessages.compute(l2, (link, counter) -> counter == null? 1 : counter+1);
         });
@@ -194,7 +200,7 @@ class IntermediateTests {
         assertTrue(sendResult.get(100));
 //        sendResult = node1.sendMessageWithReceipt(node1.getSelfLink(), P2LMessage.Factory.createSendMessage(0, idvMsgToSend));
 //        assertFalse(sendResult.get(100)); //self send does not work - todo: it currently does work to self send messages... it is even possible to be your own peer
-        sendResult = node1.sendMessageWithReceipt( P2Link.createDirectLink("google.com", 123), P2LMessage.Factory.createSendMessage(0, idvMsgToSend));
+        sendResult = node1.sendMessageWithReceipt( new P2Link.Direct("google.com", 123), P2LMessage.Factory.createSendMessage(0, idvMsgToSend));
         assertNull(sendResult.getOrNull(100)); //google is not a connected peer for node 1
 
         System.out.println("send success");
@@ -212,8 +218,8 @@ class IntermediateTests {
     @Test void futureIdvMsgText() throws IOException {
         int p1 = 34189;
         int p2 = 34188;
-        P2LNode node1 = P2LNode.create(P2Link.createLocalLink(p1).toDirect()); //creates server thread
-        P2LNode node2 = P2LNode.create(P2Link.createLocalLink(p2).toDirect()); //creates server thread
+        P2LNode node1 = P2LNode.create(Local.forTest(p1)); //creates server thread
+        P2LNode node2 = P2LNode.create(Local.forTest(p2)); //creates server thread
 
         sleep(100); //let nodes start
 
@@ -257,8 +263,8 @@ class IntermediateTests {
     @Test void longMessageTest() throws IOException {
         int p1 = 34191;
         int p2 = 34192;
-        P2LNode node1 = P2LNode.create(P2Link.createLocalLink(p1).toDirect()); //creates server thread
-        P2LNode node2 = P2LNode.create(P2Link.createLocalLink(p2).toDirect()); //creates server thread
+        P2LNode node1 = P2LNode.create(Local.forTest(p1)); //creates server thread
+        P2LNode node2 = P2LNode.create(Local.forTest(p2)); //creates server thread
 
         byte[] toSend_1To2 = new byte[(P2LMessage.CUSTOM_RAW_SIZE_LIMIT - 15) * 2];
         byte[] toSend_2To1 = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT * 2];
@@ -297,18 +303,18 @@ class IntermediateTests {
         AtomicReference<byte[]> brdMsgToSend = new AtomicReference<>(new byte[] {17,32,37,45,5,99,33,55,16,43,127});
 
         int senderPort = 55199;
-        P2Link senderLink = P2Link.createLocalLink(senderPort).toDirect();
+        P2Link senderLink = Local.forTest(senderPort);
 
         P2LNode[] nodes = generateNodes(10, 55288, p2Link -> message -> {
             throw new IllegalStateException("this should not be called here");
         }, p2Link -> message -> {
             System.out.println(p2Link + " - IntermediateTests.receivedBroadcastMessage: " + message);
-            assertEquals(senderLink, message.header.getSender());
+            assertEquals(senderLink.resolve(), message.header.getSender());
             assertArrayEquals(brdMsgToSend.get(), message.asBytes());
             nodesAndNumberOfReceivedMessages.compute(p2Link, (link, counter) -> counter == null? 1 : counter+1);
         });
 
-        P2LNode senderNode = P2LNode.create(P2Link.createLocalLink(senderPort).toDirect()); //creates server thread
+        P2LNode senderNode = P2LNode.create(Local.forTest(senderPort)); //creates server thread
         senderNode.addBroadcastListener(message -> {
             throw new IllegalStateException("broadcastReceivedCalledForSender...");
         });
@@ -329,7 +335,7 @@ class IntermediateTests {
         System.out.println("sending broadcast now");
 
         TimeDiffMarker.setMark("line + garner 4");
-        sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(senderLink, 0, brdMsgToSend.get()));
+        sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(senderLink.resolve(), 0, brdMsgToSend.get()));
         assertEquals(4, sendResult.get(1000).intValue());
 
         System.out.println("broadcast send done");
@@ -359,7 +365,7 @@ class IntermediateTests {
 
         brdMsgToSend.set(new byte[] {1,2,3,4,5});
         TimeDiffMarker.setMark("sender + ring");
-        sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(senderLink, 0, brdMsgToSend.get()));
+        sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(senderLink.resolve(), 0, brdMsgToSend.get()));
         assertEquals(1, sendResult.get(1000).intValue());
 
         while(nodesAndNumberOfReceivedMessages.size() < nodes.length) {
@@ -384,7 +390,7 @@ class IntermediateTests {
 
         brdMsgToSend.set(new byte[] {1,2,3,4,5,6,7,8});
         TimeDiffMarker.setMark("ring");
-        sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(senderLink, 0, brdMsgToSend.get()));
+        sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(senderLink.resolve(), 0, brdMsgToSend.get()));
         assertEquals(2, sendResult.get(1000).intValue());
 
 
@@ -418,7 +424,7 @@ class IntermediateTests {
         brdMsgToSend.set(new byte[] {1,2,3,4,5,6,7,8,9});
 
         TimeDiffMarker.setMark("full");
-        sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(senderLink, 0, brdMsgToSend.get()));
+        sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(senderLink.resolve(), 0, brdMsgToSend.get()));
         assertEquals(10, sendResult.get(1000).intValue());
 
 
@@ -452,7 +458,7 @@ class IntermediateTests {
 
         brdMsgToSend.set(new byte[] {1,2,3,4,5,6,7,8,9}); //note that it is the same message as before, the hash nonetheless changes...
 
-        sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(senderLink, 10, MAX_EXPIRATION_TIMEOUT, brdMsgToSend.get())); //IF NOT SUPPLYING A MESSAGE ID, THE OLD MESSAGES WILL BE RECEIVED HERE FIRST....
+        sendResult = senderNode.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(senderLink.resolve(), 10, MAX_EXPIRATION_TIMEOUT, brdMsgToSend.get())); //IF NOT SUPPLYING A MESSAGE ID, THE OLD MESSAGES WILL BE RECEIVED HERE FIRST....
         assertEquals(10, sendResult.get(1000).intValue());
 
         for(P2LNode node:nodes) {
@@ -572,7 +578,7 @@ class IntermediateTests {
             assertEquals("sup", nodes[2].expectMessage(1).get(1).asString());
             assertThrows(TimeoutException.class, () -> nodes[3].expectMessage(1).get(1));
 
-            nodes[6].sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(nodes[6].getSelfLink(), 1, MAX_EXPIRATION_TIMEOUT, "sup")).waitForIt(20000);
+            nodes[6].sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(nodes[6].getSelfLink().resolve(), 1, MAX_EXPIRATION_TIMEOUT, "sup")).waitForIt(20000);
 
             for (P2LNode node : nodes)
                 if (node != nodes[6])
@@ -594,7 +600,7 @@ class IntermediateTests {
 
             TimeDiffMarker.setMark_d();
             byte[] shortPayload = {1, 9, 2, 8, 3, 7, 4, 6, 5};
-            nodes[0].sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(nodes[0].getSelfLink(), sameType, MAX_EXPIRATION_TIMEOUT, shortPayload));
+            nodes[0].sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(nodes[0].getSelfLink().resolve(), sameType, MAX_EXPIRATION_TIMEOUT, shortPayload));
             for (P2LNode node : nodes)
                 if (node != nodes[0])
                     assertArrayEquals(shortPayload, node.expectBroadcastMessage(sameType).get(2500).asBytes());
@@ -603,7 +609,7 @@ class IntermediateTests {
 
             byte[] longPayload = new byte[P2LHeuristics.BROADCAST_USES_HASH_DETOUR_RAW_SIZE_THRESHOLD * 2];
             ThreadLocalRandom.current().nextBytes(longPayload);
-            nodes[0].sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(nodes[0].getSelfLink(), sameType, MAX_EXPIRATION_TIMEOUT, longPayload));
+            nodes[0].sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(nodes[0].getSelfLink().resolve(), sameType, MAX_EXPIRATION_TIMEOUT, longPayload));
             for (P2LNode node : nodes)
                 if (node != nodes[0])
                     assertArrayEquals(longPayload, node.expectBroadcastMessage(sameType).get(2500).asBytes());
@@ -658,8 +664,8 @@ class IntermediateTests {
         P2LNode pubRelayNode3 = null;
         try {
 //            public - public
-            pubNode1 = NodeCreator.create(P2Link.createLocalLink(7890).toDirect());
-            pubNode2 = NodeCreator.create(P2Link.createLocalLink(7891).toDirect());
+            pubNode1 = NodeCreator.create(Local.forTest(7890));
+            pubNode2 = NodeCreator.create(Local.forTest(7891));
 
             P2LFuture<Boolean> pubPubConFut = pubNode1.establishConnection(pubNode2.getSelfLink());
             assertTrue(pubPubConFut.get(1000));
@@ -667,8 +673,8 @@ class IntermediateTests {
             close(pubNode1, pubNode2);
 
             //hidden - public
-            hidNode1 = NodeCreator.create(P2Link.createLocalLink(7890).toDirect());
-            pubNode2 = NodeCreator.create(P2Link.createLocalLink(7891).toDirect());
+            hidNode1 = NodeCreator.create(Local.forTest(7890));
+            pubNode2 = NodeCreator.create(Local.forTest(7891));
 
             P2LFuture<Boolean> hidPubConFut = hidNode1.establishConnection(pubNode2.getSelfLink());
             assertTrue(hidPubConFut.get(1000));
@@ -676,13 +682,13 @@ class IntermediateTests {
             close(hidNode1, pubNode2);
 
             //public - hidden (using relay)
-            pubNode1 = NodeCreator.create(P2Link.createLocalLink(7890).toDirect());
-            hidNode2 = NodeCreator.create(P2Link.createLocalLink(7891).toDirect());
+            pubNode1 = NodeCreator.create(Local.forTest(7890));
+            hidNode2 = NodeCreator.create(Local.forTest(7891));
 
             //not possible: hidden node is hidden, link is unknown
 //        P2LFuture<Boolean> pubHidConFut = pubNode1.establishConnection(hidNode2.getSelfLink());
 //        assertTrue(pubHidConFut.get(1000));
-            pubRelayNode3 = NodeCreator.create(P2Link.createLocalLink(7892).toDirect());
+            pubRelayNode3 = NodeCreator.create(Local.forTest(7892));
             P2LFuture<Boolean> pubRelayConFut = pubNode1.establishConnection(pubRelayNode3.getSelfLink());
             P2LFuture<Boolean> hidRelayConFut = hidNode2.establishConnection(pubRelayNode3.getSelfLink());
             assertTrue(pubRelayConFut.get(1000) && hidRelayConFut.get(1000));
@@ -696,9 +702,9 @@ class IntermediateTests {
             close(pubNode1, hidNode2, pubRelayNode3);
 
             //hidden - hidden (using relay)
-            hidNode1 = NodeCreator.create(P2Link.createLocalLink(7890).toDirect());
-            hidNode2 = NodeCreator.create(P2Link.createLocalLink(7891).toDirect());
-            pubRelayNode3 = NodeCreator.create(P2Link.createLocalLink(7892).toDirect());
+            hidNode1 = NodeCreator.create(Local.forTest(7890));
+            hidNode2 = NodeCreator.create(Local.forTest(7891));
+            pubRelayNode3 = NodeCreator.create(Local.forTest(7892));
             P2LFuture<Boolean> hidRelayConFut1 = hidNode1.establishConnection(pubRelayNode3.getSelfLink());
             P2LFuture<Boolean> hidRelayConFut2 = hidNode2.establishConnection(pubRelayNode3.getSelfLink());
             assertTrue(hidRelayConFut1.get(1000) && hidRelayConFut2.get(1000));
@@ -716,14 +722,14 @@ class IntermediateTests {
     }
 
     @Test void conversationIdTest() throws IOException {
-        P2LNodeInternal parent = (P2LNodeInternal) NodeCreator.create(P2Link.createLocalLink(60943).toDirect());
+        P2LNodeInternal parent = (P2LNodeInternal) NodeCreator.create(Local.forTest(60943));
         for(int i=0;i<Short.MAX_VALUE*2;i++) {
-            short gen = EstablishConnectionProtocol.createConversationForInitialDirect(parent);
+            short gen = RelayedConnectionProtocol.createConversationForInitialDirect(parent);
             assertTrue(gen < 0);
         }
 
         for(int i=0;i<Short.MAX_VALUE*2;i++) {
-            short gen = EstablishConnectionProtocol.createConversationForReverse(parent);
+            short gen = RelayedConnectionProtocol.createConversationForRelay(parent);
             assertTrue(gen > 0);
         }
     }
@@ -770,7 +776,7 @@ class IntermediateTests {
 
     static void printPeers(P2LNode... nodes) {
         for (int i = 0; i < nodes.length; i++)
-            System.out.println("node " + i + "("+nodes[i].getSelfLink()+") peers("+nodes[i].getEstablishedConnections().size()+"): " + nodes[i].getEstablishedConnections());
+            System.out.println("node " + i + "("+nodes[i].getSelfLink()+") peers("+nodes[i].getEstablishedConnections().length+"): " + Arrays.toString(nodes[i].getEstablishedConnections()));
     }
 
     public static P2LNode[] generateNodes(int size, int startPort) throws IOException {
@@ -781,7 +787,7 @@ class IntermediateTests {
         P2Link[] links = new P2Link[nodes.length];
         for(int i=0;i<nodes.length;i++) {
             int port = startPort + i;
-            links[i] = P2Link.createLocalLink(port).toDirect();
+            links[i] = Local.forTest(port).unsafeAsDirect();
             nodes[i] = P2LNode.create(links[i]);
             if(idvListenerCreator != null)
                 nodes[i].addMessageListener(idvListenerCreator.apply(links[i]));

@@ -1,15 +1,18 @@
 package jokrey.utilities.network.link2peer;
 
 import jokrey.utilities.network.link2peer.node.conversation.ConversationAnswererChangeThisName;
-import jokrey.utilities.network.link2peer.node.core.NodeCreator;
 import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
+import jokrey.utilities.network.link2peer.node.core.HistoricConnection;
+import jokrey.utilities.network.link2peer.node.core.NodeCreator;
+import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes;
 import jokrey.utilities.network.link2peer.node.stream.*;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -120,12 +123,13 @@ public interface P2LNode {
     /**
      * @return currently active peer links, the links can be used as ids to identify individual peer nodes
      * Note: It is not guaranteed that any peer in the returned set is still active when used.
+     * DO NOT MODIFY RETURNED SET
      */
-    Set<P2Link> getEstablishedConnections();
+    P2LConnection[] getEstablishedConnections();
     /**
      * @return addresses of peers that this node had previously maintained an established connection, the connections however have since timed out or proven to be unreliable and were therefore closed
      */
-    Set<P2Link> getPreviouslyEstablishedConnections();
+    HistoricConnection[] getPreviouslyEstablishedConnections();
 
     /** @return whether any more connections can be established or the final limit has already been reached */
     boolean connectionLimitReached();
@@ -156,21 +160,29 @@ public interface P2LNode {
      * @param to is connected to?
      * @return whether this node is connected to to
      */
-    boolean isConnectedTo(SocketAddress to);
+    boolean isConnectedTo(InetSocketAddress to);
+    InetSocketAddress resolve(P2Link link);
+    InetSocketAddress resolveByName(String link);
+    P2LConnection getConnection(P2Link link);
+    P2LConnection getConnection(InetSocketAddress address);
 
     /**
      * Sends a disconnect request to the node at the given address.
      * Additionally it marks from as a broken connection and removes it from established connections.
      * @param from node address to disconnect from
      */
-    void disconnectFrom(P2Link from);
+    void disconnectFrom(P2LConnection from);
+    /**@see #disconnectFrom(P2LConnection) */
+    default void disconnectFrom(P2Link link) {
+        disconnectFrom(getConnection(link));
+    }
 
     /**
      * Gracefully closes all connections to peers and makes sure to add them to the list of historic connections.
      * Should be used when closing the application or
      */
     default void disconnectFromAll() {
-        for(P2Link connectionLink: getEstablishedConnections()) {
+        for(P2LConnection connectionLink: getEstablishedConnections()) {
             disconnectFrom(connectionLink);
         }
     }
@@ -185,10 +197,10 @@ public interface P2LNode {
 
     /** Blocking. */
     default List<P2Link> queryKnownLinksOf(P2Link from) throws IOException {
-        return queryKnownLinksOf(from.getSocketAddress());
+        return queryKnownLinksOf(resolve(from));
     }
     /** Blocking. */
-    List<P2Link> queryKnownLinksOf(SocketAddress from) throws IOException;
+    List<P2Link> queryKnownLinksOf(InetSocketAddress from) throws IOException;
 
 
     /**
@@ -202,7 +214,7 @@ public interface P2LNode {
      * @return a future for the requested self link as seen by the specified peer
      * @throws IOException if the send went to garbage
      */
-    P2LFuture<P2Link> whoAmI(SocketAddress requestFrom) throws IOException;
+    P2LFuture<P2Link> whoAmI(InetSocketAddress requestFrom) throws IOException;
 
     /**
      * Sends the given message to the given address.
@@ -211,10 +223,10 @@ public interface P2LNode {
      * @param message message to send
      * @throws IOException if the send went to garbage
      */
-    void sendMessage(SocketAddress to, P2LMessage message) throws IOException;
-    /**@see #sendMessage(SocketAddress, P2LMessage)*/
+    void sendMessage(InetSocketAddress to, P2LMessage message) throws IOException;
+    /**@see #sendMessage(InetSocketAddress, P2LMessage)*/
     default void sendMessage(P2Link to, P2LMessage message) throws IOException {
-        sendMessage(to.getSocketAddress(), message);
+        sendMessage(resolve(to), message);
     }
 
     /**
@@ -229,11 +241,11 @@ public interface P2LNode {
      * @return a future indicating the receival of a receipt for the send message
      * @throws IOException if the send went to garbage
      */
-    P2LFuture<Boolean> sendMessageWithReceipt(SocketAddress to, P2LMessage message) throws IOException;
-    /**@see #sendMessageWithReceipt(SocketAddress, P2LMessage)*/
+    P2LFuture<Boolean> sendMessageWithReceipt(InetSocketAddress to, P2LMessage message) throws IOException;
+    /**@see #sendMessageWithReceipt(InetSocketAddress, P2LMessage)*/
     default P2LFuture<Boolean> sendMessageWithReceipt(P2Link to, P2LMessage message) throws IOException {
         //todo - reverse lookup of 'to' in order to get the best, most direct ip
-        return sendMessageWithReceipt(to.getSocketAddress(), message);
+        return sendMessageWithReceipt(resolve(to), message);
     }
 
     /**
@@ -251,15 +263,15 @@ public interface P2LNode {
      * @param initialTimeout initial timeout - since doubled with each retry, max timeout is: (initialTimeout * 2^retries)
      * @throws IOException if any send went to garbage
      */
-    boolean sendMessageWithRetries(SocketAddress to, P2LMessage message, int attempts, int initialTimeout) throws IOException;
-    /**@see #sendMessageWithRetries(SocketAddress, P2LMessage, int, int)*/
+    boolean sendMessageWithRetries(InetSocketAddress to, P2LMessage message, int attempts, int initialTimeout) throws IOException;
+    /**@see #sendMessageWithRetries(InetSocketAddress, P2LMessage, int, int)*/
     default void sendMessageWithRetries(P2Link to, P2LMessage message, int attempts, int initialTimeout) throws IOException {
-        sendMessageWithRetries(to.getSocketAddress(), message, attempts, initialTimeout);
+        sendMessageWithRetries(resolve(to), message, attempts, initialTimeout);
     }
-    boolean sendMessageWithRetries(SocketAddress to, P2LMessage message, int attempts) throws IOException;
-    /**@see #sendMessageWithRetries(SocketAddress, P2LMessage, int, int)*/
+    boolean sendMessageWithRetries(InetSocketAddress to, P2LMessage message, int attempts) throws IOException;
+    /**@see #sendMessageWithRetries(InetSocketAddress, P2LMessage, int, int)*/
     default void sendMessageWithRetries(P2Link to, P2LMessage message, int attempts) throws IOException {
-        sendMessageWithRetries(to.getSocketAddress(), message, attempts);
+        sendMessageWithRetries(resolve(to), message, attempts);
     }
 
 
@@ -275,10 +287,10 @@ public interface P2LNode {
      * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
      * @return the created future
      */
-    P2LFuture<P2LMessage> expectMessage(SocketAddress from, int messageType);
-    /**@see #expectMessage(SocketAddress, int)*/
+    P2LFuture<P2LMessage> expectMessage(InetSocketAddress from, int messageType);
+    /**@see #expectMessage(InetSocketAddress, int)*/
     default P2LFuture<P2LMessage> expectMessage(P2Link from, int messageType) {
-        return expectMessage(from.getSocketAddress(), messageType);
+        return expectMessage(resolve(from), messageType);
     }
 
     /**
@@ -288,10 +300,10 @@ public interface P2LNode {
      * @param conversationId the conversation id of the message
      * @return the created future
      */
-    P2LFuture<P2LMessage> expectMessage(SocketAddress from, int type, int conversationId);
-    /**@see #expectMessage(SocketAddress, int, int)*/
+    P2LFuture<P2LMessage> expectMessage(InetSocketAddress from, int type, int conversationId);
+    /**@see #expectMessage(InetSocketAddress, int, int)*/
     default P2LFuture<P2LMessage> expectMessage(P2Link from, int messageType, int conversationId) {
-        return expectMessage(from.getSocketAddress(), messageType, conversationId);
+        return expectMessage(resolve(from), messageType, conversationId);
     }
 
     /**
@@ -323,22 +335,22 @@ public interface P2LNode {
      * @return a stream representation of the connection - with the associated guarantees
      * @see P2LOrderedInputStream
      */
-    P2LOrderedInputStream createInputStream(SocketAddress from, int messageType, int conversationId);
-    /**@see #createInputStream(SocketAddress, int, int)*/
+    P2LOrderedInputStream createInputStream(InetSocketAddress from, int messageType, int conversationId);
+    /**@see #createInputStream(InetSocketAddress, int, int)*/
     default P2LOrderedInputStream createInputStream(P2Link from, int messageType, int conversationId) {
-        return createInputStream(from.getSocketAddress(), messageType, conversationId);
+        return createInputStream(resolve(from), messageType, conversationId);
     }
-    boolean registerCustomInputStream(SocketAddress from, int messageType, int conversationId, P2LInputStream inputStream);
-    boolean registerCustomOutputStream(SocketAddress to, int messageType, int conversationId, P2LOutputStream outputStream);
+    boolean registerCustomInputStream(InetSocketAddress from, int messageType, int conversationId, P2LInputStream inputStream);
+    boolean registerCustomOutputStream(InetSocketAddress to, int messageType, int conversationId, P2LOutputStream outputStream);
 
     /**
      * Returns the stream for the given identifier. It is possible to have up to (2^31-1) * (2^31-1) streams from a single source (todo this is absolutely idiotic - who would EVER need THAT many different streams)
      * The multiple streams can be used for comfortable parallel upload or communication without establishing multiple, 'real' connections.
      *
-     * Note: Before a peer can receive data {@link #createInputStream(SocketAddress, int, int)} has to be called with the same typ-conversationId combination on the peer side.
+     * Note: Before a peer can receive data {@link #createInputStream(InetSocketAddress, int, int)} has to be called with the same typ-conversationId combination on the peer side.
      * Before that has occurred it is useless to send data. Appropriate synchronization remains the responsibility of the application.
      *
-     * Tcp-like, most simple synchronization would be to call both {@link #createInputStream(SocketAddress, int, int)} and {@link #createOutputStream(SocketAddress, int, int)} when the connection is established (using {@link #addConnectionEstablishedListener(BiConsumer)}).
+     * Tcp-like, most simple synchronization would be to call both {@link #createInputStream(InetSocketAddress, int, int)} and {@link #createOutputStream(InetSocketAddress, int, int)} when the connection is established (using {@link #addConnectionEstablishedListener(BiConsumer)}).
      *
      * @param to the intended receiver of the stream - does not currently have to be an established connection but might have to be in the future
      * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
@@ -346,23 +358,23 @@ public interface P2LNode {
      * @return a stream representation of the connection - with the associated guarantees
      * @see P2LOrderedOutputStream
      */
-    P2LOrderedOutputStream createOutputStream(SocketAddress to, int messageType, int conversationId);
-    /**@see #createOutputStream(SocketAddress, int, int)*/
+    P2LOrderedOutputStream createOutputStream(InetSocketAddress to, int messageType, int conversationId);
+    /**@see #createOutputStream(InetSocketAddress, int, int)*/
     default P2LOrderedOutputStream createOutputStream(P2Link to, int messageType, int conversationId) {
-        return createOutputStream(to.getSocketAddress(), messageType, conversationId);
+        return createOutputStream(resolve(to), messageType, conversationId);
     }
 
-    /**@see #createInputStream(SocketAddress, int, int)*/
-    P2LFragmentInputStream createFragmentInputStream(SocketAddress from, int messageType, int conversationId);
-    /**@see #createInputStream(SocketAddress, int, int)*/
+    /**@see #createInputStream(InetSocketAddress, int, int)*/
+    P2LFragmentInputStream createFragmentInputStream(InetSocketAddress from, int messageType, int conversationId);
+    /**@see #createInputStream(InetSocketAddress, int, int)*/
     default P2LFragmentInputStream createFragmentInputStream(P2Link from, int messageType, int conversationId) {
-        return createFragmentInputStream(from.getSocketAddress(), messageType, conversationId);
+        return createFragmentInputStream(resolve(from), messageType, conversationId);
     }
-    /**@see #createOutputStream(SocketAddress, int, int)*/
-    P2LFragmentOutputStream createFragmentOutputStream(SocketAddress to, int messageType, int conversationId);
-    /**@see #createOutputStream(SocketAddress, int, int)*/
+    /**@see #createOutputStream(InetSocketAddress, int, int)*/
+    P2LFragmentOutputStream createFragmentOutputStream(InetSocketAddress to, int messageType, int conversationId);
+    /**@see #createOutputStream(InetSocketAddress, int, int)*/
     default P2LFragmentOutputStream createFragmentOutputStream(P2Link to, int messageType, int conversationId) {
-        return createFragmentOutputStream(to.getSocketAddress(), messageType, conversationId);
+        return createFragmentOutputStream(resolve(to), messageType, conversationId);
     }
 
     /**
@@ -437,9 +449,9 @@ public interface P2LNode {
 
     void registerConversationFor(int type, ConversationAnswererChangeThisName handler);
     default P2LConversation convo(int type, P2Link to) {
-        return convo(type, to.getSocketAddress());
+        return convo(type, resolve(to));
     }
-    P2LConversation convo(int type, SocketAddress to);
+    P2LConversation convo(int type, InetSocketAddress to);
 
     P2LFuture<Integer> executeThreaded(P2LThreadPool.Task... tasks);
 
@@ -461,12 +473,12 @@ public interface P2LNode {
      * The given listener will receive all newly established connections.
      * @param listener listener to add
      */
-    void addConnectionEstablishedListener(BiConsumer<P2Link, Integer> listener);
+    void addConnectionEstablishedListener(BiConsumer<InetSocketAddress, Integer> listener);
     /**
      * The given listener will receive all disconnected connections.
      * @param listener listener to add
      */
-    void addConnectionDroppedListener(Consumer<P2Link> listener);
+    void addConnectionDroppedListener(Consumer<InetSocketAddress> listener);
 
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
@@ -476,10 +488,10 @@ public interface P2LNode {
     void removeBroadcastListener(P2LMessageListener listener);
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
-    void removeConnectionEstablishedListener(BiConsumer<P2Link, Integer> listener);
+    void removeConnectionEstablishedListener(BiConsumer<InetSocketAddress, Integer> listener);
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
-    void removeConnectionDroppedListener(Consumer<P2Link> listener);
+    void removeConnectionDroppedListener(Consumer<InetSocketAddress> listener);
     /** Trivial message listener - dual use for direct messages and broadcasts */
     interface P2LMessageListener { void received(P2LMessage message);}
 }

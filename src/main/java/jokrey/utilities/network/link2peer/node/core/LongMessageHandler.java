@@ -6,7 +6,7 @@ import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.HeaderIdentifier;
 
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -48,7 +48,7 @@ class LongMessageHandler {
         }
     }
 
-    void send(P2LNodeInternal parent, P2LMessage overLongMessage, SocketAddress to) throws IOException {
+    void send(P2LNodeInternal parent, P2LMessage overLongMessage, InetSocketAddress to) throws IOException {
         if(overLongMessage.canBeSentInSinglePacket()) throw new IllegalArgumentException("message could be send in a single packet...");
         int maxPayloadSize = P2LMessage.CUSTOM_RAW_SIZE_LIMIT -
                 P2LMessageHeader.getSize(overLongMessage.header.isConversationIdPresent(), overLongMessage.header.isExpirationPresent(), overLongMessage.header.isStepPresent(), true, false, false);

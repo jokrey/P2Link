@@ -1,152 +1,210 @@
 package jokrey.utilities.network.link2peer;
 
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 /**
- * Link requirements
- *       String representations
- *              For broadcast messages
- *              For relaying connections to other peers so they may establish connections to it
- *              For establishing connections
- *           String representation must:
- *              Allow dns and ip addresses
- *              Contain ports
- *              Allow being 'light peer links' - i.e. links to a relay server with an id
- *                    Hidden links are automatically created when a hidden node(i.e. a node that does not know its own public ip) connects
+ * Only to be used by higher level operations
+ *    such as user operations, connect or others
+ *    NOT to be used by low level constructs (those should use the resolved, raw socket addresses)
  *
  * @author jokrey
  */
-public class P2Link {
-    private String stringRepresentation;
-    private final InetSocketAddress rawAddr;
-    private final int port;
-    private final P2Link relayServerLink;
+public abstract class P2Link {
+    // technically it is not possible to distinguish a public link from a link behind a nat or only local
+    //   we could do heuristics, but we can also not do that.
+//    public abstract boolean isPublic();
+    public abstract boolean isDirect();
+    public abstract boolean isRelayed();
+    public abstract boolean isOnlyLocal();
 
-    private P2Link(String stringRepresentation, InetSocketAddress rawAddr, P2Link relayServerLink, int port) {
-//        if(rawAddr!=null && rawAddr.getAddress().getCanonicalHostName().equals("localhost"))
-//            rawAddr=null;
-        this.stringRepresentation = stringRepresentation;
-        this.rawAddr = rawAddr;
-        this.port = port;
-        this.relayServerLink = relayServerLink;
+    public abstract int getPort();
+    public abstract InetSocketAddress resolve();
 
-        //todo
-//        if(relayServerLink!=null && relayServerLink.getSocketAddress() == null)
-//            throw new IllegalArgumentException("relay server link cannot be hidden");
-    }
-
-    public static P2Link fromStringEnsureRelayLinkAvailable(String raw, InetSocketAddress to) {
-        P2Link link = fromString(raw);
-        if(link.isHiddenLink() && !link.relayServerLink.isDirectLink())
-            return new P2Link(null, link.getSocketAddress(), P2Link.createDirectLink(to), link.getPort());
-        return link;
-    }
-
-    public int getPort() {
-        return port;
-    }
-    public InetSocketAddress getSocketAddress() { return rawAddr; }
-    public SocketAddress getRelaySocketAddress() {
-        return relayServerLink.getSocketAddress();
-    }
-    public P2Link getRelayLink() {
-        return relayServerLink;
-    }
-
-    public boolean isDirectLink() {
-        return relayServerLink ==null && rawAddr != null;
-    }
-    public boolean isHiddenLink() {
-        return relayServerLink != null && rawAddr != null;
-    }
-    public boolean isLocalLink() {
-        return rawAddr == null;
-    }
-
-    /** Resolves local link to the localhost:port combination. NOTE: The resulting link will return 'isPublicLink' == true */
-    public P2Link toDirect() {return new P2Link(null, new InetSocketAddress("localhost", port), relayServerLink, port);}
-
-    public P2Link toHidden(P2Link relayLink) {
-        if(isLocalLink()) return new P2Link(null, new InetSocketAddress("localhost", port), relayLink, port);
-        if(isHiddenLink()) return new P2Link(null, rawAddr, relayLink, port); //overwrite existing relay link
-        if(isDirectLink()) return new P2Link(null, rawAddr, relayLink, port);
-        throw new IllegalStateException("impossible - cannot be not local, hidden and direct at the same time");
-    }
-
-    public String getStringRepresentation() {
-        //todo
-        if(stringRepresentation==null) {
-            if(rawAddr==null) //private/local/unknown link
-                stringRepresentation = Integer.toString(port);
-            else if(relayServerLink ==null) //public link
-                stringRepresentation = rawAddr.getAddress().getHostName() + ":" + rawAddr.getPort();
-            else {//hidden link
-                stringRepresentation = rawAddr.getAddress().getHostName() + ":" + rawAddr.getPort() + "(relay="+relayServerLink.getStringRepresentation()+")";
-            }
-        }
-        return stringRepresentation;
-    }
-    public byte[] getBytesRepresentation() {
-        return getStringRepresentation().getBytes(StandardCharsets.UTF_8);
-    }
 
     /**
-     * @param stringRepresentation of the form: <port> || <ip/dns>:<port> || <ip/dns>:<port>(relay=<ip/dns>:<port>)
-     * @return p2link or throws error
-     */
-    public static P2Link fromString(String stringRepresentation) {
-        if(stringRepresentation.contains("(")) { //hidden
-            String[] splitOuter = stringRepresentation.split("\\(relay=");
-            String[] split = splitOuter[0].split(":");
-            return P2Link.createHiddenLink(fromString(splitOuter[1].replace(")","")), new InetSocketAddress(split[0], Integer.parseInt(split[1])));
-        } else if(stringRepresentation.contains(":")) {//public, because already not hidden
-            String[] split = stringRepresentation.split(":");
-            return P2Link.createDirectLink(split[0], Integer.parseInt(split[1]));
+     * {@code
+     * Format:
+     *   direct link:
+     *      <ip/dns>:<port>
+     *   relayed link:
+     *      <name>[<direct link of relay server>]
+     *   local link:
+     *      <name>-at-<port>
+     *}
+     * if input is null, result is null
+     * @throws RuntimeException if not correct (i.e. not created by this objects toString method) */
+    public static P2Link from(String representation) {
+        if(representation == null) return null;
+        if(representation.contains("[")) {
+            return Relayed.from(representation);
+        } else if(representation.contains("-at-")) {
+            return Local.from(representation);
         } else {
-            return P2Link.createLocalLink(Integer.parseInt(stringRepresentation));
+            return Direct.from(representation);
         }
     }
-    public static P2Link fromBytes(byte[] asBytes) {
-        return fromString(new String(asBytes, StandardCharsets.UTF_8));
+
+    //todo - more efficient representation likely possible
+    public static P2Link from(byte[] representation) {
+        return from(new String(representation, StandardCharsets.UTF_8));
+    }
+    public byte[] toBytes() {
+        return toString().getBytes(StandardCharsets.UTF_8);
     }
 
 
 
+    public static class Direct extends P2Link {
+        public final String dnsOrIp;
+        public final int port;
+
+        public Direct(String dnsOrIp, int port) {
+            this.dnsOrIp = dnsOrIp;
+            this.port = port;
+        }
+        public Direct(InetSocketAddress raw) {
+            this(raw.getHostName(), raw.getPort());
+        }
+
+        @Override public boolean isDirect() { return true; }
+        @Override public boolean isRelayed() { return false; }
+        @Override public boolean isOnlyLocal() { return false; }
 
 
+        /** @throws RuntimeException if not correct (i.e. not created by this objects toString method) */
+        public static Direct from(String representation) {
+            String[] split = representation.split(":");
+            return new Direct(split[0], Integer.parseInt(split[1]));
+        }
+        @Override public String toString() {
+            return dnsOrIp + ':' + port;
+        }
 
-    public static P2Link createDirectLink(String publicIpOrDns, int port) {
-        return new P2Link(publicIpOrDns+":"+port, new InetSocketAddress(publicIpOrDns, port), null, port);
+        @Override public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Direct direct = (Direct) o;
+            return port == direct.port && Objects.equals(dnsOrIp, direct.dnsOrIp);
+        }
+        @Override public int hashCode() {
+            return Objects.hash(dnsOrIp, port);
+        }
+
+        @Override public InetSocketAddress resolve() {
+            return new InetSocketAddress(dnsOrIp, port);
+        }
+        @Override public int getPort() { return port; }
     }
-    public static P2Link createDirectLink(InetSocketAddress socketAddress) {
-        return new P2Link(null, socketAddress, null, socketAddress.getPort());
-    }
-    public static P2Link raw(SocketAddress socketAddress) {
-        return createDirectLink((InetSocketAddress) socketAddress);
-    }
-
-    public static P2Link createHiddenLink(P2Link relayServerLink, InetSocketAddress naiveAddress) {
-        return new P2Link(null, naiveAddress, relayServerLink, naiveAddress.getPort());
-    }
-
-    public static P2Link createLocalLink(int port) {
-        return new P2Link( port+"", null, null, port);
-    }
 
 
 
-    @Override public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        return Objects.equals(getStringRepresentation(), ((P2Link) o).getStringRepresentation());
+    //NOTE: EQUALS AND HASH CODE ONLY BY NAME - WILL SHOW EQUALITY WITH LOCAL
+    public static class Relayed extends P2Link {
+        public final String name;
+        public final Direct relayLink;
+
+        public Relayed(String name, Direct relayLink) {
+            this.name = name;
+            this.relayLink = relayLink;
+        }
+
+        @Override public boolean isDirect() {
+            return false;
+        }
+        @Override public boolean isRelayed() {
+            return true;
+        }
+        @Override public boolean isOnlyLocal() {
+            return false;
+        }
+
+        /** @throws RuntimeException if not correct (i.e. not created by this objects toString method) */
+        public static Relayed from(String representation) {
+            String[] split = representation.split("\\[");
+            return new Relayed(split[0], Direct.from(split[1].substring(0, split[1].length()-1)));
+        }
+
+        @Override public String toString() {
+            return name + '[' + relayLink + ']';
+        }
+
+        @Override public boolean equals(Object o) {
+            if (this == o) return true;
+            if(o instanceof Relayed) {
+                Relayed local = (Relayed) o;
+                return Objects.equals(name, local.name);
+            } else if(o instanceof Local) {
+                Local local = (Local) o;
+                return Objects.equals(name, local.name);
+            } else
+                return false;
+        }
+        @Override public int hashCode() {
+            return Objects.hash(name);
+        }
+
+        @Override public InetSocketAddress resolve() {
+            throw new UnsupportedOperationException("resolve not supported for relayed links. Try connection via relay link and use P2LNode.resolveLink(to)");
+        }
+        @Override public int getPort() {
+            throw new UnsupportedOperationException("Port is unknown for relayed connections (as it can be changed by intermediate NATs)");
+        }
     }
-    @Override public int hashCode() {
-        return Objects.hash(getStringRepresentation());
-    }
-    @Override public String toString() {
-        return getStringRepresentation();
+
+    //NOTE: EQUALS AND HASH CODE ONLY BY NAME - WILL SHOW EQUALITY WITH RELAYED
+    public static class Local extends P2Link {
+        public final String name;
+        public final int port;
+
+        public Local(String name, int port) {
+            this.name = name;
+            this.port = port;
+        }
+        public static Local forTest(int port) {
+            return new Local(Integer.toString(port), port);
+        }
+
+        @Override public boolean isDirect() { return false; }
+        @Override public boolean isRelayed() { return false; }
+        @Override public boolean isOnlyLocal() { return true; }
+
+
+        /** @throws RuntimeException if not correct (i.e. not created by this objects toString method) */
+        public static Local from(String representation) {
+            String[] split = representation.split("-at-");
+            return new Local(split[0], Integer.parseInt(split[1]));
+        }
+        @Override public String toString() {
+            return name + "-at-" + port;
+        }
+
+        @Override public boolean equals(Object o) {
+            if (this == o) return true;
+            if(o instanceof Local) {
+                Local local = (Local) o;
+                return Objects.equals(name, local.name);
+            } else if(o instanceof Relayed) {
+                Relayed local = (Relayed) o;
+                return Objects.equals(name, local.name);
+            } else
+                return false;
+        }
+        @Override public int hashCode() {
+            return Objects.hash(name);
+        }
+
+        @Override public InetSocketAddress resolve() {
+            return new InetSocketAddress("localhost", port);
+        }
+        @Override public int getPort() { return port; }
+
+        public P2Link withRelay(Direct direct) {
+            return new P2Link.Relayed(name, direct);
+        }
+        public Direct unsafeAsDirect() {
+            return new Direct("localhost", port);
+        }
     }
 }

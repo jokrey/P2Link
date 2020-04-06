@@ -28,7 +28,7 @@ public class RendezvousServer implements AutoCloseable {
     public static final int CALLBACK_TIMEOUT = 10000;
 
     public static void main(String[] args) throws IOException {
-        P2Link selfLink = args.length == 0? P2Link.createDirectLink("lmservicesip.ddns.net", 40000) : args.length==1? P2Link.fromString(args[0]) : P2Link.createDirectLink(args[0], Integer.parseInt(args[1]));
+        P2Link selfLink = args.length == 0? new P2Link.Direct("lmservicesip.ddns.net", 40000) : args.length==1? P2Link.from(args[0]) : new P2Link.Direct(args[0], Integer.parseInt(args[1]));
         RendezvousServer server = new RendezvousServer(selfLink);
 
         System.out.println("selfLink = " + selfLink);
@@ -55,8 +55,9 @@ public class RendezvousServer implements AutoCloseable {
             convo.pause();
 
             IdentityTriple originalId = IdentityTriple.decodeNext(m0);
-            IdentityTriple id = originalId.address.isLocalLink() ?
-                    originalId.withRelayLinkInAddress(selfLink) : originalId;
+            IdentityTriple id = //originalId.address.isOnlyLocal() ? //todo dododo
+                   // originalId.withRelayLinkInAddress(selfLink) :
+                    originalId;
 
             ArrayList<String> requestedContacts = new ArrayList<>();
             String contactName;
@@ -173,42 +174,38 @@ public class RendezvousServer implements AutoCloseable {
     public static class IdentityTriple {
         public final String name;
         public final byte[] publicKey;
-        public final P2Link address;
+        public final P2Link link;
 
-        public IdentityTriple(String name, byte[] publicKey, P2Link address) {
+        public IdentityTriple(String name, byte[] publicKey, P2Link link) {
             this.name = name;
             this.publicKey = publicKey;
-            this.address = address;
+            this.link = link;
         }
 
         MessageEncoder encodeInto(MessageEncoder encoder) {
             encoder.encodeVariableString(name);
             encoder.encodeVariable(publicKey);
-            encoder.encodeVariable(address.getBytesRepresentation());
+            encoder.encodeVariable(link.toBytes());
             return encoder;
         }
         static IdentityTriple decodeNext(P2LMessage m) {
             String name = m.nextVariableString();
             byte[] publicKey = m.nextVariable();
-            P2Link address = P2Link.fromBytes(m.nextVariable());
-            return new IdentityTriple(name, publicKey, address);
+            P2Link link = P2Link.from(m.nextVariable());
+            return new IdentityTriple(name, publicKey, link);
         }
 
         @Override public String toString() {
-            return "IdentityTriple{" + "name='" + name + '\'' + ", publicKey=" + Arrays.toString(publicKey) + ", address=" + address + '}';
+            return "IdentityTriple{" + "name='" + name + '\'' + ", publicKey=" + Arrays.toString(publicKey) + ", address=" + link + '}';
         }
         @Override public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             IdentityTriple that = (IdentityTriple) o;
-            return Objects.equals(name, that.name) && Arrays.equals(publicKey, that.publicKey) && Objects.equals(address, that.address);
+            return Objects.equals(name, that.name) && Arrays.equals(publicKey, that.publicKey) && Objects.equals(link, that.link);
         }
         @Override public int hashCode() {
-            return 31 * Objects.hash(name, address) + Arrays.hashCode(publicKey);
-        }
-
-        private IdentityTriple withRelayLinkInAddress(P2Link relayLink) {
-            return new IdentityTriple(name, publicKey, address.toHidden(relayLink));
+            return 31 * Objects.hash(name, link) + Arrays.hashCode(publicKey);
         }
     }
 }

@@ -5,7 +5,7 @@ import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.*;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 import java.util.*;
 
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.*;
@@ -37,11 +37,11 @@ public class P2LMessageQueue {
         }
         return future;
     }
-    synchronized P2LFuture<P2LMessage> futureFor(SocketAddress from, short messageType) {
+    synchronized P2LFuture<P2LMessage> futureFor(InetSocketAddress from, short messageType) {
         if(from == null) return futureFor(messageType);
         return futureFor(from, messageType, NO_CONVERSATION_ID);
     }
-    synchronized P2LFuture<P2LMessage> futureFor(SocketAddress from, short messageType, short conversationId) {
+    synchronized P2LFuture<P2LMessage> futureFor(InetSocketAddress from, short messageType, short conversationId) {
         if(from == null) throw new NullPointerException("from cannot be null here");
 
         SenderTypeConversationIdentifier request = new SenderTypeConversationIdentifier(from, messageType, conversationId);
@@ -58,16 +58,16 @@ public class P2LMessageQueue {
         return future;
     }
 
-    public synchronized P2LFuture<P2LMessage> futureFor(SocketAddress from, short messageType, short conversationId, short step) {
+    public synchronized P2LFuture<P2LMessage> futureFor(InetSocketAddress from, short messageType, short conversationId, short step) {
         if(from == null) return futureFor(messageType);
         System.out.println("futureFor - from = [" + from + "], messageType = [" + messageType + "], conversationId = [" + conversationId + "], step = [" + step + "]");
         return futureFor(new SenderTypeConversationIdStepIdentifier(from, messageType, conversationId, step));
     }
-    synchronized P2LFuture<P2LMessage> receiptFutureFor(SocketAddress from, short messageType, short conversationId) {
+    synchronized P2LFuture<P2LMessage> receiptFutureFor(InetSocketAddress from, short messageType, short conversationId) {
         if(from == null) return futureFor(messageType);
         return futureFor(new ReceiptIdentifier(from, messageType, conversationId));
     }
-    public synchronized P2LFuture<P2LMessage> receiptFutureFor(SocketAddress from, short messageType, short conversationId, short step) {
+    public synchronized P2LFuture<P2LMessage> receiptFutureFor(InetSocketAddress from, short messageType, short conversationId, short step) {
         if(from == null) return futureFor(messageType);
         System.out.println("receiptFutureFor - from = [" + from + "], messageType = [" + messageType + "], conversationId = [" + conversationId + "], step = [" + step + "]");
         return futureFor(new StepReceiptIdentifier(from, messageType, conversationId, step));

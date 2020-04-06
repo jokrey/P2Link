@@ -1,6 +1,6 @@
 package jokrey.utilities.network.link2peer.node.message_headers;
 
-import jokrey.utilities.network.link2peer.P2Link;
+import java.net.InetSocketAddress;
 
 /**
  * todo 64 bit offsets (MAYBE: HIGH PRECISION FLAG IN HEADER THAT IS ACTIVATED ON THE FLY ONLY IF REQUIRED)
@@ -10,7 +10,7 @@ import jokrey.utilities.network.link2peer.P2Link;
 public class StreamPartHeader extends ConversationHeader {
     public int index;
     private final boolean eofIndicator;
-    public StreamPartHeader(P2Link sender, short type, short conversationId, short step, int index, boolean requestReceipt, boolean eofIndicator) {
+    public StreamPartHeader(InetSocketAddress sender, short type, short conversationId, short step, int index, boolean requestReceipt, boolean eofIndicator) {
         super(sender, type, conversationId, step, requestReceipt);
 
         this.index = index;

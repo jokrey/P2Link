@@ -8,7 +8,7 @@ import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.
 import jokrey.utilities.network.link2peer.node.message_headers.StreamReceiptHeader;
 
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -26,25 +26,25 @@ public class StreamMessageHandler {
             //todo - also we will send a package for a received package without knowledge of whether that is valid.
             System.out.println("received message for unknown in stream");
             P2LMessage defaultReceipt = new StreamReceiptHeader(null, message.header.getType(), message.header.getConversationId(), message.header.getStep(), true).generateMessage(new byte[0]);
-            parent.sendInternalMessage(message.header.getSender().getSocketAddress(), defaultReceipt);
+            parent.sendInternalMessage(message.header.getSender(), defaultReceipt);
         }
         //potentially a delayed package, after a new stream of the same type and conversation id has been created (very, very unlikely in context)
     }
     private P2LInputStream getInputStream(P2LMessage m) {
         return inputStreams.get(new SenderTypeConversationIdStepIdentifier(m));
     }
-    public P2LOrderedInputStream createInputStream(P2LNodeInternal parent, SocketAddress from, P2LConnection con, short type, short conversationId, short step) {
+    public P2LOrderedInputStream createInputStream(P2LNodeInternal parent, InetSocketAddress from, P2LConnection con, short type, short conversationId, short step) {
         if(from == null || parent == null) throw new NullPointerException();
         HeaderIdentifier identifier = new SenderTypeConversationIdStepIdentifier(from, type, conversationId, step);
 //        return (P2LOrderedInputStream) inputStreams.computeIfAbsent(identifier, k -> new P2LOrderedInputStreamImplV1(parent, from, type, conversationId));
         return (P2LOrderedInputStream) inputStreams.computeIfAbsent(identifier, k -> new P2LOrderedInputStreamImplV2(parent, from, con, type, conversationId, step));
     }
-    public P2LFragmentInputStream createFragmentInputStream(P2LNodeInternal parent, SocketAddress from, P2LConnection con, short type, short conversationId, short step) {
+    public P2LFragmentInputStream createFragmentInputStream(P2LNodeInternal parent, InetSocketAddress from, P2LConnection con, short type, short conversationId, short step) {
         if(from == null || parent == null) throw new NullPointerException();
         HeaderIdentifier identifier = new SenderTypeConversationIdStepIdentifier(from, type, conversationId, step);
         return (P2LFragmentInputStream) inputStreams.computeIfAbsent(identifier, k -> new P2LFragmentInputStreamImplV1(parent, from, con, type, conversationId, step));
     }
-    public boolean createCustomInputStream(SocketAddress from, short type, short conversationId, short step, P2LInputStream inputStream) {
+    public boolean createCustomInputStream(InetSocketAddress from, short type, short conversationId, short step, P2LInputStream inputStream) {
         if(from == null) throw new NullPointerException();
         HeaderIdentifier identifier = new SenderTypeConversationIdStepIdentifier(from, type, conversationId, step);
         return inputStreams.putIfAbsent(identifier, inputStream) == null;
@@ -63,18 +63,18 @@ public class StreamMessageHandler {
     private P2LOutputStream getOutputStream(P2LMessage m) {
         return outputStreams.get(new SenderTypeConversationIdStepIdentifier(m));
     }
-    public P2LOrderedOutputStream createOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId, short step) {
+    public P2LOrderedOutputStream createOutputStream(P2LNodeInternal parent, InetSocketAddress to, P2LConnection con, short type, short conversationId, short step) {
         if(parent == null || to == null) throw new NullPointerException();
         HeaderIdentifier identifier = new SenderTypeConversationIdStepIdentifier(to, type, conversationId, step);
 //        return (P2LOrderedOutputStream) outputStreams.computeIfAbsent(identifier, k -> new P2LOrderedOutputStreamImplV1(parent, to, con, type, conversationId));
         return (P2LOrderedOutputStream) outputStreams.computeIfAbsent(identifier, k -> new P2LOrderedOutputStreamImplV2(parent, to, con, type, conversationId, step));
     }
-    public P2LFragmentOutputStream createFragmentOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId, short step) {
+    public P2LFragmentOutputStream createFragmentOutputStream(P2LNodeInternal parent, InetSocketAddress to, P2LConnection con, short type, short conversationId, short step) {
         if(parent == null || to == null) throw new NullPointerException();
         HeaderIdentifier identifier = new SenderTypeConversationIdStepIdentifier(to, type, conversationId, step);
         return (P2LFragmentOutputStream) outputStreams.computeIfAbsent(identifier, k -> new P2LFragmentOutputStreamImplV1(parent, to, con, type, conversationId, step));
     }
-    public boolean registerCustomOutputStream(SocketAddress from, short type, short conversationId, short step, P2LOutputStream outputStream) {
+    public boolean registerCustomOutputStream(InetSocketAddress from, short type, short conversationId, short step, P2LOutputStream outputStream) {
         if(from == null) throw new NullPointerException();
         HeaderIdentifier identifier = new SenderTypeConversationIdStepIdentifier(from, type, conversationId, step);
         return outputStreams.putIfAbsent(identifier, outputStream) == null;

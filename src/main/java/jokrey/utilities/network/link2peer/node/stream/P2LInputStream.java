@@ -3,7 +3,7 @@ package jokrey.utilities.network.link2peer.node.stream;
 import jokrey.utilities.network.link2peer.P2LMessage;
 
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 
 /**
  * An input stream's abstract definition which can be used to receive streams of data from peers.
@@ -16,7 +16,7 @@ public interface P2LInputStream extends AutoCloseable {
     /** Internally used to propagate appropriate raw messages to the stream */
     void received(P2LMessage message);
     /** Internal use only. */
-    SocketAddress getRawFrom();
+    InetSocketAddress getRawFrom();
     /** Internal use only. */
     short getType();
     /** Internal use only. */

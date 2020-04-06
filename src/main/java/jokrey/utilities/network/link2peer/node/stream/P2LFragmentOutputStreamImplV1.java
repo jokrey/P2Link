@@ -10,11 +10,10 @@ import jokrey.utilities.network.link2peer.util.*;
 import jokrey.utilities.simple.data_structure.pairs.Pair;
 
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.ListIterator;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.function.Function;
 
 /**
  *
@@ -64,7 +63,7 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
     private long batch_delay_ms;
 
     private final BatchSizeCalculator batchSizeCalculator;
-    protected P2LFragmentOutputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId, short step) {
+    protected P2LFragmentOutputStreamImplV1(P2LNodeInternal parent, InetSocketAddress to, P2LConnection con, short type, short conversationId, short step) {
         super(parent, to, con, type, conversationId, step);
         int headerSize = new StreamPartHeader(null, type, conversationId, step,0, false, false).getSize();
         packageSize = con==null?1024:con.remoteBufferSize - headerSize;

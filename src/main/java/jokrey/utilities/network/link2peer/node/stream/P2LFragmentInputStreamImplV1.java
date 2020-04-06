@@ -9,7 +9,7 @@ import jokrey.utilities.network.link2peer.util.LongTupleList;
 import jokrey.utilities.network.link2peer.util.SyncHelp;
 
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 
 import static jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputStreamImplV1.DEFAULT_BATCH_DELAY;
 import static jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputStreamImplV1.RECEIPT_DELAY_MULTIPLIER;
@@ -25,7 +25,7 @@ import static jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputSt
 public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
     private int receiptPackageMaxSize;
     long receipt_delay_ms;
-    protected P2LFragmentInputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId, short step) {
+    protected P2LFragmentInputStreamImplV1(P2LNodeInternal parent, InetSocketAddress to, P2LConnection con, short type, short conversationId, short step) {
         super(parent, to, con, type, conversationId, step);
         int headerSize = new StreamReceiptHeader(null, type, conversationId, step,false).getSize();
         receiptPackageMaxSize = con==null?1024:con.remoteBufferSize - headerSize;

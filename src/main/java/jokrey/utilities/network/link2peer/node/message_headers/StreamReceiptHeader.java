@@ -1,12 +1,12 @@
 package jokrey.utilities.network.link2peer.node.message_headers;
 
-import jokrey.utilities.network.link2peer.P2Link;
+import java.net.InetSocketAddress;
 
 /**
  * @author jokrey
  */
 public class StreamReceiptHeader extends ConversationHeader {
-    public StreamReceiptHeader(P2Link sender, short type, short conversationId, short step, boolean eofIndicator) {
+    public StreamReceiptHeader(InetSocketAddress sender, short type, short conversationId, short step, boolean eofIndicator) {
         super(sender, type, conversationId, step, eofIndicator);
 
         //TODO - eofIndicator == REQUEST RECEIPT IS A WEIRD INTERNAL HACK THAT WILL WORK BUT IS A BIT WEIRD SO KEEP THAT IN MIND PLEASE

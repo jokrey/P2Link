@@ -8,7 +8,7 @@ import jokrey.utilities.network.link2peer.util.SyncHelp;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 
 /**
  * todo - ask output stream to slow down if data is not being read...
@@ -23,7 +23,7 @@ public class P2LOrderedInputStreamImplV2 extends P2LOrderedInputStream {
     private int available = 0;
     private byte[] buffer = new byte[P2LHeuristics.ORDERED_STREAM_V2_MAX_BUFFER_SIZE];
 
-    protected P2LOrderedInputStreamImplV2(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId, short step) {
+    protected P2LOrderedInputStreamImplV2(P2LNodeInternal parent, InetSocketAddress to, P2LConnection con, short type, short conversationId, short step) {
         super(parent, to, type, conversationId, step);
         underlyingFragmentStream = new P2LFragmentInputStreamImplV1(parent, to, con, type, conversationId, step);
         underlyingFragmentStream.addFragmentReceivedListener((fragmentOffset, receivedRaw, dataOff, dataLen, eof) -> {

@@ -12,7 +12,7 @@ import jokrey.utilities.network.link2peer.util.SyncHelp;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 import java.util.Arrays;
 
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_STEP;
@@ -56,10 +56,10 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
     private int earliestUnconfirmedPartIndex = 0;
     private int latestAttemptedIndex = -1;
 
-    public P2LOrderedOutputStreamImplV1(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId) {
+    public P2LOrderedOutputStreamImplV1(P2LNodeInternal parent, InetSocketAddress to, P2LConnection con, short type, short conversationId) {
         this(parent, to, (con==null?P2LMessage.CUSTOM_RAW_SIZE_LIMIT:con.remoteBufferSize), type, conversationId);
     }
-    public P2LOrderedOutputStreamImplV1(P2LNodeInternal parent, SocketAddress to, int bufferSizeWithoutHeader, short type, short conversationId) {
+    public P2LOrderedOutputStreamImplV1(P2LNodeInternal parent, InetSocketAddress to, int bufferSizeWithoutHeader, short type, short conversationId) {
         super(parent, to, null, type, conversationId, NO_STEP);
 
         headerSize = new StreamPartHeader(null, toShort(type), toShort(conversationId), NO_STEP,0, false, false).getSize();

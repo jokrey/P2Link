@@ -9,7 +9,7 @@ import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 
 /**
  * @author jokrey
@@ -19,7 +19,7 @@ public class P2LOrderedOutputStreamImplV2 extends P2LOrderedOutputStream impleme
     private final TransparentBytesStorage buffer = new ByteArrayStorage(P2LHeuristics.ORDERED_STREAM_V2_MAX_BUFFER_SIZE);
     private long firstBufferIndexRepresents = 0;
 
-    protected P2LOrderedOutputStreamImplV2(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId, short step) {
+    protected P2LOrderedOutputStreamImplV2(P2LNodeInternal parent, InetSocketAddress to, P2LConnection con, short type, short conversationId, short step) {
         super(parent, to, con, type, conversationId, step);
         underlyingFragmentStream = new P2LFragmentOutputStreamImplV1(parent, to, con, type, conversationId, step);
         underlyingFragmentStream.setSource(this);

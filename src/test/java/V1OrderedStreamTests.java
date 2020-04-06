@@ -43,10 +43,10 @@ public class V1OrderedStreamTests {
         boolean successConnect = nodes[0].establishConnection(nodes[1].getSelfLink()).get(5000); //TODO TOO SLOW FOR SOME VERY COMPLEX REASON
         assertTrue(successConnect);
 
-        P2LOrderedInputStreamImplV1 in = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().getSocketAddress(), (short) 5, (short) 0);
-        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().getSocketAddress(), 5, NO_CONVERSATION_ID, in);
-        P2LOrderedOutputStreamImplV1 out = new P2LOrderedOutputStreamImplV1((P2LNodeInternal) nodes[1], nodes[0].getSelfLink().getSocketAddress(), P2LMessage.CUSTOM_RAW_SIZE_LIMIT, (short) 5, (short) 0);
-        nodes[1].registerCustomOutputStream(nodes[0].getSelfLink().getSocketAddress(), 5, NO_CONVERSATION_ID, out);
+        P2LOrderedInputStreamImplV1 in = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().resolve(), (short) 5, (short) 0);
+        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().resolve(), 5, NO_CONVERSATION_ID, in);
+        P2LOrderedOutputStreamImplV1 out = new P2LOrderedOutputStreamImplV1((P2LNodeInternal) nodes[1], nodes[0].getSelfLink().resolve(), P2LMessage.CUSTOM_RAW_SIZE_LIMIT, (short) 5, (short) 0);
+        nodes[1].registerCustomOutputStream(nodes[0].getSelfLink().resolve(), 5, NO_CONVERSATION_ID, out);
 
 //        byte[] toSend = new byte[10_000];//10kb
         byte[] toSend = new byte[100_000_000];//100mb
@@ -82,8 +82,8 @@ public class V1OrderedStreamTests {
         P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
         P2LNode[] nodes = IntermediateTests.generateNodes(2, 62820);
 
-        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().getSocketAddress(), (short) 1, (short) 0);
-        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().getSocketAddress(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
+        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().resolve(), (short) 1, (short) 0);
+        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
 
@@ -113,8 +113,8 @@ public class V1OrderedStreamTests {
         P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =128;
         P2LNode[] nodes = IntermediateTests.generateNodes(2, 62830);
 
-        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().getSocketAddress(), (short) 1, (short) 0);
-        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().getSocketAddress(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
+        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().resolve(), (short) 1, (short) 0);
+        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
         new Thread(() -> {
@@ -144,8 +144,8 @@ public class V1OrderedStreamTests {
 
         P2LNode[] nodes = IntermediateTests.generateNodes(2, 62840);
 
-        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().getSocketAddress(), (short) 1, (short) 0);
-        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().getSocketAddress(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
+        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().resolve(), (short) 1, (short) 0);
+        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
         new Thread(() -> {
@@ -175,8 +175,8 @@ public class V1OrderedStreamTests {
 
         P2LNode[] nodes = IntermediateTests.generateNodes(2, 62850);
 
-        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().getSocketAddress(), (short) 1, (short) 0);
-        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().getSocketAddress(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
+        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().resolve(), (short) 1, (short) 0);
+        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
         new Thread(() -> {
@@ -206,8 +206,8 @@ public class V1OrderedStreamTests {
         P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
         P2LNode[] nodes = IntermediateTests.generateNodes(2, 62860);
 
-        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().getSocketAddress(), (short) 1, (short) 0);
-        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().getSocketAddress(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
+        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().resolve(), (short) 1, (short) 0);
+        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
         new Thread(() -> {
@@ -252,8 +252,8 @@ public class V1OrderedStreamTests {
         P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
         P2LNode[] nodes = IntermediateTests.generateNodes(2, 62870);
 
-        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().getSocketAddress(), (short) 1, (short) 0);
-        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().getSocketAddress(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
+        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().resolve(), (short) 1, (short) 0);
+        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
         new Thread(() -> {

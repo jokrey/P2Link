@@ -11,7 +11,7 @@ import jokrey.utilities.simple.data_structure.pairs.Pair;
 
 import javax.naming.NameAlreadyBoundException;
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 import java.util.*;
 
 /**
@@ -25,7 +25,7 @@ public class RendezvousServerAttempt1LetsNotTalkAboutIt implements AutoCloseable
     public static final int CALLBACK_TIMEOUT = 10000;
 
     public static void main(String[] args) throws IOException {
-        RendezvousServerAttempt1LetsNotTalkAboutIt server = new RendezvousServerAttempt1LetsNotTalkAboutIt(args.length == 0? P2Link.createDirectLink("lmservicesip.ddns.net", 40000) : args.length==1? P2Link.fromString(args[0]) : P2Link.createDirectLink(args[0], Integer.parseInt(args[1])));
+        RendezvousServerAttempt1LetsNotTalkAboutIt server = new RendezvousServerAttempt1LetsNotTalkAboutIt(args.length == 0? new P2Link.Direct("lmservicesip.ddns.net", 40000) : args.length==1? P2Link.from(args[0]) : new P2Link.Direct(args[0], Integer.parseInt(args[1])));
 
         System.out.println("running + waiting");
     }
@@ -161,55 +161,55 @@ public class RendezvousServerAttempt1LetsNotTalkAboutIt implements AutoCloseable
     public static class IdentityTriple {
         public final String name;
         public final byte[] publicKey;
-        public final P2Link address;
+        public final P2Link link;
 
-        public IdentityTriple(String name, byte[] publicKey, P2Link address) {
+        public IdentityTriple(String name, byte[] publicKey, P2Link link) {
             this.name = name;
             this.publicKey = publicKey;
-            this.address = address;
+            this.link = link;
         }
 
         MessageEncoder encode(P2LConversation convo) {
-            return convo.encode(name, publicKey, address.getBytesRepresentation());
+            return convo.encode(name, publicKey, link.toBytes());
         }
         static IdentityTriple decode(P2LMessage m) {
             String name = m.nextVariableString();
             byte[] publicKey = m.nextVariable();
-            P2Link address = P2Link.fromBytes(m.nextVariable());
-            return new IdentityTriple(name, publicKey, address);
+            P2Link link = P2Link.from(m.nextVariable());
+            return new IdentityTriple(name, publicKey, link);
         }
 
         @Override public String toString() {
-            return "IdentityTriple{" + "name='" + name + '\'' + ", publicKey=" + Arrays.toString(publicKey) + ", address=" + address + '}';
+            return "IdentityTriple{" + "name='" + name + '\'' + ", publicKey=" + Arrays.toString(publicKey) + ", address=" + link + '}';
         }
         @Override public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             IdentityTriple that = (IdentityTriple) o;
-            return Objects.equals(name, that.name) && Arrays.equals(publicKey, that.publicKey) && Objects.equals(address, that.address);
+            return Objects.equals(name, that.name) && Arrays.equals(publicKey, that.publicKey) && Objects.equals(link, that.link);
         }
         @Override public int hashCode() {
-            return 31 * Objects.hash(name, address) + Arrays.hashCode(publicKey);
+            return 31 * Objects.hash(name, link) + Arrays.hashCode(publicKey);
         }
     }
 
     private static class KnownIdentityTriple extends IdentityTriple {
-        private final SocketAddress registerer;
+        private final InetSocketAddress registerer;
         private final long createdAt = System.currentTimeMillis(); //todo - can be used to clean up old registrations.
-        private KnownIdentityTriple(String name, byte[] publicKey, P2Link address, SocketAddress registerer) {
-            super(name, publicKey, address);
+        private KnownIdentityTriple(String name, byte[] publicKey, P2Link link, InetSocketAddress registerer) {
+            super(name, publicKey, link);
             this.registerer = registerer;
         }
 
-        public static KnownIdentityTriple decode(P2LMessage m, SocketAddress peer) {
+        public static KnownIdentityTriple decode(P2LMessage m, InetSocketAddress peer) {
             String name = m.nextVariableString();
             byte[] publicKey = m.nextVariable();
-            P2Link address = P2Link.fromBytes(m.nextVariable());
-            return new KnownIdentityTriple(name, publicKey, address, peer);
+            P2Link link = P2Link.from(m.nextVariable());
+            return new KnownIdentityTriple(name, publicKey, link, peer);
         }
 
         @Override public String toString() {
-            return "KnownIdentityTriple{" + "name='" + name + '\'' + ", publicKey=" + Arrays.toString(publicKey) + ", address=" + address + ", registerer=" + registerer + ", createdAt=" + createdAt + '}';
+            return "KnownIdentityTriple{" + "name='" + name + '\'' + ", publicKey=" + Arrays.toString(publicKey) + ", address=" + link + ", registerer=" + registerer + ", createdAt=" + createdAt + '}';
         }
         @Override public boolean equals(Object o) {
             if (this == o) return true;

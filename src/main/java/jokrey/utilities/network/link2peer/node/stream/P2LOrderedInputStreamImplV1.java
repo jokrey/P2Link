@@ -8,7 +8,7 @@ import jokrey.utilities.network.link2peer.util.SyncHelp;
 import jokrey.utilities.transparent_storage.bytes.wrapper.SubBytesStorage;
 
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 import java.util.LinkedList;
 
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_STEP;
@@ -24,7 +24,7 @@ import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessage
  * @author jokrey
  */
 public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
-    public P2LOrderedInputStreamImplV1(P2LNodeInternal parent, SocketAddress to, short type, short conversationId) {
+    public P2LOrderedInputStreamImplV1(P2LNodeInternal parent, InetSocketAddress to, short type, short conversationId) {
         super(parent, to, type, conversationId, NO_STEP);
     }
 

@@ -4,6 +4,7 @@ import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -32,10 +33,8 @@ public class GarnerConnectionsRecursivelyProtocol {
         for(P2Link peerLink : setupLinks) {
             if(newlyConnectedCounter >= newConnectionLimit || newlyConnectedCounter >= newConnectionLimitPerRecursion)
                 return connectedSetupLinks;
-            if(!parent.isConnectedTo(peerLink)) {
-                if(EstablishConnectionProtocol.asInitiator(parent, peerLink))
-                    newlyConnectedCounter++;
-            }
+            if (!parent.isConnectedTo(peerLink) && EstablishConnectionProtocol.asInitiator(parent, peerLink))
+                newlyConnectedCounter++;
             connectedSetupLinks.add(peerLink);
         }
 
@@ -43,10 +42,13 @@ public class GarnerConnectionsRecursivelyProtocol {
         for (int i = 0, connectedSetupLinksSize = connectedSetupLinks.size(); i < connectedSetupLinksSize; i++) {
             P2Link connectedSetupLink = connectedSetupLinks.get(i);
             try {
-                List<P2Link> foundLinks = RequestPeerLinksProtocol.asInitiator(parent, connectedSetupLink.getSocketAddress());
-                for (P2Link address : foundLinks) {
-                    if (!parent.isConnectedTo(address))
-                        foundUnconnectedLinks.add(address);
+                InetSocketAddress resolvedConnectedSetupLink = parent.resolve(connectedSetupLink);
+                System.out.println("connectedSetupLink = " + connectedSetupLink);
+                System.out.println("resolvedConnectedSetupLink = " + resolvedConnectedSetupLink);
+                List<P2Link> foundLinks = RequestPeerLinksProtocol.asInitiator(parent, resolvedConnectedSetupLink);
+                for (P2Link link : foundLinks) {
+                    if (!parent.isConnectedTo(link))
+                        foundUnconnectedLinks.add(link);
                 }
                 if (i + 1 > 3 && foundUnconnectedLinks.size() > 2 * parent.remainingNumberOfAllowedPeerConnections()) { //fixme heuristic
                     //assume that one of 3 peers is honest and that at least half unconnected links are still valid...

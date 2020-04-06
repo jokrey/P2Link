@@ -1,7 +1,6 @@
 package jokrey.utilities.network.link2peer.node.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.conversation.ConversationHandlerV2;
 import jokrey.utilities.network.link2peer.node.protocols.*;
@@ -11,7 +10,7 @@ import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -41,8 +40,8 @@ public class IncomingHandler {
 
 
     private void handleReceivedMessage(DatagramPacket receivedPacket) throws Throwable {
-        SocketAddress from = receivedPacket.getSocketAddress();
-        P2LMessage message = P2LMessage.fromPacket(P2Link.raw(receivedPacket.getSocketAddress()), receivedPacket);
+        InetSocketAddress from = (InetSocketAddress) receivedPacket.getSocketAddress();
+        P2LMessage message = P2LMessage.fromPacket(from, receivedPacket);
         if(DebugStats.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE>0) {
             boolean dropped = ThreadLocalRandom.current().nextInt(0, 100) < DebugStats.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE;
             if (dropped) {
@@ -51,6 +50,7 @@ public class IncomingHandler {
                 return;
             }
         }
+        if(message.header.getType() == SL_NAT_HOLE_PACKET) return; //Packets of this type are dropped ASAP
         if(DebugStats.MSG_PRINTS_ACTIVE)
             System.out.println(parent.getSelfLink() + " - handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
 
@@ -127,13 +127,13 @@ public class IncomingHandler {
                 BroadcastMessageProtocol.asAnswererWithHash(parent, convo, m0, brdMessageQueue, broadcastState);
         });
         conversationMessageHandler.registerConversationHandlerFor(SL_REQUEST_DIRECT_CONNECT_TO, ((convo, m0) -> {
-            EstablishConnectionProtocol.asAnswererRequestReverseConnection(parent, convo, m0);
+            RelayedConnectionProtocol.asAnswerer_ConnectTo(parent, convo, m0);
         }));
-        conversationMessageHandler.registerConversationHandlerFor(SL_RELAY_REQUEST_DIRECT_CONNECT, ((convo, m0) -> {
-            EstablishConnectionProtocol.asAnswererRelayRequestReverseConnection(parent, convo, m0);
+        conversationMessageHandler.registerConversationHandlerFor(SL_CONNECTION_RELAY, ((convo, m0) -> {
+            RelayedConnectionProtocol.asAnswerer_RelayConnection(parent, convo, m0);
         }));
         conversationMessageHandler.registerConversationHandlerFor(SL_DIRECT_CONNECTION_REQUEST, ((convo, m0) -> {
-            EstablishConnectionProtocol.asAnswererDirect(parent, convo, m0);
+            DirectConnectionProtocol.asAnswerer(parent, convo, m0);
         }));
 
         serverSocket = new DatagramSocket(parent.getSelfLink().getPort());

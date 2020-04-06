@@ -8,7 +8,8 @@ import jokrey.utilities.network.link2peer.util.TimeoutException;
 import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Forced efficiency, short burst communication that uses the response as validation for receival.
@@ -63,7 +64,9 @@ import java.net.SocketAddress;
  */
 public interface P2LConversation {
     /** @return the socket address of the peer this conversation attempts to communicate with. */
-    SocketAddress getPeer();
+    InetSocketAddress getPeer();
+    short getConversationId();
+    short getType();
     /** @return current average round trip time of all packages with the peer. */
     int getAvRTT();
     /** @return header size of all packages sent and received by this conversation, relevant for message encoder offset calculations. */
@@ -81,6 +84,16 @@ public interface P2LConversation {
     void setRM(int a); //retry multiplier
 
 
+    /** Encodes the given string as sole content of a newly created message encoder (to be decoded using {@link MessageEncoder#asString()} */
+    default MessageEncoder encodeSingle(String payload) {
+        return encodeSingle(payload.getBytes(StandardCharsets.UTF_8));
+    }
+    /** Encodes the given bytes as sole content of a newly created message encoder (to be decoded using {@link MessageEncoder#asBytes()} */
+    default MessageEncoder encodeSingle(byte[] bytes) {
+        MessageEncoder me = new MessageEncoder(getHeaderSize(), getHeaderSize() + bytes.length);
+        me.setBytes(bytes);
+        return me;
+    }
     /** Encodes the given payloads into a new message encoder object with the correct offset for it to be directly passed into this conversations methods */
     default MessageEncoder encode(Object... payloads) { return MessageEncoder.encodeAll(getHeaderSize(), payloads); }
     /** {@link #encoder(int)}, with initial capacity set to 64 bytes */

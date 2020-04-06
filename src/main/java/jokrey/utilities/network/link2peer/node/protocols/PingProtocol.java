@@ -5,7 +5,7 @@ import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.SL_PING;
 
@@ -13,10 +13,10 @@ import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTyp
  * @author jokrey
  */
 public class PingProtocol {
-    public static P2LFuture<Boolean> asInitiator(P2LNodeInternal parent, SocketAddress to) throws IOException {
+    public static P2LFuture<Boolean> asInitiator(P2LNodeInternal parent, InetSocketAddress to) throws IOException {
         return parent.sendInternalMessageWithReceipt(to, P2LMessage.Factory.createSendMessage(SL_PING, parent.createUniqueConversationId()));
     }
-//    static void asAnswerer(P2LNodeInternal parent, SocketAddress from) throws IOException {
+//    static void asAnswerer(P2LNodeInternal parent, InetSocketAddress from) throws IOException {
 //        answering done automatically through receipts
 //    }
 }

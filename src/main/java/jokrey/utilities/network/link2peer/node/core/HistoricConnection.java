@@ -3,21 +3,21 @@ package jokrey.utilities.network.link2peer.node.core;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
 
+import java.net.InetSocketAddress;
+
 /**
  * @author jokrey
  */
-class HistoricConnection extends P2LConnection {
-    public HistoricConnection(P2Link link, boolean retry, int remoteBufferSize, int avRTT) {
-        super(link, remoteBufferSize, avRTT);
-        if(link.getSocketAddress()==null)
-            throw new NullPointerException("otherwise we would have a problem on retry");
+public class HistoricConnection extends P2LConnection {
+    public HistoricConnection(P2Link link, InetSocketAddress address, boolean retry, int remoteBufferSize, int avRTT) {
+        super(link, address, remoteBufferSize, avRTT);
         if(!retry) nextAttemptAt = Long.MAX_VALUE;
     }
 
     long nextAttemptAt = System.currentTimeMillis();
     int numberOfAttemptsMade;
 
-    boolean retryNow(long now) {
+    boolean shouldRetryNow(long now) {
         if(nextAttemptAt <= now) {
             long newTime = (long) (nextAttemptAt + P2LHeuristics.ORIGINAL_RETRY_HISTORIC_TIMEOUT_MS * Math.pow(2, numberOfAttemptsMade));
             if (newTime < nextAttemptAt) {
@@ -31,8 +31,7 @@ class HistoricConnection extends P2LConnection {
         return false;
     }
 
-    @Override
-    public String toString() {
+    @Override public String toString() {
         return "HistoricConnection{" +
                 "nextAttemptAt=" + nextAttemptAt +
                 ", numberOfAttemptsMade=" + numberOfAttemptsMade +

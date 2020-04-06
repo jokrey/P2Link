@@ -8,7 +8,9 @@ public class P2LInternalMessageTypes {
     public static final short SL_WHO_AM_I = -3;
     public static final short SL_PING = -4;
     public static final short SL_REQUEST_DIRECT_CONNECT_TO = -5;
-    public static final short SL_RELAY_REQUEST_DIRECT_CONNECT = -6;
+    public static final short SL_CONNECTION_RELAY = -6;
+    public static final short SL_NAT_HOLE_PACKET = -7;
+
 
     public static final short SC_BROADCAST_WITH_HASH = -21;
     public static final short SC_DISCONNECT = -22;

@@ -1,7 +1,7 @@
-import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
+import jokrey.utilities.network.link2peer.P2Link.Local;
 import jokrey.utilities.network.link2peer.node.core.NodeCreator;
 import jokrey.utilities.network.link2peer.rendevouz.RendezvousServer;
 import jokrey.utilities.network.link2peer.rendevouz.RendezvousServer.IdentityTriple;
@@ -22,10 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class RendezvousTest {
     @Test
     public void rendezvousTest1() throws IOException {
-        P2Link rendezvousServerLink = P2Link.createLocalLink(40000).toDirect();
+        P2Link rendezvousServerLink = Local.forTest(40000);
         try(RendezvousServer server = new RendezvousServer(rendezvousServerLink)) {
-            P2LNode node1 = NodeCreator.create(P2Link.createLocalLink(30001).toDirect());
-            P2LNode node2 = NodeCreator.create(P2Link.createLocalLink(30002).toDirect());
+            P2LNode node1 = NodeCreator.create(Local.forTest(30001));
+            P2LNode node2 = NodeCreator.create(Local.forTest(30002));
 
             P2LFuture<IdentityTriple> fut1 = P2LThreadPool.executeSingle(() -> RendezvousServer.rendezvousWith(node1, rendezvousServerLink, new IdentityTriple("1", new byte[] {}, node1.getSelfLink()), "2")[0]);
             P2LFuture<IdentityTriple> fut2 = P2LThreadPool.executeSingle(() -> RendezvousServer.rendezvousWith(node2, rendezvousServerLink, new IdentityTriple("2", new byte[] {}, node2.getSelfLink()), "1")[0]);
@@ -42,10 +42,10 @@ class RendezvousTest {
 
     @Test
     public void rendezvousTest2() throws IOException {
-        P2Link rendezvousServerLink = P2Link.createLocalLink(40000).toDirect();
+        P2Link rendezvousServerLink = Local.forTest(40000);
         try(RendezvousServer server = new RendezvousServer(rendezvousServerLink)) {
-            P2LNode node1 = NodeCreator.create(P2Link.createLocalLink(30003).toDirect());
-            P2LNode node2 = NodeCreator.create(P2Link.createLocalLink(30004).toDirect());
+            P2LNode node1 = NodeCreator.create(Local.forTest(30003));
+            P2LNode node2 = NodeCreator.create(Local.forTest(30004));
 
             P2LFuture<IdentityTriple> fut1 = P2LThreadPool.executeSingle(() -> {
                 sleep(1000);
@@ -72,10 +72,10 @@ class RendezvousTest {
 
     @Test
     public void rendezvousTest3() throws IOException {
-        P2Link rendezvousServerLink = P2Link.createLocalLink(40000).toDirect();
+        P2Link rendezvousServerLink = Local.forTest(40000);
         try(RendezvousServer server = new RendezvousServer(rendezvousServerLink)) {
-            P2LNode node1 = NodeCreator.create(P2Link.createLocalLink(30005).toDirect());
-            P2LNode node2 = NodeCreator.create(P2Link.createLocalLink(30006).toDirect());
+            P2LNode node1 = NodeCreator.create(Local.forTest(30005));
+            P2LNode node2 = NodeCreator.create(Local.forTest(30006));
 
             P2LFuture<IdentityTriple> fut1 = P2LThreadPool.executeSingle(() -> {
                 sleep((long) (RendezvousServer.CALLBACK_TIMEOUT * 1.5));
@@ -105,13 +105,13 @@ class RendezvousTest {
     }
 
     private void shortBackAndForthTest(P2LNode node1, P2LNode node2, IdentityTriple idOf1KnownTo2, IdentityTriple idOf2KnownTo1) throws IOException {
-        node1.establishConnection(idOf2KnownTo1.address);
+        node1.establishConnection(idOf2KnownTo1.link);
 
         P2LFuture<P2LMessage> msgFut = node1.expectMessage(123);
 
         P2LMessage msgToSend = P2LMessage.Factory.createSendMessage(123);
         msgToSend.encode(-432);
-        node2.sendMessage(idOf1KnownTo2.address, msgToSend);
+        node2.sendMessage(idOf1KnownTo2.link, msgToSend);
 
         assertEquals(-432, msgFut.get(1000).nextInt());
     }

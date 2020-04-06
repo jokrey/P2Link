@@ -5,7 +5,7 @@ import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 
 /**
  * An output stream's abstract definition which can be used to send streams of data to peers.
@@ -16,11 +16,11 @@ import java.net.SocketAddress;
  */
 public abstract class P2LOrderedOutputStream extends OutputStream implements P2LOutputStream {
     protected final P2LNodeInternal parent;
-    protected final SocketAddress to;
+    protected final InetSocketAddress to;
     protected final P2LConnection con;
     protected final short type, conversationId, step;
 
-    protected P2LOrderedOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId, short step) {
+    protected P2LOrderedOutputStream(P2LNodeInternal parent, InetSocketAddress to, P2LConnection con, short type, short conversationId, short step) {
         this.parent = parent;
         this.to = to;
         this.con = con;
@@ -28,7 +28,7 @@ public abstract class P2LOrderedOutputStream extends OutputStream implements P2L
         this.conversationId = conversationId;
         this.step = step;
     }
-    @Override public SocketAddress getRawFrom() { return to; }
+    @Override public InetSocketAddress getRawFrom() { return to; }
     @Override public short getType() { return type; }
     @Override public short getConversationId() { return conversationId; }
     @Override public short getStep() { return step; }

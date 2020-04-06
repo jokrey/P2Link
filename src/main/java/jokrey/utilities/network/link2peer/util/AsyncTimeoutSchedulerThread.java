@@ -54,6 +54,7 @@ public class AsyncTimeoutSchedulerThread {
                             e.printStackTrace();
                         }
                     }
+                    if(shutdown) break;
                     futureToCancel = scheduledTimeouts.remove(scheduledTimeouts.firstKey());
                 }
                 if(shutdown) break;

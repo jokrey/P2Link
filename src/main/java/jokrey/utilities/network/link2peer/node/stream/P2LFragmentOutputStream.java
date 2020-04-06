@@ -6,7 +6,7 @@ import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 import jokrey.utilities.transparent_storage.bytes.non_persistent.ByteArrayStorage;
 
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 import java.util.Objects;
 
 /**
@@ -14,11 +14,11 @@ import java.util.Objects;
  */
 public abstract class P2LFragmentOutputStream implements P2LOutputStream {
     protected final P2LNodeInternal parent;
-    protected final SocketAddress to;
+    protected final InetSocketAddress to;
     protected final P2LConnection con;
     protected final short type, conversationId, step;
     protected FragmentRetriever source;
-    protected P2LFragmentOutputStream(P2LNodeInternal parent, SocketAddress to, P2LConnection con, short type, short conversationId, short step) {
+    protected P2LFragmentOutputStream(P2LNodeInternal parent, InetSocketAddress to, P2LConnection con, short type, short conversationId, short step) {
         this.parent = parent;
         this.to = to;
         this.con = con;
@@ -26,7 +26,7 @@ public abstract class P2LFragmentOutputStream implements P2LOutputStream {
         this.conversationId = conversationId;
         this.step = step;
     }
-    @Override public SocketAddress getRawFrom() { return to; }
+    @Override public InetSocketAddress getRawFrom() { return to; }
     @Override public short getType() { return type; }
     @Override public short getConversationId() { return conversationId; }
     @Override public short getStep() { return step; }
