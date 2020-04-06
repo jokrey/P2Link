@@ -43,12 +43,12 @@ public class EstablishConnectionProtocolOld {
         return asInitiator(parent, to, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT);
     }
     public static boolean asInitiator(P2LNodeInternal parent, P2Link to, int attempts, int initialTimeout) {
-        if(to.isPrivateLink())
+        if(to.isLocalLink())
             throw new IllegalArgumentException("cannot connect to private link");
         else if(to.isHiddenLink()) {
             P2Link self = parent.getSelfLink();
             boolean relayAvailable = !to.getRelayLink().equals(self) && to.getRelayLink().getSocketAddress()!=null;
-            if(self.isPrivateLink() || self.isHiddenLink()) { //self should always be private or public, but it is possible to manually set it to a hidden link
+            if(self.isLocalLink() || self.isHiddenLink()) { //self should always be private or public, but it is possible to manually set it to a hidden link
                 //todo - this scenario could not be realisticly tested as of yet AND cannot be tested automatically
                 for(int i=0;i<attempts;i++) {
                     //attempt direct connection to the link the relay server sees
@@ -199,7 +199,7 @@ public class EstablishConnectionProtocolOld {
 
     private static P2LMessage selfLinkToMessage(P2LNodeInternal parent, int type, int conversationId) {
         P2Link selfLink = parent.getSelfLink();
-        if(selfLink.isPublicLink()) {
+        if(selfLink.isDirectLink()) {
             byte[] selfLinkByteRepresentation = selfLink.getBytesRepresentation();
             return P2LMessage.Factory.createSendMessageFrom(type, conversationId,
                     P2LMessage.CUSTOM_RAW_SIZE_LIMIT, LIbae.generateLI(selfLinkByteRepresentation.length), selfLinkByteRepresentation);

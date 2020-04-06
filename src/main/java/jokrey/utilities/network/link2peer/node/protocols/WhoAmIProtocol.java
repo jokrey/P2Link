@@ -26,7 +26,7 @@ public class WhoAmIProtocol {
     }
     public static void asAnswerer(P2LConversation convo, P2LMessage m0) throws IOException {
         InetSocketAddress address = (InetSocketAddress) convo.getPeer();
-        convo.closeWith(P2Link.createPublicLink(address.getAddress().getCanonicalHostName(), address.getPort()).getBytesRepresentation());
+        convo.closeWith(P2Link.createDirectLink(address.getAddress().getCanonicalHostName(), address.getPort()).getBytesRepresentation());
     }
 
 

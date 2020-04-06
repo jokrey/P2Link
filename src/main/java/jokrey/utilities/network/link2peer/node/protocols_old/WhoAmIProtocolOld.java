@@ -26,7 +26,7 @@ public class WhoAmIProtocolOld {
     }
     public static void asAnswerer(P2LNodeInternal parent, DatagramPacket receivedPacket) throws IOException {
         parent.sendInternalMessage(receivedPacket.getSocketAddress(), P2LMessage.Factory.createSendMessage(R_WHO_AM_I_ANSWER,
-                P2Link.createPublicLink(receivedPacket.getAddress().getCanonicalHostName(), receivedPacket.getPort()).getBytesRepresentation()
+                P2Link.createDirectLink(receivedPacket.getAddress().getCanonicalHostName(), receivedPacket.getPort()).getBytesRepresentation()
         ));
     }
 }

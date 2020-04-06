@@ -40,17 +40,15 @@ public class P2Link {
 
     public static P2Link fromStringEnsureRelayLinkAvailable(String raw, InetSocketAddress to) {
         P2Link link = fromString(raw);
-        if(link.isHiddenLink() && !link.relayServerLink.isPublicLink())
-            return new P2Link(null, link.getSocketAddress(), P2Link.createPublicLink(to), link.getPort());
+        if(link.isHiddenLink() && !link.relayServerLink.isDirectLink())
+            return new P2Link(null, link.getSocketAddress(), P2Link.createDirectLink(to), link.getPort());
         return link;
     }
 
     public int getPort() {
         return port;
     }
-    public InetSocketAddress getSocketAddress() {
-        return rawAddr;
-    }
+    public InetSocketAddress getSocketAddress() { return rawAddr; }
     public SocketAddress getRelaySocketAddress() {
         return relayServerLink.getSocketAddress();
     }
@@ -58,23 +56,31 @@ public class P2Link {
         return relayServerLink;
     }
 
-    public boolean isPublicLink() {
+    public boolean isDirectLink() {
         return relayServerLink ==null && rawAddr != null;
     }
     public boolean isHiddenLink() {
         return relayServerLink != null && rawAddr != null;
     }
-    public boolean isPrivateLink() {
+    public boolean isLocalLink() {
         return rawAddr == null;
     }
 
+    /** Resolves local link to the localhost:port combination. NOTE: The resulting link will return 'isPublicLink' == true */
+    public P2Link toDirect() {return new P2Link(null, new InetSocketAddress("localhost", port), relayServerLink, port);}
 
+    public P2Link toHidden(P2Link relayLink) {
+        if(isLocalLink()) return new P2Link(null, new InetSocketAddress("localhost", port), relayLink, port);
+        if(isHiddenLink()) return new P2Link(null, rawAddr, relayLink, port); //overwrite existing relay link
+        if(isDirectLink()) return new P2Link(null, rawAddr, relayLink, port);
+        throw new IllegalStateException("impossible - cannot be not local, hidden and direct at the same time");
+    }
 
     public String getStringRepresentation() {
         //todo
         if(stringRepresentation==null) {
             if(rawAddr==null) //private/local/unknown link
-                stringRepresentation = port+"";
+                stringRepresentation = Integer.toString(port);
             else if(relayServerLink ==null) //public link
                 stringRepresentation = rawAddr.getAddress().getHostName() + ":" + rawAddr.getPort();
             else {//hidden link
@@ -86,6 +92,11 @@ public class P2Link {
     public byte[] getBytesRepresentation() {
         return getStringRepresentation().getBytes(StandardCharsets.UTF_8);
     }
+
+    /**
+     * @param stringRepresentation of the form: <port> || <ip/dns>:<port> || <ip/dns>:<port>(relay=<ip/dns>:<port>)
+     * @return p2link or throws error
+     */
     public static P2Link fromString(String stringRepresentation) {
         if(stringRepresentation.contains("(")) { //hidden
             String[] splitOuter = stringRepresentation.split("\\(relay=");
@@ -93,9 +104,9 @@ public class P2Link {
             return P2Link.createHiddenLink(fromString(splitOuter[1].replace(")","")), new InetSocketAddress(split[0], Integer.parseInt(split[1])));
         } else if(stringRepresentation.contains(":")) {//public, because already not hidden
             String[] split = stringRepresentation.split(":");
-            return P2Link.createPublicLink(split[0], Integer.parseInt(split[1]));
+            return P2Link.createDirectLink(split[0], Integer.parseInt(split[1]));
         } else {
-            return P2Link.createPrivateLink(Integer.parseInt(stringRepresentation));
+            return P2Link.createLocalLink(Integer.parseInt(stringRepresentation));
         }
     }
     public static P2Link fromBytes(byte[] asBytes) {
@@ -107,21 +118,21 @@ public class P2Link {
 
 
 
-    public static P2Link createPublicLink(String publicIpOrDns, int port) {
+    public static P2Link createDirectLink(String publicIpOrDns, int port) {
         return new P2Link(publicIpOrDns+":"+port, new InetSocketAddress(publicIpOrDns, port), null, port);
     }
-    public static P2Link createPublicLink(InetSocketAddress socketAddress) {
+    public static P2Link createDirectLink(InetSocketAddress socketAddress) {
         return new P2Link(null, socketAddress, null, socketAddress.getPort());
     }
     public static P2Link raw(SocketAddress socketAddress) {
-        return createPublicLink((InetSocketAddress) socketAddress);
+        return createDirectLink((InetSocketAddress) socketAddress);
     }
 
     public static P2Link createHiddenLink(P2Link relayServerLink, InetSocketAddress naiveAddress) {
         return new P2Link(null, naiveAddress, relayServerLink, naiveAddress.getPort());
     }
 
-    public static P2Link createPrivateLink(int port) {
+    public static P2Link createLocalLink(int port) {
         return new P2Link( port+"", null, null, port);
     }
 

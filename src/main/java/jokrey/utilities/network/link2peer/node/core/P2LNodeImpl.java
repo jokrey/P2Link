@@ -54,6 +54,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
                 long now = System.currentTimeMillis();
                 try {
                     //todo - this in the future will also be required to keep alive nat holes - therefore it may need to be called more than the current every two minutes
+                    //   however the default timeout appears to be 300 seconds, i.e. five minutes so it should be fine
 
                     List<P2Link> dormant = getDormantEstablishedConnections(now);
                     P2LFuture<Boolean>[] pingResults = new P2LFuture[dormant.size()];
@@ -242,7 +243,9 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     private final int connectionLimit;
     @Override public boolean isConnectedTo(P2Link address) {
         //todo - this is not neccessarily correct - address can contain different socket address, but still be a link in a p2l connection...
-        return address!=null && establishedConnections.containsKey(address.getSocketAddress());
+        System.out.println("address = " + address);
+        System.out.println("establishedConnections = " + establishedConnections);
+        return address!=null && address.getSocketAddress() != null && establishedConnections.containsKey(address.getSocketAddress());
     }
     @Override public boolean isConnectedTo(SocketAddress to) {
         return establishedConnections.containsKey(to);
@@ -347,7 +350,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
 
     private void notifyConnectionEstablished(P2Link newAddress, int conversationId) {
-        for (BiConsumer<P2Link, Integer> l : newConnectionEstablishedListeners) { l.accept(newAddress, conversationId); }
+        for (BiConsumer<P2Link, Integer> l : (List<BiConsumer<P2Link, Integer>>) newConnectionEstablishedListeners.clone()) { l.accept(newAddress, conversationId); }
     }
     private void notifyConnectionDisconnected(P2Link newAddress) {
         for (Consumer<P2Link> l : connectionDisconnectedListeners) { l.accept(newAddress); }

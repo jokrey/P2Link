@@ -37,8 +37,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class IntermediateTests {
     @Test void establishConnectionProtocolTest() throws IOException {
-        P2LNode node1 = P2LNode.create(P2Link.createPublicLink("localhost", 53189)); //creates server thread
-        P2LNode node2 = P2LNode.create(P2Link.createPublicLink("localhost", 53188)); //creates server thread
+        P2LNode node1 = P2LNode.create(P2Link.createLocalLink(53189).toDirect()); //creates server thread
+        P2LNode node2 = P2LNode.create(P2Link.createLocalLink(53188).toDirect()); //creates server thread
 
         boolean connected = node2.establishConnection(node1.getSelfLink()).get(1000);
         assertTrue(connected);
@@ -48,6 +48,24 @@ class IntermediateTests {
 
         close(node1, node2);
     }
+
+    @Test void establishConnectionProtocolTest_RELAY() throws IOException {
+        P2LNode relayServer = P2LNode.create(P2Link.createLocalLink(5319).toDirect()); //creates server thread
+
+        P2LNode node1 = P2LNode.create(P2Link.createLocalLink(53189)); //creates server thread
+        P2LNode node2 = P2LNode.create(P2Link.createLocalLink(53188)); //creates server thread
+
+        P2Link node1LinkAsKnownTo2 = node1.getSelfLink().toHidden(relayServer.getSelfLink());
+
+        boolean connected = node2.establishConnection(node1LinkAsKnownTo2).get(1000);
+        assertTrue(connected);
+
+        assertTrue(node2.isConnectedTo(node1.getSelfLink()));
+        assertTrue(node1.isConnectedTo(node2.getSelfLink()));
+
+        close(node1, node2);
+    }
+
 
 
 
@@ -135,8 +153,8 @@ class IntermediateTests {
 
         int p1 = 54189;
         int p2 = 54188;
-        P2Link l1 = P2Link.createPublicLink("localhost", p1);
-        P2Link l2 = P2Link.createPublicLink("localhost",  p2);
+        P2Link l1 = P2Link.createLocalLink(p1).toDirect();
+        P2Link l2 = P2Link.createLocalLink( p2).toDirect();
         P2LNode node1 = P2LNode.create(l1); //creates server thread
         P2LNode node2 = P2LNode.create(l2); //creates server thread
 
@@ -176,7 +194,7 @@ class IntermediateTests {
         assertTrue(sendResult.get(100));
 //        sendResult = node1.sendMessageWithReceipt(node1.getSelfLink(), P2LMessage.Factory.createSendMessage(0, idvMsgToSend));
 //        assertFalse(sendResult.get(100)); //self send does not work - todo: it currently does work to self send messages... it is even possible to be your own peer
-        sendResult = node1.sendMessageWithReceipt( P2Link.createPublicLink("google.com", 123), P2LMessage.Factory.createSendMessage(0, idvMsgToSend));
+        sendResult = node1.sendMessageWithReceipt( P2Link.createDirectLink("google.com", 123), P2LMessage.Factory.createSendMessage(0, idvMsgToSend));
         assertNull(sendResult.getOrNull(100)); //google is not a connected peer for node 1
 
         System.out.println("send success");
@@ -194,8 +212,8 @@ class IntermediateTests {
     @Test void futureIdvMsgText() throws IOException {
         int p1 = 34189;
         int p2 = 34188;
-        P2LNode node1 = P2LNode.create(P2Link.createPublicLink("localhost", p1)); //creates server thread
-        P2LNode node2 = P2LNode.create(P2Link.createPublicLink("localhost", p2)); //creates server thread
+        P2LNode node1 = P2LNode.create(P2Link.createLocalLink(p1).toDirect()); //creates server thread
+        P2LNode node2 = P2LNode.create(P2Link.createLocalLink(p2).toDirect()); //creates server thread
 
         sleep(100); //let nodes start
 
@@ -239,8 +257,8 @@ class IntermediateTests {
     @Test void longMessageTest() throws IOException {
         int p1 = 34191;
         int p2 = 34192;
-        P2LNode node1 = P2LNode.create(P2Link.createPublicLink("localhost", p1)); //creates server thread
-        P2LNode node2 = P2LNode.create(P2Link.createPublicLink("localhost", p2)); //creates server thread
+        P2LNode node1 = P2LNode.create(P2Link.createLocalLink(p1).toDirect()); //creates server thread
+        P2LNode node2 = P2LNode.create(P2Link.createLocalLink(p2).toDirect()); //creates server thread
 
         byte[] toSend_1To2 = new byte[(P2LMessage.CUSTOM_RAW_SIZE_LIMIT - 15) * 2];
         byte[] toSend_2To1 = new byte[P2LMessage.CUSTOM_RAW_SIZE_LIMIT * 2];
@@ -279,7 +297,7 @@ class IntermediateTests {
         AtomicReference<byte[]> brdMsgToSend = new AtomicReference<>(new byte[] {17,32,37,45,5,99,33,55,16,43,127});
 
         int senderPort = 55199;
-        P2Link senderLink = P2Link.createPublicLink("localhost",  senderPort);
+        P2Link senderLink = P2Link.createLocalLink(senderPort).toDirect();
 
         P2LNode[] nodes = generateNodes(10, 55288, p2Link -> message -> {
             throw new IllegalStateException("this should not be called here");
@@ -290,7 +308,7 @@ class IntermediateTests {
             nodesAndNumberOfReceivedMessages.compute(p2Link, (link, counter) -> counter == null? 1 : counter+1);
         });
 
-        P2LNode senderNode = P2LNode.create(P2Link.createPublicLink("localhost", senderPort)); //creates server thread
+        P2LNode senderNode = P2LNode.create(P2Link.createLocalLink(senderPort).toDirect()); //creates server thread
         senderNode.addBroadcastListener(message -> {
             throw new IllegalStateException("broadcastReceivedCalledForSender...");
         });
@@ -640,8 +658,8 @@ class IntermediateTests {
         P2LNode pubRelayNode3 = null;
         try {
 //            public - public
-            pubNode1 = NodeCreator.create(P2Link.createPublicLink("localhost", 7890));
-            pubNode2 = NodeCreator.create(P2Link.createPublicLink("localhost", 7891));
+            pubNode1 = NodeCreator.create(P2Link.createLocalLink(7890).toDirect());
+            pubNode2 = NodeCreator.create(P2Link.createLocalLink(7891).toDirect());
 
             P2LFuture<Boolean> pubPubConFut = pubNode1.establishConnection(pubNode2.getSelfLink());
             assertTrue(pubPubConFut.get(1000));
@@ -649,8 +667,8 @@ class IntermediateTests {
             close(pubNode1, pubNode2);
 
             //hidden - public
-            hidNode1 = NodeCreator.create(P2Link.createPrivateLink(7890));
-            pubNode2 = NodeCreator.create(P2Link.createPublicLink("localhost", 7891));
+            hidNode1 = NodeCreator.create(P2Link.createLocalLink(7890).toDirect());
+            pubNode2 = NodeCreator.create(P2Link.createLocalLink(7891).toDirect());
 
             P2LFuture<Boolean> hidPubConFut = hidNode1.establishConnection(pubNode2.getSelfLink());
             assertTrue(hidPubConFut.get(1000));
@@ -658,13 +676,13 @@ class IntermediateTests {
             close(hidNode1, pubNode2);
 
             //public - hidden (using relay)
-            pubNode1 = NodeCreator.create(P2Link.createPublicLink("localhost", 7890));
-            hidNode2 = NodeCreator.create(P2Link.createPrivateLink(7891));
+            pubNode1 = NodeCreator.create(P2Link.createLocalLink(7890).toDirect());
+            hidNode2 = NodeCreator.create(P2Link.createLocalLink(7891).toDirect());
 
             //not possible: hidden node is hidden, link is unknown
 //        P2LFuture<Boolean> pubHidConFut = pubNode1.establishConnection(hidNode2.getSelfLink());
 //        assertTrue(pubHidConFut.get(1000));
-            pubRelayNode3 = NodeCreator.create(P2Link.createPublicLink("localhost", 7892));
+            pubRelayNode3 = NodeCreator.create(P2Link.createLocalLink(7892).toDirect());
             P2LFuture<Boolean> pubRelayConFut = pubNode1.establishConnection(pubRelayNode3.getSelfLink());
             P2LFuture<Boolean> hidRelayConFut = hidNode2.establishConnection(pubRelayNode3.getSelfLink());
             assertTrue(pubRelayConFut.get(1000) && hidRelayConFut.get(1000));
@@ -678,9 +696,9 @@ class IntermediateTests {
             close(pubNode1, hidNode2, pubRelayNode3);
 
             //hidden - hidden (using relay)
-            hidNode1 = NodeCreator.create(P2Link.createPrivateLink(7890));
-            hidNode2 = NodeCreator.create(P2Link.createPrivateLink(7891));
-            pubRelayNode3 = NodeCreator.create(P2Link.createPublicLink("localhost", 7892));
+            hidNode1 = NodeCreator.create(P2Link.createLocalLink(7890).toDirect());
+            hidNode2 = NodeCreator.create(P2Link.createLocalLink(7891).toDirect());
+            pubRelayNode3 = NodeCreator.create(P2Link.createLocalLink(7892).toDirect());
             P2LFuture<Boolean> hidRelayConFut1 = hidNode1.establishConnection(pubRelayNode3.getSelfLink());
             P2LFuture<Boolean> hidRelayConFut2 = hidNode2.establishConnection(pubRelayNode3.getSelfLink());
             assertTrue(hidRelayConFut1.get(1000) && hidRelayConFut2.get(1000));
@@ -698,7 +716,7 @@ class IntermediateTests {
     }
 
     @Test void conversationIdTest() throws IOException {
-        P2LNodeInternal parent = (P2LNodeInternal) NodeCreator.create(P2Link.createPublicLink("localhost", 60943));
+        P2LNodeInternal parent = (P2LNodeInternal) NodeCreator.create(P2Link.createLocalLink(60943).toDirect());
         for(int i=0;i<Short.MAX_VALUE*2;i++) {
             short gen = EstablishConnectionProtocol.createConversationForInitialDirect(parent);
             assertTrue(gen < 0);
@@ -755,7 +773,7 @@ class IntermediateTests {
             System.out.println("node " + i + "("+nodes[i].getSelfLink()+") peers("+nodes[i].getEstablishedConnections().size()+"): " + nodes[i].getEstablishedConnections());
     }
 
-    static P2LNode[] generateNodes(int size, int startPort) throws IOException {
+    public static P2LNode[] generateNodes(int size, int startPort) throws IOException {
         return generateNodes(size, startPort, null, null);
     }
     static P2LNode[] generateNodes(int size, int startPort, Function<P2Link, P2LNode.P2LMessageListener> idvListenerCreator, Function<P2Link, P2LNode.P2LMessageListener> brdListenerCreator) throws IOException {
@@ -763,7 +781,7 @@ class IntermediateTests {
         P2Link[] links = new P2Link[nodes.length];
         for(int i=0;i<nodes.length;i++) {
             int port = startPort + i;
-            links[i] = P2Link.createPublicLink("localhost", port);
+            links[i] = P2Link.createLocalLink(port).toDirect();
             nodes[i] = P2LNode.create(links[i]);
             if(idvListenerCreator != null)
                 nodes[i].addMessageListener(idvListenerCreator.apply(links[i]));
