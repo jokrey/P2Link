@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class P2LThreadPool {
     private final int coreThreads, maxThreads, maxQueuedTasks;
     private List<P2LThread> pool;
-    private Queue<P2LTask> queuedTasks = new LinkedList<>();
+    private Queue<P2LTask<?>> queuedTasks = new LinkedList<>();
 
     public P2LThreadPool(int coreThreads, int maxThreads) {
         this(coreThreads, maxThreads, Integer.MAX_VALUE);
@@ -42,7 +42,7 @@ public class P2LThreadPool {
     private void taskFinished(P2LThread noLongerOccupied) {
         if(shutdown) return;
 
-        P2LTask unstartedTask;
+        P2LTask<?> unstartedTask;
         synchronized (this) {
             unstartedTask = queuedTasks.poll();
 //            System.out.println("taskFinished - left="+queuedTasks.size()+" - new="+unstartedTask);
@@ -245,6 +245,7 @@ public class P2LThreadPool {
             futures.add(execute(task));
         return futures;
     }
+
     public static P2LTask<Boolean> executeSingle(Task t) {
         P2LTask<Boolean> task = new P2LTask<Boolean>() {
             @Override protected Boolean run() {
@@ -257,8 +258,23 @@ public class P2LThreadPool {
                 }
             }
         };
-
         new Thread(task::start).start();
         return task;
     }
+
+    public static <R>P2LTask<R> executeSingle(ProvidingTask<R> t) {
+        P2LTask<R> task = new P2LTask<R>() {
+            @Override protected R run() {
+                try {
+                    return t.run();
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                    return null;//sets task to canceled
+                }
+            }
+        };
+        new Thread(task::start).start();
+        return task;
+    }
+
 }

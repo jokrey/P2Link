@@ -10,14 +10,11 @@ import jokrey.utilities.network.link2peer.node.stream.P2LFragmentInputStream;
 import jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputStream;
 import jokrey.utilities.network.link2peer.util.AsyncRetryer;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
-import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
 import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 
 import java.io.IOException;
 import java.net.SocketAddress;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 /**
  * todo For few dropped packages the number of double resend packages is relatively high
@@ -248,8 +245,8 @@ public class P2LConversationImplV2 implements P2LConversation {
         parent.sendInternalMessage(peer, msg);
     }
     @Override public void initClose(MessageEncoder message) throws IOException {
-        if(step != -2) throw new IllegalStateException("cannot init twice");
         if(isServer) throw new IllegalStateException("init only possible on client side, server does this automatically, use closeWith or answerClose");
+        if(step != -2) throw new IllegalStateException("cannot init twice");
         step = 0;
         answerClose(message);
     }
@@ -472,7 +469,6 @@ public class P2LConversationImplV2 implements P2LConversation {
         handler.remove(this);
         throw new TimeoutException();
     }
-
 
 
 

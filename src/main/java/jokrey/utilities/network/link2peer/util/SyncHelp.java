@@ -94,10 +94,35 @@ public class SyncHelp {
             return false;
         }
     }
+
     public interface IOAction {
         void run() throws IOException;
     }
 
+
+
+    public static boolean wait(Object monitor, long timeout) {
+        synchronized (monitor) {
+            try {
+                monitor.wait(timeout);
+                return true;
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                return false;
+            }
+        }
+    }
+    public static boolean wait(Object monitor) {
+        synchronized (monitor) {
+            try {
+                monitor.wait();
+                return true;
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                return false;
+            }
+        }
+    }
     public static void notify(Object monitor) {
         synchronized (monitor) {
             monitor.notify();

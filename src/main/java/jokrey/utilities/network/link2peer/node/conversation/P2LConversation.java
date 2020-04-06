@@ -260,7 +260,7 @@ public interface P2LConversation {
      * @throws IOException if the message cannot be send
      * @throws TimeoutException if there is no response after (maxAttempts * (m * avRTT + a) + triangularNumber(maxAttempts)*rM) milliseconds
      */
-    @Deprecated void initClose(MessageEncoder message) throws IOException, TimeoutException;
+    void initClose(MessageEncoder message) throws IOException, TimeoutException;
 
 
 
@@ -315,7 +315,10 @@ public interface P2LConversation {
 
 
 
+    //todo - proper comments for the new methods
 
+    //todo MORE DIFFICULT THAN EXPECTED - long messages will internally use an appropriate-method-of-relay, so they will either use a fragment stream or use long messages(split up automatically) or something else
+    //    the caller cannot influence what method is used - though it is decided based on the length of the message.
 
     void initExpectLong(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
     void answerExpectLong(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
@@ -326,13 +329,14 @@ public interface P2LConversation {
     void longAnswerExpectLong(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException;
     void initExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
     void answerExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
-
-
+//    P2LMessage longAnswerExpectAfterPause(TransparentBytesStorage messageSource, int timeout) throws IOException;//NOT REQUIRED - a long answer can always include a pause
+//    void longAnswerExpectLongAfterPause(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException;//NOT REQUIRED - a long answer can always include a pause
 
 
     // important rule for using async methods: Before the next async method in the conversation chain is called, the former one HAS TO HAVE COMPLETED
     //     ensure using either p2lfuture.get() - or p2lfuture.callmeback
-    //todo  unless otherwise noted canceling the returned future will cancel the entire conversation (asap)
+    //     DO NOT USE callmebackfirst - internal structures might be required to run first
+    //     unless otherwise noted canceling the returned future will cancel the entire conversation (asap)
     P2LFuture<P2LMessage> initExpectAsync(MessageEncoder message);
     P2LFuture<P2LMessage> answerExpectAsync(MessageEncoder message);
     P2LFuture<Boolean> answerCloseAsync(MessageEncoder message);
@@ -348,5 +352,6 @@ public interface P2LConversation {
     P2LFuture<Boolean> longAnswerExpectLongAsync(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget);
     P2LFuture<Boolean> initExpectLongAsyncAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget);
     P2LFuture<Boolean> answerExpectLongAsyncAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget);
-
+//    P2LFuture<P2LMessage> longAnswerExpectAsyncAfterPause(TransparentBytesStorage messageSource);//NOT REQUIRED - a long answer can always include a pause
+//    P2LFuture<Boolean> longAnswerExpectLongAsyncAfterPause(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget);//NOT REQUIRED - a long answer can always include a pause
 }
