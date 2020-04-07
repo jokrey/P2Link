@@ -94,7 +94,7 @@ public class RelayedConnectionProtocol {
             convoWithSecondPeer.initClose(convoWithSecondPeer.encodeSingle(directLinkToRequesterPeerBytes));
         } else {
 
-            InterfaceAddress localIPv4InterfaceAddress = NetUtil.getLocalIPv4Interface();
+            InterfaceAddress localIPv4InterfaceAddress = NetUtil.getLocalIPv4InterfaceAddress();
             boolean isRequesterPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressSecondPeer.getAddress(), localIPv4InterfaceAddress);
             boolean isSecondPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressSecondPeer.getAddress(), localIPv4InterfaceAddress);
 
