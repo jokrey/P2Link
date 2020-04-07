@@ -42,7 +42,7 @@ public class P2LConnection {
     @Override public String toString() {
         return "P2LConnection{" +
                 "link=" + link +
-                "address=" + address +
+//                ", address=" + address +
                 ", remoteBufferSize=" + remoteBufferSize +
                 ", avRTT=" + avRTT +
                 ", lastPacketReceived=" + lastPacketReceived +
@@ -55,10 +55,13 @@ public class P2LConnection {
         P2LConnection that = (P2LConnection) o;
         return remoteBufferSize == that.remoteBufferSize &&
                 avRTT == that.avRTT &&
-                Objects.equals(link, that.link) &&
-                Objects.equals(address, that.address);
+                Objects.equals(link, that.link)
+//                && Objects.equals(address, that.address)
+                ;
     }
     @Override public int hashCode() {
-        return Objects.hash(link, address, remoteBufferSize, avRTT);
+        return Objects.hash(link,
+//                address,
+                remoteBufferSize, avRTT);
     }
 }

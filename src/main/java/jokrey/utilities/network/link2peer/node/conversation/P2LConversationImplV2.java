@@ -173,7 +173,7 @@ public class P2LConversationImplV2 implements P2LConversation {
             }
         }
 
-        throw new TimeoutException();
+        throw new TimeoutException("after "+maxAttempts+" attempts");
     }
 
 
