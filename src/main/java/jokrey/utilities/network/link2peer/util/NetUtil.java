@@ -2,14 +2,23 @@ package jokrey.utilities.network.link2peer.util;
 
 import jokrey.utilities.bitsandbytes.BitHelper;
 import java.net.*;
+import java.util.Enumeration;
 
 /**
  * @author jokrey
  */
 public class NetUtil {
-    public static InterfaceAddress getLocalIPv4Interface() throws UnknownHostException, SocketException {
+    public static InterfaceAddress getLocalIPv4InterfaceAddress() throws UnknownHostException, SocketException {
         InetAddress localHost = Inet4Address.getLocalHost();
         NetworkInterface networkInterface = NetworkInterface.getByInetAddress(localHost);
+        if(networkInterface == null) {
+            Enumeration<NetworkInterface> allInterfaces = NetworkInterface.getNetworkInterfaces();
+            while(networkInterface == null && allInterfaces.hasMoreElements())
+                networkInterface = allInterfaces.nextElement();
+            if(networkInterface == null)
+                return null;
+        }
+
         return networkInterface.getInterfaceAddresses().stream().filter(it -> it.getAddress() instanceof Inet4Address).findFirst().orElse(null);
     }
     public static boolean isV4AndFromSameSubnet(InetAddress anyIP, InterfaceAddress localIPv4InterfaceAddress) {

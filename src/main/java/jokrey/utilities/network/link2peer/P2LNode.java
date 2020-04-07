@@ -9,8 +9,6 @@ import jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes;
 import jokrey.utilities.network.link2peer.node.stream.*;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
-import org.jetbrains.annotations.NotNull;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
