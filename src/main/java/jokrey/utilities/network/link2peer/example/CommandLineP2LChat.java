@@ -9,6 +9,7 @@ import jokrey.utilities.network.link2peer.node.P2LHeuristics;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 
@@ -29,7 +30,7 @@ public class CommandLineP2LChat {
                 System.out.println("Link Format:\n" +
                         "  direct link:\n" +
                         "     <ip/dns>:<port>\n" +
-                        "  relayed link:\n" +
+                        "  relayed link [NO USE HERE - CAN BE USED TO CONNECT]:\n" +
                         "     <name>[<direct link of relay server>]\n" +
                         "  local link:\n" +
                         "     <name>-at-<port>");
@@ -74,7 +75,7 @@ public class CommandLineP2LChat {
         loop.addCommand("close", "closes this node and kills the process", args -> {
             node.close();System.exit(0);
         }, "exit");
-        loop.addCommand("printActivePeers", "Prints all active peer links", Argument.noargs(), args -> System.out.println(node.getEstablishedConnections()),
+        loop.addCommand("printActivePeers", "Prints all active peer links", Argument.noargs(), args -> System.out.println(Arrays.toString(node.getEstablishedConnections())),
                 "peers");
         loop.addCommand("printSelf", "Prints own nodes link", Argument.noargs(), args -> System.out.println(node.getSelfLink()),
                 "self", "me");

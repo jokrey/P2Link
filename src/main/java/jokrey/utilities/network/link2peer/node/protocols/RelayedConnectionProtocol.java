@@ -1,5 +1,6 @@
 package jokrey.utilities.network.link2peer.node.protocols;
 
+import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
@@ -12,15 +13,16 @@ import java.io.IOException;
 import java.net.*;
 import java.util.function.BiConsumer;
 
-import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.SL_CONNECTION_RELAY;
-import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.SL_REQUEST_DIRECT_CONNECT_TO;
+import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.*;
 
 /**
  * @author jokrey
  */
 public class RelayedConnectionProtocol {
     private static final byte NAME_UNKNOWN = -1;
-    private static final byte SUCCESS = 1;
+    private static final byte EXPECT_INCOMING_CONNECTION = 1;
+    private static final byte CONTINUE_WITH_NAT_PUNCH = 2;
+    private static final byte CONTINUE_WITH_NAT_PUNCH_MODIFY_DESTINATION_IP_TO_RELAY_IP = 3;
 
     public static boolean asInitiator(P2LNodeInternal parent, P2Link.Relayed to) {
         System.out.println(parent.getSelfLink()+" - RelayedConnectionProtocol.asInitiator - to = " + to);
@@ -33,28 +35,39 @@ public class RelayedConnectionProtocol {
 
                 byte result = convo.initExpectClose(convo.encode(true, to.name)).nextByte();
                 System.out.println(parent.getSelfLink()+" - d1 - result: "+result);
-                if(result == NAME_UNKNOWN || result != SUCCESS) {
-                    return false;
-                } else {
+                if (result == EXPECT_INCOMING_CONNECTION) {
                     return reverseConnectionEstablishedFuture.get(5000);
+                } else {
+                    return false;
                 }
             } else {
                 P2LMessage m1 = convo.initExpect(convo.encode(false, to.name));
                 byte result = m1.nextByte();
                 System.out.println(parent.getSelfLink()+" - d2 - result: "+result);
-                if(result == NAME_UNKNOWN || result != SUCCESS) {
-                    return false;
-                } else {
-                    P2Link.Direct directLinkOfRequestedNameAsSeenFromRelayLinkPeer = (P2Link.Direct) P2Link.Direct.from(m1.nextVariable());
+                if (result == CONTINUE_WITH_NAT_PUNCH) {
+                    P2Link.Direct directLinkOfRequestedName = (P2Link.Direct) P2Link.Direct.from(m1.nextVariable());
 
                     //before we close we will send a packet to the link, just so we create a hole in our own firewall.. We need no response, as it is too likely that it at least reached our router - creating the hole.
-                    parent.sendInternalMessage(directLinkOfRequestedNameAsSeenFromRelayLinkPeer.resolve(), P2LMessage.Factory.createNatHolePacket());
+                    parent.sendInternalMessage(directLinkOfRequestedName.resolve(), P2LMessage.Factory.createNatHolePacket());
 
                     P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, conversationId);
 
                     convo.close(); //now we can close and the remote can attempt a connection to our ip (not known to us, but known to the peer we used to relay) - an ip which should now have an NAT-entry for the remote
 
                     return reverseConnectionEstablishedFuture.get(5000);
+                } else if(result == CONTINUE_WITH_NAT_PUNCH_MODIFY_DESTINATION_IP_TO_RELAY_IP) {
+                    P2Link.Direct directLinkOfRequestedName = new P2Link.Direct(to.relayLink.dnsOrIp, m1.nextInt());
+
+                    //before we close we will send a packet to the link, just so we create a hole in our own firewall.. We need no response, as it is too likely that it at least reached our router - creating the hole.
+                    parent.sendInternalMessage(directLinkOfRequestedName.resolve(), P2LMessage.Factory.createNatHolePacket());
+
+                    P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, conversationId);
+
+                    convo.close(); //now we can close and the remote can attempt a connection to our ip (not known to us, but known to the peer we used to relay) - an ip which should now have an NAT-entry for the remote
+
+                    return reverseConnectionEstablishedFuture.get(5000);
+                } else {
+                    return false;
                 }
             }
         } catch (TimeoutException | IOException e) {
@@ -62,6 +75,7 @@ public class RelayedConnectionProtocol {
         }
     }
 
+    //SL_REQUEST_DIRECT_CONNECT_TO
     public static void asAnswerer_ConnectTo(P2LNodeInternal parent, P2LConversation convo, P2LMessage m0) throws IOException {
         System.out.println(parent.getSelfLink()+" - RelayedConnectionProtocol.asAnswerer_ConnectTo");
         convo.close();
@@ -70,8 +84,18 @@ public class RelayedConnectionProtocol {
         DirectConnectionProtocol.asInitiator(parent, toConnectTo.resolve(), convo.getConversationId());
     }
 
+    //SL_REQUEST_DIRECT_CONNECT_TO_MODIFY_DESTINATION_IP_TO_RELAY_IP
+    public static void asAnswerer_ConnectTo_modifyDestinationIpToRelayIp(P2LNodeInternal parent, P2LConversation convo, P2LMessage m0) throws IOException {
+        System.out.println(parent.getSelfLink()+" - RelayedConnectionProtocol.asAnswerer_ConnectTo_modifyDestinationIpToRelayIp");
+        convo.close();
+        P2Link.Direct toConnectTo = new P2Link.Direct(convo.getPeer().getHostName(), m0.nextInt());
+        System.out.println(parent.getSelfLink()+" - toConnectTo = " + toConnectTo);
+        DirectConnectionProtocol.asInitiator(parent, toConnectTo.resolve(), convo.getConversationId());
+    }
+
     //SL_CONNECTION_RELAY
     public static void asAnswerer_RelayConnection(P2LNodeInternal parent, P2LConversation convo, P2LMessage m0) throws IOException {
+        InetSocketAddress rawAddressRequesterPeer = convo.getPeer();
         System.out.println(parent.getSelfLink()+" - RelayedConnectionProtocol.asAnswerer_RelayConnection");
         int connectionId = convo.getConversationId();
         boolean isRequestComingFromPubliclyAvailableLink = m0.nextBool();
@@ -83,13 +107,13 @@ public class RelayedConnectionProtocol {
             return;
         }
         byte[] directLinkToSecondPeerBytes = new P2Link.Direct(rawAddressSecondPeer).toBytes();
-        byte[] directLinkToRequesterPeerBytes = new P2Link.Direct(convo.getPeer()).toBytes();
+        byte[] directLinkToRequesterPeerBytes = new P2Link.Direct(rawAddressRequesterPeer).toBytes();
 
         //we do not inform the peer that requested the relay of the result, nor does the second peer inform us whether it accepted the request.
         //  the initially requesting peer will notice via timeout that no one connected to it.
         if(isRequestComingFromPubliclyAvailableLink) {
             //No need to NAT punch, requester is public
-            convo.closeWith(convo.encode(SUCCESS));
+            convo.closeWith(convo.encode(EXPECT_INCOMING_CONNECTION));
             P2LConversation convoWithSecondPeer = parent.internalConvo(SL_REQUEST_DIRECT_CONNECT_TO, connectionId, rawAddressSecondPeer);
             convoWithSecondPeer.initClose(convoWithSecondPeer.encodeSingle(directLinkToRequesterPeerBytes));
         } else {
@@ -98,11 +122,30 @@ public class RelayedConnectionProtocol {
             boolean isRequesterPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressSecondPeer.getAddress(), localIPv4InterfaceAddress);
             boolean isSecondPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressSecondPeer.getAddress(), localIPv4InterfaceAddress);
 
-            //NAT PUNCH - requester has already send punching packet(which will likely not be received by remote) - so now the remote can start sending
-            convo.answerClose(convo.encode(SUCCESS, directLinkToSecondPeerBytes));
+            if(isRequesterPeerInLocalSubnet == isSecondPeerInLocalSubnet) { //i.e. either both in WAN or both in LAN - i.e. nat punch is either not required but works anyways or is required and hopefully works(nat config)
+                //NAT PUNCH - requester has already send punching packet(which will likely not be received by remote) - so now the remote can start sending
+                convo.answerClose(convo.encode(CONTINUE_WITH_NAT_PUNCH, directLinkToSecondPeerBytes)); //THIS HAS TO COMPLETE BEFORE WE TELL SECOND PEER TO CONNECT - IT CONTAINS THE NAT PUNCH INITIAL MESSAGE
 
-            P2LConversation convoWithSecondPeer = parent.internalConvo(SL_REQUEST_DIRECT_CONNECT_TO, connectionId, rawAddressSecondPeer);
-            convoWithSecondPeer.initClose(convoWithSecondPeer.encodeSingle(directLinkToRequesterPeerBytes));
+                //now that a nat hole exists in the requester's nat, we can simply initiate a connection to it from the second peer (which will create a nat hole with its first message)
+                P2LConversation convoWithSecondPeer = parent.internalConvo(SL_REQUEST_DIRECT_CONNECT_TO, connectionId, rawAddressSecondPeer);
+                convoWithSecondPeer.initClose(convoWithSecondPeer.encodeSingle(directLinkToRequesterPeerBytes));
+            } else if(isSecondPeerInLocalSubnet) { //requires the server to be behind a symmetric nat
+                //We still do the NAT punch, but we assume that our nat is SYMMETRIC and that it's outgoing port will be the same that we see here...
+                //   however since it is in the same subnet we are, we let the remote modify the ip to ours - hoping that we and the second peer are behind the same nat
+                convo.answerClose(convo.encode(CONTINUE_WITH_NAT_PUNCH_MODIFY_DESTINATION_IP_TO_RELAY_IP, rawAddressSecondPeer.getPort())); //THIS HAS TO COMPLETE BEFORE WE TELL SECOND PEER TO CONNECT - IT CONTAINS THE NAT PUNCH INITIAL MESSAGE
+
+                //continue normally
+                P2LConversation convoWithSecondPeer = parent.internalConvo(SL_REQUEST_DIRECT_CONNECT_TO, connectionId, rawAddressSecondPeer);
+                convoWithSecondPeer.initClose(convoWithSecondPeer.encodeSingle(directLinkToRequesterPeerBytes));
+            } else if(isRequesterPeerInLocalSubnet) { //requires the server to be behind a symmetric nat
+                //the requester can do a normal nat punch
+                convo.answerClose(convo.encode(CONTINUE_WITH_NAT_PUNCH, directLinkToSecondPeerBytes)); //THIS HAS TO COMPLETE BEFORE WE TELL SECOND PEER TO CONNECT - IT CONTAINS THE NAT PUNCH INITIAL MESSAGE
+
+                //but the second peer will have to connect to a modified address, consisting of what it sees as source ip from our request and the port of the requester peer
+                P2LConversation convoWithSecondPeer = parent.internalConvo(SL_REQUEST_DIRECT_CONNECT_TO_MODIFY_DESTINATION_IP_TO_RELAY_IP, connectionId, rawAddressSecondPeer);
+                convoWithSecondPeer.initClose(convoWithSecondPeer.encode(rawAddressRequesterPeer.getPort()));
+            }
+
         }
     }
 

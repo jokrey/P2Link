@@ -129,6 +129,9 @@ public class IncomingHandler {
         conversationMessageHandler.registerConversationHandlerFor(SL_REQUEST_DIRECT_CONNECT_TO, ((convo, m0) -> {
             RelayedConnectionProtocol.asAnswerer_ConnectTo(parent, convo, m0);
         }));
+        conversationMessageHandler.registerConversationHandlerFor(SL_REQUEST_DIRECT_CONNECT_TO_MODIFY_DESTINATION_IP_TO_RELAY_IP, ((convo, m0) -> {
+            RelayedConnectionProtocol.asAnswerer_ConnectTo_modifyDestinationIpToRelayIp(parent, convo, m0);
+        }));
         conversationMessageHandler.registerConversationHandlerFor(SL_CONNECTION_RELAY, ((convo, m0) -> {
             RelayedConnectionProtocol.asAnswerer_RelayConnection(parent, convo, m0);
         }));
