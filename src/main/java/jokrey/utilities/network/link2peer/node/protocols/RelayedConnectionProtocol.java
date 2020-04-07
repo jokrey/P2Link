@@ -4,11 +4,12 @@ import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
+import jokrey.utilities.network.link2peer.util.NetUtil;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
+import java.net.*;
 import java.util.function.BiConsumer;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.SL_CONNECTION_RELAY;
@@ -93,7 +94,11 @@ public class RelayedConnectionProtocol {
             convoWithSecondPeer.initClose(convoWithSecondPeer.encodeSingle(directLinkToRequesterPeerBytes));
         } else {
 
-            //DO NAT PUNCH
+            InterfaceAddress localIPv4InterfaceAddress = NetUtil.getLocalIPv4Interface();
+            boolean isRequesterPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressSecondPeer.getAddress(), localIPv4InterfaceAddress);
+            boolean isSecondPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressSecondPeer.getAddress(), localIPv4InterfaceAddress);
+
+            //NAT PUNCH - requester has already send punching packet(which will likely not be received by remote) - so now the remote can start sending
             convo.answerClose(convo.encode(SUCCESS, directLinkToSecondPeerBytes));
 
             P2LConversation convoWithSecondPeer = parent.internalConvo(SL_REQUEST_DIRECT_CONNECT_TO, connectionId, rawAddressSecondPeer);
