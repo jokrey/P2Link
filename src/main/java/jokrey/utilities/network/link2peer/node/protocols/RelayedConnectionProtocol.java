@@ -29,6 +29,7 @@ public class RelayedConnectionProtocol {
         try {
             short conversationId = createConversationForRelay(parent);
             P2LConversation convo = parent.internalConvo(SL_CONNECTION_RELAY, conversationId, to.relayLink.resolve());
+            convo.setA(100);
 
             if(parent.getSelfLink().isDirect()) {
                 P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, conversationId);
