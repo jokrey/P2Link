@@ -150,6 +150,7 @@ public class IncomingHandler {
                 DatagramPacket receivedPacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
                 try {
                     serverSocket.receive(receivedPacket);
+                    System.out.println("received packet from: "+receivedPacket.getSocketAddress());
 
                     handleReceivedMessagesPool.execute(() -> {
                         //has to be on a thread, because most protocols also wait for an answer - that has to be done outside of the thread that receives the answer (the outer thread here...)

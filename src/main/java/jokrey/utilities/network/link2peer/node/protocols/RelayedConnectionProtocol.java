@@ -29,7 +29,7 @@ public class RelayedConnectionProtocol {
         try {
             short conversationId = createConversationForRelay(parent);
             P2LConversation convo = parent.internalConvo(SL_CONNECTION_RELAY, conversationId, to.relayLink.resolve());
-            convo.setA(100);
+            convo.setRM(300); //for some reason the first packet takes a while to complete - so lets wait a little longer
 
             if(parent.getSelfLink().isDirect()) {
                 P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, conversationId);
@@ -97,7 +97,6 @@ public class RelayedConnectionProtocol {
 
     //SL_CONNECTION_RELAY
     public static void asAnswerer_RelayConnection(P2LNodeInternal parent, P2LConversation convo, P2LMessage m0) throws IOException {
-        convo.setA(100);
         InetSocketAddress rawAddressRequesterPeer = convo.getPeer();
         System.out.println(parent.getSelfLink()+" - RelayedConnectionProtocol.asAnswerer_RelayConnection - "+convo.getPeer());
         int connectionId = convo.getConversationId();
