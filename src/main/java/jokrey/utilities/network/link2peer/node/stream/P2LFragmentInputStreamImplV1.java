@@ -5,7 +5,7 @@ import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.node.message_headers.StreamReceiptHeader;
-import jokrey.utilities.network.link2peer.util.LongTupleList;
+import jokrey.utilities.simple.data_structure.lists.LongTupleList;
 import jokrey.utilities.network.link2peer.util.SyncHelp;
 
 import java.io.IOException;

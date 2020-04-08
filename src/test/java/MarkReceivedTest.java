@@ -1,5 +1,5 @@
 import jokrey.utilities.network.link2peer.node.stream.P2LFragmentInputStreamImplV1;
-import jokrey.utilities.network.link2peer.util.LongTupleList;
+import jokrey.utilities.simple.data_structure.lists.LongTupleList;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

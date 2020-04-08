@@ -3,7 +3,7 @@ package jokrey.utilities.network.link2peer.node.stream;
 import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.node.message_headers.StreamReceiptHeader;
-import jokrey.utilities.network.link2peer.util.LongTupleList;
+import jokrey.utilities.simple.data_structure.lists.LongTupleList;
 
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 
