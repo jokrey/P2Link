@@ -112,6 +112,8 @@ public class RelayedConnectionProtocol {
         //we do not inform the peer that requested the relay of the result, nor does the second peer inform us whether it accepted the request.
         //  the initially requesting peer will notice via timeout that no one connected to it.
         if(isRequestComingFromPubliclyAvailableLink) {
+            System.out.println(parent.getSelfLink()+" - isRequestComingFromPubliclyAvailableLink");
+
             //No need to NAT punch, requester is public
             convo.closeWith(convo.encode(EXPECT_INCOMING_CONNECTION));
             P2LConversation convoWithSecondPeer = parent.internalConvo(SL_REQUEST_DIRECT_CONNECT_TO, connectionId, rawAddressSecondPeer);
@@ -123,6 +125,7 @@ public class RelayedConnectionProtocol {
             boolean isSecondPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressSecondPeer.getAddress(), localIPv4InterfaceAddress);
 
             if(isRequesterPeerInLocalSubnet == isSecondPeerInLocalSubnet) { //i.e. either both in WAN or both in LAN - i.e. nat punch is either not required but works anyways or is required and hopefully works(nat config)
+                System.out.println(parent.getSelfLink()+" - isRequesterPeerInLocalSubnet == isSecondPeerInLocalSubnet");
                 //NAT PUNCH - requester has already send punching packet(which will likely not be received by remote) - so now the remote can start sending
                 convo.answerClose(convo.encode(CONTINUE_WITH_NAT_PUNCH, directLinkToSecondPeerBytes)); //THIS HAS TO COMPLETE BEFORE WE TELL SECOND PEER TO CONNECT - IT CONTAINS THE NAT PUNCH INITIAL MESSAGE
 
@@ -130,6 +133,8 @@ public class RelayedConnectionProtocol {
                 P2LConversation convoWithSecondPeer = parent.internalConvo(SL_REQUEST_DIRECT_CONNECT_TO, connectionId, rawAddressSecondPeer);
                 convoWithSecondPeer.initClose(convoWithSecondPeer.encodeSingle(directLinkToRequesterPeerBytes));
             } else if(isSecondPeerInLocalSubnet) { //requires the server to be behind a symmetric nat
+                System.out.println(parent.getSelfLink()+" - isSecondPeerInLocalSubnet");
+
                 //We still do the NAT punch, but we assume that our nat is SYMMETRIC and that it's outgoing port will be the same that we see here...
                 //   however since it is in the same subnet we are, we let the remote modify the ip to ours - hoping that we and the second peer are behind the same nat
                 convo.answerClose(convo.encode(CONTINUE_WITH_NAT_PUNCH_MODIFY_DESTINATION_IP_TO_RELAY_IP, rawAddressSecondPeer.getPort())); //THIS HAS TO COMPLETE BEFORE WE TELL SECOND PEER TO CONNECT - IT CONTAINS THE NAT PUNCH INITIAL MESSAGE
@@ -138,6 +143,7 @@ public class RelayedConnectionProtocol {
                 P2LConversation convoWithSecondPeer = parent.internalConvo(SL_REQUEST_DIRECT_CONNECT_TO, connectionId, rawAddressSecondPeer);
                 convoWithSecondPeer.initClose(convoWithSecondPeer.encodeSingle(directLinkToRequesterPeerBytes));
             } else if(isRequesterPeerInLocalSubnet) { //requires the server to be behind a symmetric nat
+                System.out.println(parent.getSelfLink()+" - isRequesterPeerInLocalSubnet");
                 //the requester can do a normal nat punch
                 convo.answerClose(convo.encode(CONTINUE_WITH_NAT_PUNCH, directLinkToSecondPeerBytes)); //THIS HAS TO COMPLETE BEFORE WE TELL SECOND PEER TO CONNECT - IT CONTAINS THE NAT PUNCH INITIAL MESSAGE
 
