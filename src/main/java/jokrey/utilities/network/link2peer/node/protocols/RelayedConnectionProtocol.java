@@ -71,6 +71,7 @@ public class RelayedConnectionProtocol {
                 }
             }
         } catch (TimeoutException | IOException e) {
+            e.printStackTrace();
             return false;
         }
     }
