@@ -8,18 +8,39 @@ import java.util.Enumeration;
  * @author jokrey
  */
 public class NetUtil {
-    public static InterfaceAddress getLocalIPv4InterfaceAddress() throws UnknownHostException, SocketException {
-        InetAddress localHost = Inet4Address.getLocalHost();
-        NetworkInterface networkInterface = NetworkInterface.getByInetAddress(localHost);
-        if(networkInterface == null) {
-            Enumeration<NetworkInterface> allInterfaces = NetworkInterface.getNetworkInterfaces();
-            while(networkInterface == null && allInterfaces.hasMoreElements())
-                networkInterface = allInterfaces.nextElement();
-            if(networkInterface == null)
-                return null;
-        }
+    public static InterfaceAddress getLocalIPv6InterfaceAddress() {
+        try {
+            InetAddress localHost = Inet6Address.getLocalHost();
+            NetworkInterface networkInterface = NetworkInterface.getByInetAddress(localHost);
+            if(networkInterface == null) {
+                Enumeration<NetworkInterface> allInterfaces = NetworkInterface.getNetworkInterfaces();
+                while(networkInterface == null && allInterfaces.hasMoreElements())
+                    networkInterface = allInterfaces.nextElement();
+                if(networkInterface == null)
+                    return null;
+            }
 
-        return networkInterface.getInterfaceAddresses().stream().filter(it -> it.getAddress() instanceof Inet4Address).findFirst().orElse(null);
+            return networkInterface.getInterfaceAddresses().stream().filter(it -> it.getAddress() instanceof Inet6Address).findFirst().orElse(null);
+        } catch (UnknownHostException | SocketException e) {
+            return null;
+        }
+    }
+    public static InterfaceAddress getLocalIPv4InterfaceAddress() {
+        try {
+            InetAddress localHost = Inet4Address.getLocalHost();
+            NetworkInterface networkInterface = NetworkInterface.getByInetAddress(localHost);
+            if(networkInterface == null) {
+                Enumeration<NetworkInterface> allInterfaces = NetworkInterface.getNetworkInterfaces();
+                while(networkInterface == null && allInterfaces.hasMoreElements())
+                    networkInterface = allInterfaces.nextElement();
+                if(networkInterface == null)
+                    return null;
+            }
+
+            return networkInterface.getInterfaceAddresses().stream().filter(it -> it.getAddress() instanceof Inet4Address).findFirst().orElse(null);
+        } catch (UnknownHostException | SocketException e) {
+            return null;
+        }
     }
     public static boolean isV4AndFromSameSubnet(InetAddress anyIP, InterfaceAddress localIPv4InterfaceAddress) {
         if(anyIP instanceof Inet4Address) {

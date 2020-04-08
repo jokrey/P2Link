@@ -9,20 +9,25 @@ import jokrey.utilities.network.link2peer.node.conversation.ConversationAnswerer
 import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
 import jokrey.utilities.network.link2peer.node.protocols.*;
 import jokrey.utilities.network.link2peer.node.stream.*;
+import jokrey.utilities.network.link2peer.util.NetUtil;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
+import jokrey.utilities.network.link2peer.util.SyncHelp;
 import jokrey.utilities.simple.data_structure.BadConcurrentMultiKeyMap;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.InterfaceAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.validateMsgTypeNotInternal;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.*;
@@ -333,9 +338,14 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         return outgoingPool.execute(tasks);
     }
 
-
-
-
+    private AtomicReference<InterfaceAddress> ip4InterfaceAddress = new AtomicReference<>(null);
+    @Override public InterfaceAddress getLocalIPv4InterfaceAddress() {
+        return SyncHelp.lazy(this, ip4InterfaceAddress, NetUtil::getLocalIPv4InterfaceAddress);
+    }
+    private AtomicReference<InterfaceAddress> ip6InterfaceAddress = new AtomicReference<>(null);
+    @Override public InterfaceAddress getLocalIPv6InterfaceAddress() {
+        return SyncHelp.lazy(this, ip6InterfaceAddress, NetUtil::getLocalIPv6InterfaceAddress);
+    }
 
     //LISTENERS:
     private final ArrayList<P2LMessageListener> individualMessageListeners = new ArrayList<>();

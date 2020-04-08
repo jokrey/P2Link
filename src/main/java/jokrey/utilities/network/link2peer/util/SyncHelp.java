@@ -1,6 +1,7 @@
 package jokrey.utilities.network.link2peer.util;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import static jokrey.utilities.network.link2peer.util.P2LFuture.ENDLESS_WAIT;
@@ -93,6 +94,20 @@ public class SyncHelp {
         } catch (InterruptedException e) {
             return false;
         }
+    }
+
+    public static <T> T lazy(Object monitor, AtomicReference<T> reference, Supplier<T> supplier) {
+        T t = reference.get();
+        if(t == null) {
+            synchronized (monitor) {//synchronizing over supplier is fine, as long as i
+                t = reference.get();
+                if(t == null) {
+                    t = supplier.get();
+                    reference.set(t);
+                }
+            }
+        }
+        return t;
     }
 
     public interface IOAction {

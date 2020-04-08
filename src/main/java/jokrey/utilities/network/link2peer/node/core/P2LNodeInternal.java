@@ -8,11 +8,13 @@ import jokrey.utilities.network.link2peer.node.stream.P2LFragmentInputStream;
 import jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputStream;
 import jokrey.utilities.network.link2peer.node.stream.P2LInputStream;
 import jokrey.utilities.network.link2peer.node.stream.P2LOutputStream;
+import jokrey.utilities.network.link2peer.util.NetUtil;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.InterfaceAddress;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.validateMsgTypeNotInternal;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_STEP;
@@ -101,4 +103,9 @@ public interface P2LNodeInternal extends P2LNode {
         validateMsgTypeNotInternal(type);
         return expectInternalMessage(from, type, conversationId);
     }
+
+
+
+    InterfaceAddress getLocalIPv4InterfaceAddress();
+    InterfaceAddress getLocalIPv6InterfaceAddress();
 }

@@ -97,7 +97,7 @@ public class RelayedConnectionProtocol {
     //SL_CONNECTION_RELAY
     public static void asAnswerer_RelayConnection(P2LNodeInternal parent, P2LConversation convo, P2LMessage m0) throws IOException {
         InetSocketAddress rawAddressRequesterPeer = convo.getPeer();
-        System.out.println(parent.getSelfLink()+" - RelayedConnectionProtocol.asAnswerer_RelayConnection");
+        System.out.println(parent.getSelfLink()+" - RelayedConnectionProtocol.asAnswerer_RelayConnection - "+convo.getPeer());
         int connectionId = convo.getConversationId();
         boolean isRequestComingFromPubliclyAvailableLink = m0.nextBool();
         String nameOfSecondPeer = m0.nextVariableString();
@@ -121,9 +121,8 @@ public class RelayedConnectionProtocol {
             convoWithSecondPeer.initClose(convoWithSecondPeer.encodeSingle(directLinkToRequesterPeerBytes));
         } else {
 
-            InterfaceAddress localIPv4InterfaceAddress = NetUtil.getLocalIPv4InterfaceAddress();
-            boolean isRequesterPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressRequesterPeer.getAddress(), localIPv4InterfaceAddress);
-            boolean isSecondPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressSecondPeer.getAddress(), localIPv4InterfaceAddress);
+            boolean isRequesterPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressRequesterPeer.getAddress(), parent.getLocalIPv4InterfaceAddress());
+            boolean isSecondPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressSecondPeer.getAddress(), parent.getLocalIPv4InterfaceAddress());
 
             if(isRequesterPeerInLocalSubnet == isSecondPeerInLocalSubnet) { //i.e. either both in WAN or both in LAN - i.e. nat punch is either not required but works anyways or is required and hopefully works(nat config)
                 System.out.println(parent.getSelfLink()+" - isRequesterPeerInLocalSubnet == isSecondPeerInLocalSubnet");
