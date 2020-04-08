@@ -97,15 +97,30 @@ public abstract class P2Link {
         @Override public int getPort() { return port; }
     }
 
-    //TODO - put under new 'Named' superclass
 
-    //NOTE: EQUALS AND HASH CODE ONLY BY NAME - WILL SHOW EQUALITY WITH LOCAL
-    public static class Relayed extends P2Link {
+    public static abstract class Named extends P2Link {
         public final String name;
+
+        public Named(String name) {
+            this.name = name;
+        }
+
+        @Override public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof Named)) return false;
+            Named named = (Named) o;
+            return Objects.equals(name, named.name);
+        }
+        @Override public int hashCode() {
+            return Objects.hash(name);
+        }
+    }
+
+    public static class Relayed extends Named {
         public final Direct relayLink;
 
         public Relayed(String name, Direct relayLink) {
-            this.name = name;
+            super(name);
             this.relayLink = relayLink;
         }
 
@@ -129,33 +144,16 @@ public abstract class P2Link {
             return name + '[' + relayLink + ']';
         }
 
-        @Override public boolean equals(Object o) {
-            if (this == o) return true;
-            if(o instanceof Relayed) {
-                Relayed local = (Relayed) o;
-                return Objects.equals(name, local.name);
-            } else if(o instanceof Local) {
-                Local local = (Local) o;
-                return Objects.equals(name, local.name);
-            } else
-                return false;
-        }
-        @Override public int hashCode() {
-            return Objects.hash(name);
-        }
-
         @Override public int getPort() {
             throw new UnsupportedOperationException("Port is unknown for relayed connections (as it can be changed by intermediate NATs)");
         }
     }
 
-    //NOTE: EQUALS AND HASH CODE ONLY BY NAME - WILL SHOW EQUALITY WITH RELAYED
-    public static class Local extends P2Link {
-        public final String name;
+    public static class Local extends Named {
         public final int port;
 
         public Local(String name, int port) {
-            this.name = name;
+            super(name);
             this.port = port;
         }
         public static Local forTest(int port) {
@@ -174,21 +172,6 @@ public abstract class P2Link {
         }
         @Override public String toString() {
             return name + "-at-" + port;
-        }
-
-        @Override public boolean equals(Object o) {
-            if (this == o) return true;
-            if(o instanceof Local) {
-                Local local = (Local) o;
-                return Objects.equals(name, local.name);
-            } else if(o instanceof Relayed) {
-                Relayed local = (Relayed) o;
-                return Objects.equals(name, local.name);
-            } else
-                return false;
-        }
-        @Override public int hashCode() {
-            return Objects.hash(name);
         }
 
         @Override public int getPort() { return port; }
