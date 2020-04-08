@@ -338,13 +338,13 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         return outgoingPool.execute(tasks);
     }
 
-    private AtomicReference<InterfaceAddress> ip4InterfaceAddress = new AtomicReference<>(null);
+    private final InterfaceAddress ip4InterfaceAddress = NetUtil.getLocalIPv4InterfaceAddress(); //might take a while to instantiate - so we have to do it before
     @Override public InterfaceAddress getLocalIPv4InterfaceAddress() {
-        return SyncHelp.lazy(this, ip4InterfaceAddress, NetUtil::getLocalIPv4InterfaceAddress);
+        return ip4InterfaceAddress;
     }
-    private AtomicReference<InterfaceAddress> ip6InterfaceAddress = new AtomicReference<>(null);
+    private InterfaceAddress ip6InterfaceAddress = NetUtil.getLocalIPv4InterfaceAddress(); //might take a while to instantiate - so we have to do it before
     @Override public InterfaceAddress getLocalIPv6InterfaceAddress() {
-        return SyncHelp.lazy(this, ip6InterfaceAddress, NetUtil::getLocalIPv6InterfaceAddress);
+        return ip6InterfaceAddress;
     }
 
     //LISTENERS:

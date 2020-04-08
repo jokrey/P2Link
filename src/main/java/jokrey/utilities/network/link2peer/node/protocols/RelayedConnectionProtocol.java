@@ -96,6 +96,7 @@ public class RelayedConnectionProtocol {
 
     //SL_CONNECTION_RELAY
     public static void asAnswerer_RelayConnection(P2LNodeInternal parent, P2LConversation convo, P2LMessage m0) throws IOException {
+        convo.setA(100);
         InetSocketAddress rawAddressRequesterPeer = convo.getPeer();
         System.out.println(parent.getSelfLink()+" - RelayedConnectionProtocol.asAnswerer_RelayConnection - "+convo.getPeer());
         int connectionId = convo.getConversationId();
