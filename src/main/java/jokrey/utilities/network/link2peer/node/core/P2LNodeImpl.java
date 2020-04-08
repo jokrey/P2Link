@@ -160,7 +160,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
             incomingHandler.serverSocket.send(message.toPacket(to));
         } else {
             //todo - is it really desirable to have packages be broken up THIS automatically???
-            //todo    - like it is cool that breaking up packages does not make a difference, but... like it is so transparent it could lead to inefficiencies
+            //    - like it is cool that breaking up packages does not make a difference, but... like it is so transparent it could lead to inefficiencies
 //            throw new IllegalStateException(message.size+"");
             System.out.println("sendLong(being broken up) - message = " + message + ", to = " + to);
             incomingHandler.longMessageHandler.send(this, message, to);
@@ -307,7 +307,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         }
     }
     @Override public void notifyPacketReceivedFrom(InetSocketAddress from) {
-        //todo this operation may be to slow to compute EVERY TIME a packet is received - on the other hand..
+        //todo this operation may be to slow to compute EVERY TIME a packet is received - on the other hand it is very convenient..
         P2LConnection established = establishedConnections.getBy1(from);
         if(established!=null) {
             established.notifyActivity();

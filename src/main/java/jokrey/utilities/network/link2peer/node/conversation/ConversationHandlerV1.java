@@ -1,6 +1,5 @@
 package jokrey.utilities.network.link2peer.node.conversation;
 
-import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.node.core.IncomingHandler;
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
@@ -28,7 +27,7 @@ class ConversationHandlerV1 {
         boolean hasBeenHandled = incomingHandler.messageQueue.handleNewMessage(received);
         System.out.println("received = " + received+" - hasBeenHandled="+hasBeenHandled);
         if(!hasBeenHandled) {
-            if(!received.header.isReceipt() && received.header.getStep() == 0) {//todo - potentially only allow greater(->newer) conversation id's for a peer-type combination,  - circular conversation id problem
+            if(!received.header.isReceipt() && received.header.getStep() == 0) {//to-do - potentially only allow greater(->newer) conversation id's for a peer-type combination,  - circular conversation id problem
                 ConversationAnswererChangeThisName handler = conversationHandlers.get(received.header.getType());
                 if (handler != null) {
                     P2LConversationImplV1 servingConvo = (P2LConversationImplV1) parent.internalConvo(received.header.getType(), received.header.getConversationId(), from);

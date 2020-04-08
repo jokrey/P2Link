@@ -1,6 +1,5 @@
 package jokrey.utilities.network.link2peer.node.protocols;
 
-import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
@@ -10,7 +9,7 @@ import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
 
 import java.io.IOException;
-import java.net.*;
+import java.net.InetSocketAddress;
 import java.util.function.BiConsumer;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.*;

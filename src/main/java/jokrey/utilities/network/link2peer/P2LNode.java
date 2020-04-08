@@ -9,6 +9,7 @@ import jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes;
 import jokrey.utilities.network.link2peer.node.stream.*;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -30,11 +31,6 @@ import java.util.function.Function;
  * Or broadcast messages that will be automatically redistributed to peers, should they not have knowledge of the message yet.
  *
  *
- * !!!!!
- * TODO: light clients (clients without a public link, i.e. url + free port)
- *     light client - as their public ip - provide the ip of a relay server (another node they are connected to - and where they are registered as light) - with a note that it is merely the ip of a relay server
- * TODO: allow light clients to connect with each other (using udp hole punching)
- *    - does this work out of the box??
  *
  *
  * LATER:
@@ -62,11 +58,10 @@ import java.util.function.Function;
  *    allows sending individual messages to socket addresses (temp/potential connection - with optional received receipt)
  *        for receipt messages it allows a retry functionality after which an exception is thrown and (if the connection was an established one) the connection is marked as broken
  *        allow breaking up messages and sending them in parts
- *        allow streaming very long messages (i.e. break up messages, but requery lost part-packets) todo improve upon the current(naive) streaming protocol (better congestion control + receipt synchronization)
+ *        allow streaming very long messages (i.e. break up messages, but requery lost part-packets)
  *      both internal and user messages can use this functionality.
  *
  * todo - allow automatically finding mtu using icmp for established connections (require streams to be to established connections and use mtu there, mtu can be different to every node, mtu max = CUSTOM_RAW_SIZE of a peer node)
- * todo - eliminate string type sender of sender in P2LMessage and the repeated calls to WhoAmIProtocol.toString() - replace with wrapper to a socket address and its string representation
  *
  *
  * THREE TYPES OF NODES:
@@ -242,7 +237,6 @@ public interface P2LNode {
     P2LFuture<Boolean> sendMessageWithReceipt(InetSocketAddress to, P2LMessage message) throws IOException;
     /**@see #sendMessageWithReceipt(InetSocketAddress, P2LMessage)*/
     default P2LFuture<Boolean> sendMessageWithReceipt(P2Link to, P2LMessage message) throws IOException {
-        //todo - reverse lookup of 'to' in order to get the best, most direct ip
         return sendMessageWithReceipt(resolve(to), message);
     }
 
@@ -332,7 +326,7 @@ public interface P2LNode {
 //    P2LFuture<P2LMessage> expectBroadcastMessage(String from, int messageType);
 
     /**
-     * Returns the stream for the given identifier. It is possible to have up to (2^31-1) * (2^31-1) streams from a single source (todo this is absolutely idiotic - who would EVER need THAT many different streams)
+     * Returns the stream for the given identifier. It is possible to have up to (2^15-1) * (2^15-1) streams from a single source
      * The multiple streams can be used for comfortable parallel download or communication without establishing multiple, 'real' connections.
      * @param from the sender of the broadcast message (decoded from the raw ip packet)
      * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
@@ -349,7 +343,7 @@ public interface P2LNode {
     boolean registerCustomOutputStream(InetSocketAddress to, int messageType, int conversationId, P2LOutputStream outputStream);
 
     /**
-     * Returns the stream for the given identifier. It is possible to have up to (2^31-1) * (2^31-1) streams from a single source (todo this is absolutely idiotic - who would EVER need THAT many different streams)
+     * Returns the stream for the given identifier. It is possible to have up to (2^15-1) * (2^15-1) streams from a single source
      * The multiple streams can be used for comfortable parallel upload or communication without establishing multiple, 'real' connections.
      *
      * Note: Before a peer can receive data {@link #createInputStream(InetSocketAddress, int, int)} has to be called with the same typ-conversationId combination on the peer side.

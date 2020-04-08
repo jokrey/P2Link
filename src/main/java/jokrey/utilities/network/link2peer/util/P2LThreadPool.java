@@ -111,7 +111,7 @@ public class P2LThreadPool {
             shutdown = true;
             P2LTask<?> before = task.getAndSet(null);
             if(before!=null)
-                before.cancelIfNotCompleted();
+                before.tryCancel();
             synchronized (task) {task.notifyAll();}
         }
         synchronized boolean shutdownIfIdle() {

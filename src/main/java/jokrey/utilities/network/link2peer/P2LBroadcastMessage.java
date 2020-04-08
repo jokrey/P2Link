@@ -3,7 +3,6 @@ package jokrey.utilities.network.link2peer;
 import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
 import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.util.Hash;
-import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 
 public class P2LBroadcastMessage extends P2LMessage {
     public final P2Link source;

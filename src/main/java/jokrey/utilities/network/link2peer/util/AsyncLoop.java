@@ -20,7 +20,7 @@ public class AsyncLoop<T> extends P2LFuture<Boolean> implements Consumer<T>  {
             P2LFuture<T> fut = loopFunc.handle(toHandle);
             if(fut != null) {
                 fut.whenCompleted(this);
-                fut.whenCanceled(this::cancelIfNotCompleted);
+                fut.whenCanceled(this::tryCancel);
             } else {
                 setCompleted(true);
             }
@@ -31,7 +31,7 @@ public class AsyncLoop<T> extends P2LFuture<Boolean> implements Consumer<T>  {
 
     private void fail(Throwable e) {
         e.printStackTrace();
-        //todo - how do we handle? - is this sufficient?!:
+        //is this sufficient?!:
         cancel();
     }
 

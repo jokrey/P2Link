@@ -14,9 +14,9 @@ import java.util.LinkedList;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_STEP;
 
 /**
- * TODO - should itself decide when to send receipts, the current system allows an exploit where many small packages request receipts
+ * TO-DO - should itself decide when to send receipts, the current system allows an exploit where many small packages request receipts
  *
- * FIXME GENERAL DOWNSIDE COMPARED TO TCP:
+ * FI-XME GENERAL DOWNSIDE COMPARED TO TCP:
  *    MTP IS LIMITED by custom max raw size of a message (for each incoming udp message a buffer must be reserved - that buffer should be as small as possible)
  *    currently this is defaulted at 8192 - tcp can set this buffer to the max ip package size...
  *    in a distributed environment mtp is naturally limited by other factors, but localhost this is a huge performance decrease 'out of the box'
@@ -28,11 +28,11 @@ public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
         super(parent, to, type, conversationId, NO_STEP);
     }
 
-    private int earliestIndexMissing = 0;//todo wrap around feature (i.e. infinite stream)
+    private int earliestIndexMissing = 0;//to-do wrap around feature (i.e. infinite stream)
     private int latestIndexReceived = 0;
     private boolean eofReceived =false;
     private int available = 0;
-    private LinkedList<SubBytesStorage> unconsumedChunksQueue = new LinkedList<>();//max size is not defined todo limit to a maximum size (i.e. if no one is reading from the stream at some point it will stop receiving)
+    private LinkedList<SubBytesStorage> unconsumedChunksQueue = new LinkedList<>();//max size is not defined tod-o limit to a maximum size (i.e. if no one is reading from the stream at some point it will stop receiving)
 
     //idea: earliestIndexMissing is to be understood as the -1th element in this array
     private SubBytesStorage[] unqueuedChunks = new SubBytesStorage[P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE];//allows up to 64 later messages to be received, before the first message is finally required to drain this buffer
@@ -72,7 +72,7 @@ public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
                 }
             }
             int shiftBy = index + 1;
-            if(shiftBy>unqueuedChunks.length) shiftBy = unqueuedChunks.length; //todo this line feels weird
+            if(shiftBy>unqueuedChunks.length) shiftBy = unqueuedChunks.length;
             //   not_todo: only recopy if it is full - i.e. keep an additional internal index and use that (index+internalOff, unqueuedIndex+internalOff)
             System.arraycopy(unqueuedChunks, shiftBy, unqueuedChunks, 0, unqueuedChunks.length - shiftBy);//no rotate required, new packages always have new pointer
             for(int i=unqueuedChunks.length-shiftBy;i<unqueuedChunks.length;i++)
@@ -191,7 +191,7 @@ public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
     }
     @Override public long skip(long n) throws IOException {
         System.err.println("todo optimized skip in which unreceived intermediate packages are ignored and not waited upon");
-        return super.skip(n);  //todo highly optimized skip, potentially with informing the other stream of the intention, by sending a receipt with a sufficiently high confirmation id (though bytes are not transferable to parts....)
+        return super.skip(n);  //to-do highly optimized skip, potentially with informing the other stream of the intention, by sending a receipt with a sufficiently high confirmation id (though bytes are not transferable to parts....)
     }
     @Override public synchronized void close() {
         if(isClosed()) return;
@@ -201,7 +201,7 @@ public class P2LOrderedInputStreamImplV1 extends P2LOrderedInputStream {
         sendReceipt();
         notify();
         parent.unregister(this);
-        //todo remove this object from the stream message handler - do not remove if it is closed from the other side tho - force close for resource destruction
+        //to-do remove this object from the stream message handler - do not remove if it is closed from the other side tho - force close for resource destruction
     }
 
 

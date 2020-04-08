@@ -31,10 +31,10 @@ public class RendezvousServerAttempt1LetsNotTalkAboutIt implements AutoCloseable
     }
 
 
-    private final HashMap<String, KnownIdentityTriple> knownIdentitiesByName = new HashMap<>(); //todo clean thread over v.createdAt
+    private final HashMap<String, KnownIdentityTriple> knownIdentitiesByName = new HashMap<>(); //to-do clean thread over v.createdAt
 //        private final HashMap<P2Link, KnownIdentityTriple> knownIdentitiesByLink = new HashMap<>(); //can be used to prohibit multiple registers from the same ip and or to the same address under different names - or is that allowed?
 //        private final HashMap<SocketAddress, KnownIdentityTriple> knownIdentitiesByRegisterer = new HashMap<>();
-    private final HashMap<String, List<Pair<P2LConversation, Long>>> waitingCallbackConvos = new HashMap<>(); //todo clean thread over v foreach it.second
+    private final HashMap<String, List<Pair<P2LConversation, Long>>> waitingCallbackConvos = new HashMap<>(); //to-do clean thread over v foreach it.second
     private final P2LNode node;
     @Override public void close() { node.close(); }
     public RendezvousServerAttempt1LetsNotTalkAboutIt(P2Link selfLink) throws IOException {
@@ -195,7 +195,7 @@ public class RendezvousServerAttempt1LetsNotTalkAboutIt implements AutoCloseable
 
     private static class KnownIdentityTriple extends IdentityTriple {
         private final InetSocketAddress registerer;
-        private final long createdAt = System.currentTimeMillis(); //todo - can be used to clean up old registrations.
+        private final long createdAt = System.currentTimeMillis(); //to-do - can be used to clean up old registrations.
         private KnownIdentityTriple(String name, byte[] publicKey, P2Link link, InetSocketAddress registerer) {
             super(name, publicKey, link);
             this.registerer = registerer;

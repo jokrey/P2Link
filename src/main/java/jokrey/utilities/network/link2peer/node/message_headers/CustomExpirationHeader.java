@@ -1,7 +1,5 @@
 package jokrey.utilities.network.link2peer.node.message_headers;
 
-import java.net.InetSocketAddress;
-
 /**
  * @author jokrey
  */

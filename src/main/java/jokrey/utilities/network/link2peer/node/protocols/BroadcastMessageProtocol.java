@@ -82,7 +82,7 @@ public class BroadcastMessageProtocol {
         } else {
             MessageEncoder encoder = convo.encoder();
             broadcastMessage.packInto(encoder);
-            convo.longAnswerClose(encoder, 10000); //FIXME HEURISTIC
+            convo.longAnswerClose(encoder, P2LHeuristics.LONG_BROADCAST_STREAM_TIMEOUT);
         }
     }
 
@@ -92,7 +92,7 @@ public class BroadcastMessageProtocol {
             convo.answerClose(convo.encode(ALREADY_KNOWN)); //indicates true
         } else {
             MessageEncoder broadcastMessageStorage = new MessageEncoder(P2LHeuristics.BROADCAST_USES_HASH_DETOUR_RAW_SIZE_THRESHOLD * 2);
-            convo.answerExpectLong(convo.encode(BROADCAST_UNKNOWN), broadcastMessageStorage, 10000); //FIXME HEURISTIC
+            convo.answerExpectLong(convo.encode(BROADCAST_UNKNOWN), broadcastMessageStorage, P2LHeuristics.LONG_BROADCAST_STREAM_TIMEOUT);
             P2LBroadcastMessage receivedBroadcastMessage = P2LBroadcastMessage.unpackFrom(broadcastMessageStorage);
             if(receivedBroadcastMessage == null || state.markAsKnown(brdMessageHash)) ////if message invalid or message was known - while receiving this message, this node has received it from somewhere else
                 return;

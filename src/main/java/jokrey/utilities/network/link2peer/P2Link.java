@@ -97,7 +97,7 @@ public abstract class P2Link {
         @Override public int getPort() { return port; }
     }
 
-
+    //TODO - put under new 'Named' superclass
 
     //NOTE: EQUALS AND HASH CODE ONLY BY NAME - WILL SHOW EQUALITY WITH LOCAL
     public static class Relayed extends P2Link {

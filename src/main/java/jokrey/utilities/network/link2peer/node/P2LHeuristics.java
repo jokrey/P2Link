@@ -8,6 +8,7 @@ import jokrey.utilities.network.link2peer.P2LMessage;
  * todo add explanations on why the values where chosen and what their theoretical bounds are
  */
 public class P2LHeuristics {
+    public static final int LONG_BROADCAST_STREAM_TIMEOUT = 10000;
     public static int ORDERED_STREAM_V2_MAX_BUFFER_SIZE =65536*100;// 16384; //todo - this max buffer size is not respected in the slightest;
     public static int BROADCAST_USES_HASH_DETOUR_RAW_SIZE_THRESHOLD = P2LMessage.CUSTOM_RAW_SIZE_LIMIT;
     public static long ORDERED_STREAM_V1_RECEIPT_TIMEOUT_MS = 500; //todo should be variable - or should it? - yes it should!
@@ -26,7 +27,7 @@ public class P2LHeuristics {
     public static int BROADCAST_STATE_ATTEMPT_CLEAN_KNOWN_HASH_COUNT_TRIGGER = 3500;
     public static int BROADCAST_STATE_ATTEMPT_CLEAN_TIMEOUT_TRIGGER_MS = 30*1000;
     public static int BROADCAST_STATE_KNOWN_HASH_TIMEOUT_MS = 2*60*1000;
-    public static int ESTABLISHED_CONNECTION_IS_DORMANT_THRESHOLD_MS = 30*1000;
+    public static int ESTABLISHED_CONNECTION_IS_DORMANT_THRESHOLD_MS = 90*1000;
     public static long LONG_MESSAGE_RECEIVE_NO_PART_TIMEOUT_MS = 10 * 1000;
 
     /**

@@ -11,8 +11,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * TODO this entire functionality is just a basic concept at this point
- *
  * Fragments other than stream parts do not have a package index, but rather a 'start' byte offset value.
  *    Unlike Streams this requires a mapping of said start index to a buffer, because it can no longer be directly calculated from the index and earliest received index.
  *
@@ -72,35 +70,6 @@ public abstract class P2LFragmentInputStream implements P2LInputStream {
     }
 
 
-    //    private HashMap<Integer, Integer> mappingOfStartToEndIndexOfMissingRanges = new HashMap<>(P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE);
-//    private int latestReceivedEndIndex = 0;
-//
-//    void received(P2LMessage message) throws IOException {
-//        int receivedRangeStartIndex = message.header.getPartIndex();
-//        int receivedRangeEndIndex = receivedRangeStartIndex + message.payloadLength;
-//        Integer missingRangeEndIndex = mappingOfStartToEndIndexOfMissingRanges.remove(receivedRangeStartIndex);
-//        if(missingRangeEndIndex != null) {
-//            if(receivedRangeEndIndex < missingRangeEndIndex) {
-//                mappingOfStartToEndIndexOfMissingRanges.put(receivedRangeEndIndex, missingRangeEndIndex); //new missing range inserted
-//            } else if(receivedRangeEndIndex > missingRangeEndIndex)
-//                throw new IllegalStateException("bug");
-//        } else { //newest package received
-//            //todo - could also be in between some unreceived range - requires a search
-//
-//            latestReceivedEndIndex = receivedRangeEndIndex;
-//        }
-//
-//        DataChunk received = new DataChunk(message);
-//        fragmentReceived(receivedRangeStartIndex, received);
-//
-//        if(message.header.requestReceipt()) {
-//            parent.sendInternalMessage(StreamReceipt.encode(type, conversationId, false, latestReceivedEndIndex, getMissingRanges()), to);
-//        }
-//    }
-//
-//    private int[] getMissingRanges() {
-//        return new int[0];
-//    }
 
     public abstract boolean isFullyReceived();
     public abstract boolean waitForFullyReceived(int timeout_ms);
@@ -148,10 +117,7 @@ public abstract class P2LFragmentInputStream implements P2LInputStream {
          * @param dataLen
          * @param eof
          */
-        void received(long fragmentOffset, byte[] receivedRaw, int dataOff, int dataLen, boolean eof);//todo potentially replace the three received vars with the DataChunk type
+        void received(long fragmentOffset, byte[] receivedRaw, int dataOff, int dataLen, boolean eof);
         //can be directly written to disk - on file transfer the file can be written to 'randomly', i.e. later parts written first(using randomaccessfile) - earlier parts are automatically re-requested
-
-        //todo if this proves reasonable and possible the fragment stream could be used to implement a P2LInputStream(mildly less efficient):
-        //  can be cached until order is available - in which case a maximum is required before new packages are dropped ( which has to be respected by the sender for efficiency reasons )
     }
 }

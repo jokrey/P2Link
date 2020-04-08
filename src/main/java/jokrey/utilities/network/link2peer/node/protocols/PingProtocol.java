@@ -1,6 +1,5 @@
 package jokrey.utilities.network.link2peer.node.protocols;
 
-import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.util.P2LFuture;

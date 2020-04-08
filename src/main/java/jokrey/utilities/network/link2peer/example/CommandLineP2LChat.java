@@ -2,7 +2,6 @@ package jokrey.utilities.network.link2peer.example;
 
 import jokrey.utilities.command.line.helper.Argument;
 import jokrey.utilities.command.line.helper.CommandLoop;
-import jokrey.utilities.network.link2peer.P2LBroadcastMessage;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;

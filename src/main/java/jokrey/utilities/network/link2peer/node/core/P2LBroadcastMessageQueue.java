@@ -1,11 +1,14 @@
 package jokrey.utilities.network.link2peer.node.core;
 
-import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LBroadcastMessage;
+import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader;
-import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.*;
+import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.BroadcastSourceTypeIdentifier;
+import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.HeaderIdentifier;
+import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.TypeIdentifier;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
+
 import java.util.*;
 
 /**

@@ -1,17 +1,5 @@
 package jokrey.utilities.network.link2peer.node.protocols_old;
 
-import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.P2Link;
-import jokrey.utilities.network.link2peer.node.P2LHeuristics;
-import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
-import jokrey.utilities.network.link2peer.util.P2LFuture;
-
-import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.InetSocketAddress;
-
-import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.SL_WHO_AM_I;
-
 /**
  * @author jokrey
  */

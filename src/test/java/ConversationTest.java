@@ -13,7 +13,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Consumer;
 
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
 import static org.junit.jupiter.api.Assertions.*;
@@ -419,7 +418,7 @@ public class ConversationTest {
                 assertTrue(serverCompletedFut.get(30_000));
                 assertTrue(clientCompletedFut.get(30_000));
             } finally {
-                for(P2LFuture<?> futi : intermediateFutures) futi.cancelIfNotCompleted(); //this is required that in case of test failure the next test does not also fail - all active retryers are shutdown.
+                for(P2LFuture<?> futi : intermediateFutures) futi.tryCancel(); //this is required that in case of test failure the next test does not also fail - all active retryers are shutdown.
                 DebugStats.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE = 0;
                 DebugStats.MSG_PRINTS_ACTIVE = false;
                 IntermediateTests.close(nodes);

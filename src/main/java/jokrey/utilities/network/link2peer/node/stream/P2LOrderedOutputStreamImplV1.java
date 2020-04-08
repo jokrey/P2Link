@@ -19,17 +19,17 @@ import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessage
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 
 /**
- * TODO - missing more advanced congestion control algorithm - current 'algorithm' works exclusively based on buffer size
- *     TODO - this entire stream algorithm should not be considered 'ready' - it is highly experimental and is missing critical features and optimizations
- *     TODO - it is little more than a demonstration of a
+ * TO-DO - missing more advanced congestion control algorithm - current 'algorithm' works exclusively based on buffer size
+ *      - this entire stream algorithm should not be considered 'ready' - it is highly experimental and is missing critical features and optimizations
+ *      - it is little more than a demonstration of a
  *
- * TODO reuse header object - currently recreated with each part, could easily be reused
- * TODO    just reuse p2lMessage object
+ * TO-DO reuse header object - currently recreated with each part, could easily be reused
+ * TO-DO    just reuse p2lMessage object
  *
- * TODO the three largest missing features: path mtu(maximum transmission unit size) discovery, congestion control and warp around after 2^31-1 packages
+ * TO-DO the three largest missing features: path mtu(maximum transmission unit size) discovery, congestion control and warp around after 2^31-1 packages
  *
  *
- * TODO TODO TODO  - investigate extreme drops in performance on package loss (requires timeout -> request receipt, which is insane)
+ * TO-DO TO-DO TO-DO  - investigate extreme drops in performance on package loss (requires timeout -> request receipt, which is insane)
  *     REASON: loss of last package (the package that requests the receipt)
  *
  * dynamically determined parameters:
@@ -241,7 +241,7 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
                         newEarliestUnconfirmedIndex = latestIndexReceivedByPeer + 1;
                 } catch (IOException e) {
                     e.printStackTrace();
-                    //todo mark broken, etc...
+                    //to-do mark broken, etc...
                 }
             }
 //            else newEarliestUnconfirmedIndex > latestAttemptedIndex : the peer notifies us that it has been waiting on a part we have not send yet - it might do this in case of delayed receipt requests
@@ -265,7 +265,7 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
 
     private synchronized boolean isConfirmed(int partIndex) {
         int bufferIndex = partIndex - earliestUnconfirmedPartIndex;
-        return unconfirmedSendPackages[bufferIndex] == null || unconfirmedSendPackages[bufferIndex].size==-1;//todo size shou
+        return unconfirmedSendPackages[bufferIndex] == null || unconfirmedSendPackages[bufferIndex].size==-1;
     }
     private synchronized void markConfirmed(int partIndex) {
         int bufferIndex = partIndex - earliestUnconfirmedPartIndex;

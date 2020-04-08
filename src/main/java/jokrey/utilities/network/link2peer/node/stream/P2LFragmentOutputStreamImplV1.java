@@ -6,7 +6,10 @@ import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.node.message_headers.StreamPartHeader;
 import jokrey.utilities.network.link2peer.node.stream.fragment.*;
-import jokrey.utilities.network.link2peer.util.*;
+import jokrey.utilities.network.link2peer.util.AsyncCallbackSchedulerThread;
+import jokrey.utilities.network.link2peer.util.AsyncLoop;
+import jokrey.utilities.network.link2peer.util.P2LFuture;
+import jokrey.utilities.network.link2peer.util.SyncHelp;
 import jokrey.utilities.simple.data_structure.lists.LongTupleList;
 import jokrey.utilities.simple.data_structure.pairs.Pair;
 
@@ -17,12 +20,6 @@ import java.util.ListIterator;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
- *
- *
- * todo - this could(!) benefit from a 'x to 1' thread engine (because the batch send stuff needs to happen in intermediate steps..
- *        essentially a scheduler for tasks on a single thread (uses less threads and does the synchronization between tasks)
- *          enqueue tasks with a priority (one off tasks, continuous tasks), allow tasks to say whether they would like to be woken up
- *
  *
  * Fragment vs Continuous:
  *   All data available without buffering

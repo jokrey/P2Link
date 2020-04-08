@@ -2,7 +2,6 @@ package jokrey.utilities.network.link2peer.node.message_headers;
 
 import jokrey.utilities.bitsandbytes.BitHelper;
 
-import java.net.InetSocketAddress;
 import java.util.Objects;
 
 /**
@@ -11,8 +10,6 @@ import java.util.Objects;
  *
  * Max header size(for broken up messages):
  *    1(flags) + 4(type) + 4(conversationId, optional) + 2(expiration, optional) + 8(long msg, index+size) + 8(udp) = 19 + 8 = 27 byte (on top of ip)
- *
- * TODO - multiple header classes ('SimpleHeader' does not require storage of conversation id and expiration - its getter can statically return the values - should safe on object size)
  *
  * @author jokrey
  */

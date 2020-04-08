@@ -1,6 +1,5 @@
 package jokrey.utilities.network.link2peer.node.conversation;
 
-import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 
 import java.io.IOException;

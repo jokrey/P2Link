@@ -129,7 +129,7 @@ public class P2LConversationImplV1 implements P2LConversation {
 
             ReceivedP2LMessage result = next.getOrNull(calcWaitBeforeRetryTime(i));
             if(previous != null) {
-                boolean wasCompleted = ! previous.cancelIfNotCompleted();
+                boolean wasCompleted = ! previous.tryCancel();
                 if(wasCompleted)
                     DebugStats.conversation_numDoubleReceived.getAndIncrement();
             }
@@ -191,7 +191,7 @@ public class P2LConversationImplV1 implements P2LConversation {
 
             ReceivedP2LMessage result = last.getOrNull(calcWaitBeforeRetryTime(i));
             if(previous != null) {
-                boolean wasCompleted = ! previous.cancelIfNotCompleted();
+                boolean wasCompleted = ! previous.tryCancel();
                 if(wasCompleted)
                     DebugStats.conversation_numDoubleReceived.getAndIncrement();
             }
@@ -275,7 +275,7 @@ public class P2LConversationImplV1 implements P2LConversation {
 
             ReceivedP2LMessage result = ack.getOrNull(calcWaitBeforeRetryTime(i));
             if(previous != null) {
-                boolean wasCompleted = ! previous.cancelIfNotCompleted();
+                boolean wasCompleted = ! previous.tryCancel();
                 if(wasCompleted)
                     DebugStats.conversation_numDoubleReceived.getAndIncrement();
             }
@@ -375,7 +375,7 @@ public class P2LConversationImplV1 implements P2LConversation {
         };
         stepHandler.resultFunc = result -> {
             if (stepHandler.previous != null) {
-                boolean wasCompleted = ! stepHandler.previous.cancelIfNotCompleted();
+                boolean wasCompleted = ! stepHandler.previous.tryCancel();
                 if (wasCompleted)
                     DebugStats.conversation_numDoubleReceived.getAndIncrement();
             }
@@ -423,7 +423,7 @@ public class P2LConversationImplV1 implements P2LConversation {
         };
         stepHandler.resultFunc = result -> {
             if (stepHandler.previous != null) {
-                boolean wasCompleted = !stepHandler.previous.cancelIfNotCompleted();
+                boolean wasCompleted = !stepHandler.previous.tryCancel();
                 if (wasCompleted)
                     DebugStats.conversation_numDoubleReceived.getAndIncrement();
             }
@@ -509,7 +509,7 @@ public class P2LConversationImplV1 implements P2LConversation {
         };
         stepHandler.resultFunc = result -> {
             if (stepHandler.previous != null) {
-                boolean wasCompleted = !stepHandler.previous.cancelIfNotCompleted();
+                boolean wasCompleted = !stepHandler.previous.tryCancel();
                 if (wasCompleted)
                     DebugStats.conversation_numDoubleReceived.getAndIncrement();
             }

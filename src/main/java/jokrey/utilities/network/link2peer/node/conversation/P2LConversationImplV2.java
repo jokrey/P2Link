@@ -26,7 +26,6 @@ import java.net.InetSocketAddress;
  * todo     - OPTION: it could be possible to have the server never resend, UNLESS the client resends...
  *
  * todo - long message intermediate receipts / stream usage for long messages
- * todo - 
  */
 public class P2LConversationImplV2 implements P2LConversation {
     public static int DEFAULT_NUM_ATTEMPTS = 4;
@@ -84,15 +83,14 @@ public class P2LConversationImplV2 implements P2LConversation {
     }
 
     private int calcWaitBeforeRetryTime(int numPreviousRetries) {
-        return ( con.avRTT == -1? 500 :(int) (con.avRTT * m + a) )
-                + rM*numPreviousRetries;//todo - do this? helped to reduce number of timeouts in catch up tests
+        return ( con.avRTT == -1? 500 :(int) (con.avRTT * m + a) ) + rM*numPreviousRetries;
     }
 
 
 
     private short step = -2;
     private boolean pausedMode = false;
-    private boolean pausedDoubleExpectMode = false; //todo - is there a clean way? this works, probably even best, but using an extra bool is a bit annoying to me
+    private boolean pausedDoubleExpectMode = false;
 
     private boolean isServer = false;
     public void notifyServerInit(ConversationAnswererChangeThisName handler, ReceivedP2LMessage m0) throws IOException {
@@ -136,7 +134,7 @@ public class P2LConversationImplV2 implements P2LConversation {
             System.err.println("message requires more than three packages - should use long message functionality");
     }
     private void resetLatest() {
-        latest.cancelIfNotCompleted();
+        latest.tryCancel();
         latest = new P2LFuture<>();
     }
 
@@ -352,7 +350,7 @@ public class P2LConversationImplV2 implements P2LConversation {
             parent.sendInternalMessage(peer, msg);
             Boolean result = receivedAnyResponse.getOrNull(calcWaitBeforeRetryTime(i));
             if(result!=null) {
-                latest.cancelIfNotCompleted();
+                latest.tryCancel();
                 latest = new P2LFuture<>(new ConversationHeader(type, conversationId, step, false).generateMockReceived(getPeer()));//in case the next message is close..
                 int adjustedTimeout = (int) (timeout - (System.currentTimeMillis() - stepBeganAt));
                 if(adjustedTimeout <= 0) adjustedTimeout = 1;
@@ -387,7 +385,6 @@ public class P2LConversationImplV2 implements P2LConversation {
             int elapsed = (int) (System.currentTimeMillis() - stepBeganAt);
             int adjustedTimeout = timeout - elapsed;
             if (adjustedTimeout > 0 || latest.isCompleted()) {
-                //TODO - what if this message is lost??
                 ReceivedP2LMessage result = latest.getOrNull(adjustedTimeout); //todo - technically this message could/should be included in the last receipt - would require 1 packet less.
                 if (result != null) {
                     step++;
@@ -412,12 +409,11 @@ public class P2LConversationImplV2 implements P2LConversation {
         out.send();
         boolean success = out.close(timeout);
         if(success) {
-            //todo retry here, though...
             int elapsed = (int) (System.currentTimeMillis() - ctmUpTop);
             int adjustedTimeout = timeout - elapsed;
             if (adjustedTimeout > 0 || latest.isCompleted()) {
                 System.out.println("waiting for: step = " + step);
-//                ReceivedP2LMessage result = latest.getOrNull(adjustedTimeout); //NOT REQUIRED, BECAUSE THE STREAM HAD A RECEIPT WHICH IS SUFFICIENT - todo other side still sending useless close package(cannot really be avoided without coding this specific exception)
+//                ReceivedP2LMessage result = latest.getOrNull(adjustedTimeout); //NOT REQUIRED, BECAUSE THE STREAM HAD A RECEIPT WHICH IS SUFFICIENT - OTHER SIDE DOES NOT NEED TO SEND CLOSE (but it doesn't hurt too much)
 //                if (result != null) {
                     step=-1;
                     handler.remove(this);
@@ -496,7 +492,7 @@ public class P2LConversationImplV2 implements P2LConversation {
 
         step++;
 
-        latest.cancelIfNotCompleted();
+        latest.tryCancel();
         DefaultRetryer<ReceivedP2LMessage> stepHandler = new DefaultRetryer<>(msg);
         stepHandler.resultFunc = result -> {
             if (result != null) {
@@ -524,7 +520,7 @@ public class P2LConversationImplV2 implements P2LConversation {
         ConversationHeader header = new ConversationHeader(type, conversationId, step, true);
         P2LMessage msg = P2LMessage.from(header, message);
 
-        latest.cancelIfNotCompleted();
+        latest.tryCancel();
         DefaultRetryer<Boolean> stepHandler = new DefaultRetryer<>(msg);
         stepHandler.resultFunc = result -> {
             if (result != null && result.validateIsReceiptFor(msg)) {
@@ -556,7 +552,7 @@ public class P2LConversationImplV2 implements P2LConversation {
         P2LMessage msg = P2LMessage.from(header, message);
 
         pausedDoubleExpectMode = true;
-        latest.cancelIfNotCompleted();
+        latest.tryCancel();
         DefaultRetryer<ReceivedP2LMessage> stepHandler = new DefaultRetryer<>(msg);
         stepHandler.resultFunc = result -> {
             if (result != null && (
@@ -619,11 +615,11 @@ public class P2LConversationImplV2 implements P2LConversation {
 
         step++;
 
-        latest.cancelIfNotCompleted();
+        latest.tryCancel();
         DefaultRetryer<Boolean> stepHandler = new DefaultRetryer<>(msg);//todo - should be a different retryer that does not use latest
         stepHandler.resultFunc = result -> {
             if(receivedAnyResponse.isCompleted()) {
-                latest.cancelIfNotCompleted();
+                latest.tryCancel();
                 latest = new P2LFuture<>(new ConversationHeader(type, conversationId, step, false).generateMockReceived(getPeer()));//in case the next message is close..
 
                 step++;
@@ -701,7 +697,7 @@ public class P2LConversationImplV2 implements P2LConversation {
         ConversationHeader header = new ConversationHeader(type, conversationId, step, false);
         P2LMessage msg = P2LMessage.from(header, message);
 
-        latest.cancelIfNotCompleted();
+        latest.tryCancel();
         DefaultRetryer<Boolean> stepHandler = new DefaultRetryer<>(msg);//todo - should be a different retryer that does not use latest
         stepHandler.resultFunc = result -> {
             if (result != null && result.validateIsReceiptFor(msg)) {

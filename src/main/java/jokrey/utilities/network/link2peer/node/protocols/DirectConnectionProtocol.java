@@ -100,8 +100,6 @@ public class DirectConnectionProtocol {
         byte[] selfProclaimedLinkOfInitiatorRaw = mx.nextVariable();
         int remoteBufferSize = mx.nextInt();
         P2Link link = P2Link.from(selfProclaimedLinkOfInitiatorRaw);
-//        if(link.isOnlyLocal()) //todo - this has to happen SOMEWHERE....
-//            link = ((P2Link.Local) link).toRelayed(parent.getSelfLink());
         return new P2LConnection(link, address, remoteBufferSize, avRTT);
     }
 }

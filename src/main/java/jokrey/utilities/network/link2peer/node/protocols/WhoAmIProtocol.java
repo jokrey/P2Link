@@ -1,6 +1,5 @@
 package jokrey.utilities.network.link2peer.node.protocols;
 
-import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;

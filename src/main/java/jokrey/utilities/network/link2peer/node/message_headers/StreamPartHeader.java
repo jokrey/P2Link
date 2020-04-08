@@ -1,7 +1,5 @@
 package jokrey.utilities.network.link2peer.node.message_headers;
 
-import java.net.InetSocketAddress;
-
 /**
  * todo 64 bit offsets (MAYBE: HIGH PRECISION FLAG IN HEADER THAT IS ACTIVATED ON THE FLY ONLY IF REQUIRED)
  *

@@ -1,6 +1,5 @@
 package jokrey.utilities.network.link2peer.node.conversation;
 
-import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
@@ -38,7 +37,7 @@ public class ConversationHandlerV2 {
         }
     }
     public void clean() {
-//        activeConversations.clear(); todo - how do we clean dormant active conversations?! Do they exist? Don't they time out?
+//        activeConversations.clear(); how do we clean dormant active conversations?! Do they exist? Don't they time out? They timeout...
     }
 
     public P2LConversation getConvoFor(P2LNodeInternal parent, P2LConnection con, InetSocketAddress to, short type, short conversationId) {

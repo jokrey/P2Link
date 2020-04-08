@@ -1,11 +1,6 @@
 package jokrey.utilities.network.link2peer;
 
-import jokrey.utilities.bitsandbytes.BitHelper;
-import jokrey.utilities.encoder.as_union.li.bytes.LIbae;
 import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
-import jokrey.utilities.encoder.tag_based.implementation.paired.length_indicator.type.transformer.LITypeToBytesTransformer;
-import jokrey.utilities.encoder.type_transformer.bytes.TypeToBytesTransformer;
-import jokrey.utilities.network.link2peer.node.message_headers.CustomExpirationHeader;
 import jokrey.utilities.network.link2peer.node.message_headers.MinimalHeader;
 import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.node.message_headers.ReceiptHeader;
@@ -17,8 +12,6 @@ import java.net.InetSocketAddress;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Iterator;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.SL_NAT_HOLE_PACKET;
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.isInternalMessageId;
@@ -97,20 +90,8 @@ public class P2LMessage extends MessageEncoder {
     public DatagramPacket toPacket(InetSocketAddress to) {
         int actualLength = requiredRawSize();
 
-        //todo: the following is automatically done by new Datagram packet(kind of)
-//        int maxSize = getMaxPacketSize();
-//        byte[] actual = content;
-//        if(actual.length > maxSize) {
-//            if(actualLength < maxSize) { //never gonna trigger, when message created with factory methods
-//                byte[] shrunk = new byte[actualLength];
-//                System.arraycopy(actual, 0, shrunk, 0, shrunk.length);
-//                actual = shrunk;
-//            }
-//        }
-        if (actualLength > CUSTOM_RAW_SIZE_LIMIT) throw new IllegalArgumentException("total size of raw cannot exceed " + CUSTOM_RAW_SIZE_LIMIT + ", user set limit - size here is: " + actualLength + " - max payload size is: " + (CUSTOM_RAW_SIZE_LIMIT - header.getSize()));
+        if (actualLength > CUSTOM_RAW_SIZE_LIMIT) throw new IllegalArgumentException("total size of raw cannot exceed " + CUSTOM_RAW_SIZE_LIMIT + "(user set limit) - size here is: " + actualLength + " - max payload size is: " + (CUSTOM_RAW_SIZE_LIMIT - header.getSize()));
         if (actualLength > MAX_UDP_PACKET_SIZE) throw new IllegalArgumentException("total size of a udp packet cannot exceed " + MAX_UDP_PACKET_SIZE + " - size here is: " + actualLength);
-//        if(raw.length > 512)
-//            System.err.println("message greater than 512 bytes - this can be considered inefficient because intermediate low level protocols might break it up - size here is: "+raw.length);
         return new DatagramPacket(content, actualLength, to);
     }
 
@@ -158,7 +139,6 @@ public class P2LMessage extends MessageEncoder {
     public P2LMessage createReceipt() {
         if(header.isLongPart() || header.isStreamPart()) throw new UnsupportedOperationException("receipt cannot be created for parts - that would be like tcp ACK, but we wants receipts for many parts and this requires a difference functionality");
         //todo - use less cryptographic function - the checksum of udp is already pretty safe - so even without the hash at all it is pretty safe
-        //todo     - interesting would be a hash id that allows getting two receipts for the same sender-type-conversationId simultaneously  (though we are quickly approaching overkill territory here)
         Hash receiptHash = getContentHash();
         P2LMessageHeader receiptHeader = new ReceiptHeader(header.getType(), header.getConversationId(), header.getStep());
         return receiptHeader.generateMessage(receiptHash.raw());

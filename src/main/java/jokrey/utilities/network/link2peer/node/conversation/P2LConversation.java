@@ -2,8 +2,8 @@ package jokrey.utilities.network.link2peer.node.conversation;
 
 import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
 import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
+import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
 import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
@@ -16,11 +16,9 @@ import java.nio.charset.StandardCharsets;
  * Forced efficiency, short burst communication that uses the response as validation for receival.
  *    Tcp - in the optimal case - should work similarly and have similar performance...
  *
- * todo - transparent long message support(but with like ever 2-3 packets an ack intermediate, for very long messages use the fragment stream behind the scenes)
- * todo - out-of-the-box/appealing support for error codes and branching based on those codes
- * todo(!) - asynchronous version in which instead of returning ReceivedP2LMessages the methods return P2LFuture<ReceivedP2LMessage>.
- *         - Here two things are important: Maintaining performance and loosing the need to keep constantly keep the thread that handles the conversation (a (greenish) thread is needed to handle incoming messages anyways).
- *         - Additionally very cool: associated branching based on first-byte-codes in the message.
+ * todo - transparent long message support
+ *        NOTE: not sure if 1 a good idea, 2 possible without overhead
+ * todo - out-of-the-box/appealing support for error codes and branching based on those codes (in async)
  *
  * Timeout occurs after = maxAttempts * (m * avRTT + a) + triangularNumber(maxAttempts)*rM
  *
@@ -308,11 +306,11 @@ public interface P2LConversation {
     default ReceivedP2LMessage initExpectClose(byte[] bytes) throws IOException, TimeoutException { return initExpectClose(MessageEncoder.from(getHeaderSize(), bytes)); }
     /** bytes using shortcut for {@link #closeWith(MessageEncoder)} */
     default void closeWith(byte[] bytes) throws IOException, TimeoutException { closeWith(MessageEncoder.from(getHeaderSize(), bytes)); }
-    /** bytes using shortcut for {@link #answerExpectData(MessageEncoder)} */
+    /** bytes using shortcut for {@link #answerExpect(MessageEncoder)} */
     default byte[] answerExpectData(MessageEncoder message) throws IOException, TimeoutException { return answerExpect(message).asBytes(); }
-    /** bytes using shortcut for {@link #initExpectData(MessageEncoder)} */
+    /** bytes using shortcut for {@link #initExpect(MessageEncoder)} */
     default byte[] initExpectData(MessageEncoder message) throws IOException, TimeoutException { return initExpect(message).asBytes(); }
-    /** bytes using shortcut for {@link #initExpectDataClose(MessageEncoder)} */
+    /** bytes using shortcut for {@link #initExpectClose(MessageEncoder)} */
     default byte[] initExpectDataClose(MessageEncoder message) throws IOException, TimeoutException { return initExpectClose(message).asBytes(); }
     /** bytes using shortcut for {@link #answerExpectData(MessageEncoder)} */
     default byte[] answerExpectData(byte[] bytes) throws IOException, TimeoutException { return answerExpectData(MessageEncoder.from(getHeaderSize(), bytes)); }
@@ -330,9 +328,6 @@ public interface P2LConversation {
 
 
     //todo - proper comments for the new methods
-
-    //todo MORE DIFFICULT THAN EXPECTED - long messages will internally use an appropriate-method-of-relay, so they will either use a fragment stream or use long messages(split up automatically) or something else
-    //    the caller cannot influence what method is used - though it is decided based on the length of the message.
 
     void initExpectLong(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
     void answerExpectLong(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;

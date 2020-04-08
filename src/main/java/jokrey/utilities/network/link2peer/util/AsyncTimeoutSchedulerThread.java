@@ -60,7 +60,7 @@ public class AsyncTimeoutSchedulerThread {
                 if(shutdown) break;
                 //PROBLEM: If a scheduled cancellation has callbacks that attempts to schedule further timeouts, this entire thread deadlocks.......
                 //         Which is why this fine grained locking is required..
-                futureToCancel.cancelIfNotCompleted();
+                futureToCancel.tryCancel();
             }
         }).start();
     }

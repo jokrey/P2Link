@@ -3,14 +3,9 @@ package jokrey.utilities.network.link2peer.node.message_headers;
 import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
 import jokrey.utilities.network.link2peer.*;
-import jokrey.utilities.network.link2peer.util.Hash;
-import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 import java.util.Objects;
 
 import static jokrey.utilities.network.link2peer.P2LMessage.EXPIRE_INSTANTLY;
@@ -36,8 +31,6 @@ public interface P2LMessageHeader {
     /**
      * Type of the message. A shortcut for applications to determine what this message represents without decoding the data field.
      * Also used to wait-for/expect certain types of messages and assigning custom handlers.
-     *
-     * TODO - reduce type range to 8 bit - otherwise the type might be misused (and typical application do not require many different types of messages)
      */
     short getType();
     /**
@@ -167,7 +160,7 @@ public interface P2LMessageHeader {
             highestByteWritten = Math.max(highestByteWritten, stepFieldOffset+2);
         }
         if(isPartIndexFieldPresent()) {
-            BitHelper.writeInt32(raw, indexFieldOffset, getPartIndex()); //todo do not encode if is receipt, stream receipt does not need to have an index field
+            BitHelper.writeInt32(raw, indexFieldOffset, getPartIndex());
             highestByteWritten = Math.max(highestByteWritten, indexFieldOffset+4);
         }
         if(isLongPart()) {

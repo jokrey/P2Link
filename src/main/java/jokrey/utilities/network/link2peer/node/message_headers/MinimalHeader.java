@@ -3,7 +3,6 @@ package jokrey.utilities.network.link2peer.node.message_headers;
 import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.network.link2peer.P2LMessage;
 
-import java.net.InetSocketAddress;
 import java.util.Objects;
 
 /**

@@ -2,8 +2,6 @@ package jokrey.utilities.network.link2peer.util;
 
 import jokrey.utilities.network.link2peer.util.P2LThreadPool.Task;
 import jokrey.utilities.simple.data_structure.pairs.Pair;
-import jokrey.utilities.simple.data_structure.stack.LinkedStack;
-import jokrey.utilities.simple.data_structure.stack.Stack;
 
 import java.util.Collection;
 import java.util.LinkedList;
@@ -331,7 +329,7 @@ public class P2LFuture<T> {
      * Like {@link #cancel()} except it won't even throw an exception
      * @return !isCompleted() && !isCanceled()
      */
-    public boolean cancelIfNotCompleted() { //todo rename to tryCancel()
+    public boolean tryCancel() {
         synchronized (this) {
             if(isCompleted()) return false;
             if(isCanceled()) return false;
@@ -456,7 +454,7 @@ public class P2LFuture<T> {
     public <R> P2LFuture<R> toType(Function<T, R> converter) {
         P2LFuture<R> f = new P2LFuture<>();
         callMeBack(t -> f.setCompletedOrCanceledBasedOn(t == null ? null : converter.apply(t)));
-        f.callMeBack(t -> { if(t == null) cancelIfNotCompleted(); }); //if f is canceled, the underlying needs to be canceled as well - might be a short loop(i.e. the other callback canceled f, but that is not a problem)
+        f.callMeBack(t -> { if(t == null) tryCancel(); }); //if f is canceled, the underlying needs to be canceled as well - might be a short loop(i.e. the other callback canceled f, but that is not a problem)
         return f;
     }
 
@@ -609,8 +607,8 @@ public class P2LFuture<T> {
                 f.overrideResult(new Pair<>(previousResult.l, u));
         });
         f.callMeBack(t -> { if(t == null) {
-            previous.cancelIfNotCompleted();
-            next.cancelIfNotCompleted();
+            previous.tryCancel();
+            next.tryCancel();
         } }); //if f is canceled, the underlying needs to be canceled as well - might be a short loop(i.e. the other callback canceled f, but that is not a problem)
         return f;
     }

@@ -58,7 +58,7 @@ public class AsyncRetryer<T, E> implements Consumer<E> {
 
     private void fail(Throwable e) {
         e.printStackTrace();
-        //todo - how do we handle? - is this sufficient?!:
+        //is this sufficient?!:
         finalResultFuture.cancel();
     }
 
