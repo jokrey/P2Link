@@ -34,7 +34,7 @@ public class CommandLineP2LChat {
                         "  relayed link [NO USE HERE - CAN BE USED TO CONNECT]:\n" +
                         "     <name>[<direct link of relay server>]\n" +
                         "  local link:\n" +
-                        "     <name>-at-<port>");
+                        "     <name>[local=<port>]");
                 System.out.print("Enter own link (type \"format\" to see a description of the link format):  \n");
             }
         }

@@ -30,16 +30,16 @@ public abstract class P2Link {
      *   relayed link:
      *      <name>[<direct link of relay server>]
      *   local link:
-     *      <name>-at-<port>
+     *      <name>[local=<port>]
      *}
      * if input is null, result is null
      * @throws RuntimeException if not correct (i.e. not created by this objects toString method) */
     public static P2Link from(String representation) {
         if(representation == null) return null;
-        if(representation.contains("[")) {
-            return Relayed.from(representation);
-        } else if(representation.contains("-at-")) {
+        if(representation.contains("[local=")) {
             return Local.from(representation);
+        } else if(representation.contains("[") && representation.contains(":")) {
+            return Relayed.from(representation);
         } else {
             return Direct.from(representation);
         }
@@ -167,11 +167,11 @@ public abstract class P2Link {
 
         /** @throws RuntimeException if not correct (i.e. not created by this objects toString method) */
         public static Local from(String representation) {
-            String[] split = representation.split("-at-");
-            return new Local(split[0], Integer.parseInt(split[1]));
+            String[] split = representation.split("\\[local=");
+            return new Local(split[0], Integer.parseInt(split[1].substring(0, split[1].length()-1)));
         }
         @Override public String toString() {
-            return name + "-at-" + port;
+            return name + "[local=" + port+"]";
         }
 
         @Override public int getPort() { return port; }

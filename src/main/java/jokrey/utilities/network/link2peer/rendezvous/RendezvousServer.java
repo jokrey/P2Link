@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Scanner;
+import java.util.concurrent.RejectedExecutionException;
 
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
 
@@ -153,12 +154,15 @@ public class RendezvousServer implements AutoCloseable {
             requestEncoder.encodeVariableString(name);
 
         ReceivedP2LMessage reply = convo.initExpectClose(requestEncoder);
-
-        ArrayList<IdentityTriple> foundIdentities = new ArrayList<>();
-        IdentityTriple foundIdentity;
-        while(reply.hasAnyMore() && reply.nextByte() == SUCCESS && (foundIdentity = IdentityTriple.decodeNextOrNull(reply)) != null)
-            foundIdentities.add(foundIdentity);
-        return foundIdentities.toArray(new IdentityTriple[0]);
+        if(reply.nextByte() == SUCCESS) {
+            ArrayList<IdentityTriple> foundIdentities = new ArrayList<>();
+            IdentityTriple foundIdentity;
+            while (reply.hasAnyMore() && (foundIdentity = IdentityTriple.decodeNextOrNull(reply)) != null)
+                foundIdentities.add(foundIdentity);
+            return foundIdentities.toArray(new IdentityTriple[0]);
+        } else {
+            throw new IOException("denied answering - are you connected?");
+        }
     }
 
     /** Node has to be previously registered with {@link #register(P2LNode, P2Link.Direct, IdentityTriple)} */
@@ -166,12 +170,15 @@ public class RendezvousServer implements AutoCloseable {
         P2LConversation convo = node.convo(C_REQUEST_ALL, rendezvousServerLink);
 
         ReceivedP2LMessage reply = convo.initExpectClose();
-
-        ArrayList<IdentityTriple> foundIdentities = new ArrayList<>();
-        IdentityTriple foundIdentity;
-        while(reply.hasAnyMore() && reply.nextByte() == SUCCESS && (foundIdentity = IdentityTriple.decodeNextOrNull(reply)) != null)
-            foundIdentities.add(foundIdentity);
-        return foundIdentities.toArray(new IdentityTriple[0]);
+        if(reply.nextByte() == SUCCESS) {
+            ArrayList<IdentityTriple> foundIdentities = new ArrayList<>();
+            IdentityTriple foundIdentity;
+            while (reply.hasAnyMore() && (foundIdentity = IdentityTriple.decodeNextOrNull(reply)) != null)
+                foundIdentities.add(foundIdentity);
+            return foundIdentities.toArray(new IdentityTriple[0]);
+        } else {
+            throw new IOException("denied answering - are you connected?");
+        }
     }
 
 
@@ -192,8 +199,8 @@ public class RendezvousServer implements AutoCloseable {
                 remaining = timeout - elapsed;
                 if(remaining <= 0) break main;
 
-                boolean success = node.establishConnection(it.link).get(remaining);
-                if(success) {
+                Boolean success = node.establishConnection(it.link).getOrNull(remaining);
+                if(success != null && success) {
                     connectedPeers.add(it);
                     remainingNames.remove(it.name);
                 }

@@ -31,7 +31,7 @@ public class RelayedConnectionProtocol {
             convo.setRM(300); //for some reason the first packet takes a while to complete - so lets wait a little longer
 
             if(parent.getSelfLink().isDirect()) {
-                P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, conversationId);
+                P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, to, conversationId);
 
                 byte result = convo.initExpectClose(convo.encode(true, to.name)).nextByte();
                 if (result == EXPECT_INCOMING_CONNECTION) {
@@ -48,7 +48,7 @@ public class RelayedConnectionProtocol {
                     //before we close we will send a packet to the link, just so we create a hole in our own firewall.. We need no response, as it is too likely that it at least reached our router - creating the hole.
                     parent.sendInternalMessage(directLinkOfRequestedName.resolve(), P2LMessage.createNatHolePacket());
 
-                    P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, conversationId);
+                    P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, to, conversationId);
 
                     convo.close(); //now we can close and the remote can attempt a connection to our ip (not known to us, but known to the peer we used to relay) - an ip which should now have an NAT-entry for the remote
 
@@ -59,7 +59,7 @@ public class RelayedConnectionProtocol {
                     //before we close we will send a packet to the link, just so we create a hole in our own firewall.. We need no response, as it is too likely that it at least reached our router - creating the hole.
                     parent.sendInternalMessage(directLinkOfRequestedName.resolve(), P2LMessage.createNatHolePacket());
 
-                    P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, conversationId);
+                    P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, to, conversationId);
 
                     convo.close(); //now we can close and the remote can attempt a connection to our ip (not known to us, but known to the peer we used to relay) - an ip which should now have an NAT-entry for the remote
 
@@ -146,15 +146,20 @@ public class RelayedConnectionProtocol {
 
 
 
-    private static P2LFuture<Boolean> waitForReverseConnection(P2LNodeInternal parent, short requiredConversationId) {
+    private static P2LFuture<Boolean> waitForReverseConnection(P2LNodeInternal parent, P2Link.Relayed requiredFrom, short requiredConversationId) {
+        if(parent.isConnectedTo(requiredFrom))
+            return new P2LFuture<>(true);
+
         P2LFuture<Boolean> future = new P2LFuture<>();
-        BiConsumer<P2LConnection, Integer> listener = (link, connectConversationId) -> {
-            if(requiredConversationId == connectConversationId)
+        BiConsumer<P2LConnection, Integer> listener = (con, connectConversationId) -> {
+            if(requiredConversationId == connectConversationId && requiredFrom.equals(con.link))
                 future.trySetCompleted(true);
         };
         parent.addConnectionEstablishedListener(listener);
         future.callMeBack(b -> parent.removeConnectionEstablishedListener(listener));
 
+        if(parent.isConnectedTo(requiredFrom))
+            future.trySetCompleted(true);
         return future;
     }
 
