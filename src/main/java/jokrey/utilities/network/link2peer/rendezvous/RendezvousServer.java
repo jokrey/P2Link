@@ -41,7 +41,10 @@ public class RendezvousServer implements AutoCloseable {
 
         System.out.println("Given = " + rawLink);
 
-        RendezvousServer server = new RendezvousServer(selfLink);
+        if(!selfLink.isDirect())
+            throw new IllegalArgumentException("Given link not a direct link - rendezvous requires a link easily reachable by others");
+
+        RendezvousServer server = new RendezvousServer((P2Link.Direct) selfLink);
 
 
 
@@ -75,8 +78,7 @@ public class RendezvousServer implements AutoCloseable {
 
     private final BadConcurrentMultiKeyMap<String, InetSocketAddress, IdentityTriple> registeredIdentities = new BadConcurrentMultiKeyMap<>();
 
-    public RendezvousServer(P2Link selfLink) throws IOException {
-        if(!selfLink.isDirect()) throw new IllegalArgumentException("Given link not a direct link - rendezvous requires a link easily reachable by others");
+    public RendezvousServer(P2Link.Direct selfLink) throws IOException {
         node = P2LNode.create(selfLink, 512);
 
         node.addConnectionDroppedListener(p2LConnection -> {
@@ -87,7 +89,12 @@ public class RendezvousServer implements AutoCloseable {
             P2LConnection registeringConversation = node.getConnection(convo.getPeer());
             if(registeringConversation != null) {
                 String name = m0.nextVariableString();
-                registeredIdentities.put(name, convo.getPeer(), new IdentityTriple(name, m0.nextVariable(), registeringConversation.link));
+                byte[] publicKey = m0.nextVariable();
+                P2Link link = registeringConversation.link;
+                if(link.isOnlyLocal())
+                    link = ((P2Link.Local) link).withRelay(selfLink);
+                IdentityTriple decodedIdentityTriple = new IdentityTriple(name, publicKey, link);
+                registeredIdentities.put(name, convo.getPeer(), decodedIdentityTriple);
             } else {
                 System.out.println(convo.getPeer() + " - tried registering without being connected... That is not possible(then you couldn't use this rendezvous server as a relay node)");
             }
@@ -180,14 +187,12 @@ public class RendezvousServer implements AutoCloseable {
             if(remaining <= 0) break;
 
             IdentityTriple[] newlyFound = request(node, rendezvousServerLink, remainingNames.toArray(new String[0]));
-            System.out.println("newlyFound = " + Arrays.toString(newlyFound));
             for(IdentityTriple it : newlyFound) {
                 elapsed = (int) (System.currentTimeMillis() - startedAt);
                 remaining = timeout - elapsed;
                 if(remaining <= 0) break main;
 
                 boolean success = node.establishConnection(it.link).get(remaining);
-                System.out.println("success = " + success);
                 if(success) {
                     connectedPeers.add(it);
                     remainingNames.remove(it.name);

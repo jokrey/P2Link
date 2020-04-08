@@ -28,7 +28,6 @@ public class ConversationHandlerV2_2 implements ConversationHandler {
     private final Map<SenderTypeConversationIdentifier, P2LConversationImplV2> activeOutgoingConversations = new ConcurrentHashMap<>();
 
     public void received(P2LNodeInternal parent, InetSocketAddress from, ReceivedP2LMessage received) throws IOException {
-        System.out.println(parent.getSelfLink()+ " - from = " + from+", received = " + received);
         SenderTypeConversationIdentifier id = new SenderTypeConversationIdentifier(received);
         if(!received.header.isReceipt() && received.header.getStep() == 0) {
             P2LConversationImplV2 convo = activeIncomingConversations.computeIfAbsent(id, k ->
