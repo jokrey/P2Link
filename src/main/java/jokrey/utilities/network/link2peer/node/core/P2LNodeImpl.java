@@ -12,7 +12,6 @@ import jokrey.utilities.network.link2peer.node.stream.*;
 import jokrey.utilities.network.link2peer.util.NetUtil;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
-import jokrey.utilities.network.link2peer.util.SyncHelp;
 import jokrey.utilities.simple.data_structure.BadConcurrentMultiKeyMap;
 
 import java.io.IOException;
@@ -24,10 +23,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.validateMsgTypeNotInternal;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.*;
@@ -52,7 +49,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         this(selfLink, Integer.MAX_VALUE);
     }
     P2LNodeImpl(P2Link selfLink, int connectionLimit) throws IOException {
-        this.selfLink = selfLink;
+        setSelfLink(selfLink);
         this.connectionLimit = connectionLimit;
 
         incomingHandler = new IncomingHandler(this);
@@ -68,9 +65,9 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
                     P2LFuture<Boolean>[] pingResults = new P2LFuture[dormant.size()];
                     for (int i = 0; i < dormant.size(); i++)
                         pingResults[i] = PingProtocol.asInitiator(this, dormant.get(i));
-                    List<P2Link> retryableHistoricConnections = getRetryableHistoricConnections(now);
-                    for(P2Link retryable:retryableHistoricConnections)
-                        outgoingPool.execute(() -> EstablishConnectionProtocol.asInitiator(this, retryable)); //result does not matter - initiator will internally graduate a successful connection - and the timeout is much less than 10000
+                    List<InetSocketAddress> retryableHistoricConnections = getRetryableHistoricSocketAdresses(now);
+                    for(InetSocketAddress retryable:retryableHistoricConnections)
+                        outgoingPool.execute(() -> EstablishConnectionProtocol.asInitiator(this, null, retryable)); //result does not matter - initiator will internally graduate a successful connection - and the timeout is much less than 10000
 
                     incomingHandler.messageQueue.clean();
                     incomingHandler.brdMessageQueue.clean();
@@ -97,6 +94,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
 
     @Override public P2Link getSelfLink() { return selfLink; }
     @Override public void setSelfLink(P2Link selfLink) {
+        if(selfLink.isRelayed()) throw new IllegalArgumentException("self link cannot be relayed - use local link");
         this.selfLink = selfLink;
     }
 
@@ -111,7 +109,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
 
     @Override public P2LFuture<Boolean> establishConnection(P2Link to) {
-        return outgoingPool.execute(() -> isConnectedTo(to) || EstablishConnectionProtocol.asInitiator(P2LNodeImpl.this, to));
+        return outgoingPool.execute(() -> isConnectedTo(to) || EstablishConnectionProtocol.asInitiator(P2LNodeImpl.this, to, null));
     }
     @Override public P2LFuture<Set<P2Link>> establishConnections(P2Link... addresses) {
         P2LThreadPool.Task[] tasks = new P2LThreadPool.Task[addresses.length];
@@ -120,7 +118,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         for(int i=0;i<addresses.length;i++) {
             P2Link link = addresses[i];
             tasks[i] = () -> {
-                if(isConnectedTo(link) || EstablishConnectionProtocol.asInitiator(this, link))
+                if(isConnectedTo(link) || EstablishConnectionProtocol.asInitiator(this, link, null))
                     successes.add(link);
             };
         }
@@ -257,8 +255,10 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         return establishedConnections.containsBy1(to);
     }
     @Override public InetSocketAddress resolve(P2Link link) {
-        if (link.isDirect() || link.isOnlyLocal()) {
-            return link.resolve();
+        if (link.isDirect()) {
+            return ((P2Link.Direct) link).resolve();
+        } else if(link.isOnlyLocal()) {
+            return ((P2Link.Local) link).unsafeAsDirect().resolve();
         } else {
             System.out.println("link = " + link);
             P2LConnection con = establishedConnections.getBy2(link);
@@ -326,11 +326,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         return dormantConnections;
     }
     /** Already sets the new retry time - so after using this method it is mandatory to actually retry the given connections  */
-    private List<P2Link> getRetryableHistoricConnections(long now) {
-        ArrayList<P2Link> retryableHistoricConnections = new ArrayList<>(Math.min(16, historicConnections.size()));
+    private List<InetSocketAddress> getRetryableHistoricSocketAdresses(long now) {
+        ArrayList<InetSocketAddress> retryableHistoricConnections = new ArrayList<>(Math.min(16, historicConnections.size()));
         for(HistoricConnection e:historicConnections.values(new HistoricConnection[0]))
             if(e.shouldRetryNow(now))
-                retryableHistoricConnections.add(e.link);
+                retryableHistoricConnections.add(e.address);
         return retryableHistoricConnections;
     }
 

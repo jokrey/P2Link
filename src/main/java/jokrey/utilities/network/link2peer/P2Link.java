@@ -20,7 +20,6 @@ public abstract class P2Link {
     public abstract boolean isOnlyLocal();
 
     public abstract int getPort();
-    public abstract InetSocketAddress resolve();
 
 
     /**
@@ -92,7 +91,7 @@ public abstract class P2Link {
             return Objects.hash(dnsOrIp, port);
         }
 
-        @Override public InetSocketAddress resolve() {
+        public InetSocketAddress resolve() {
             return new InetSocketAddress(dnsOrIp, port);
         }
         @Override public int getPort() { return port; }
@@ -145,9 +144,6 @@ public abstract class P2Link {
             return Objects.hash(name);
         }
 
-        @Override public InetSocketAddress resolve() {
-            throw new UnsupportedOperationException("resolve not supported for relayed links. Try connection via relay link and use P2LNode.resolveLink(to)");
-        }
         @Override public int getPort() {
             throw new UnsupportedOperationException("Port is unknown for relayed connections (as it can be changed by intermediate NATs)");
         }
@@ -195,9 +191,6 @@ public abstract class P2Link {
             return Objects.hash(name);
         }
 
-        @Override public InetSocketAddress resolve() {
-            return new InetSocketAddress("localhost", port);
-        }
         @Override public int getPort() { return port; }
 
         public P2Link withRelay(Direct direct) {
