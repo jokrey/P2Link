@@ -133,7 +133,7 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
     private final ArrayList<Pair<Long, LongTupleList>> sendSinceLastReceipt = new ArrayList<>(RECEIPT_DELAY_MULTIPLIER+1);
 
     @Override public synchronized void receivedReceipt(P2LMessage rawReceipt) {
-        if (rawReceipt.getPayloadLength() == 0) { //todo remote no longer knows about this stream conversation... This may be valid - or not. Current we treat it as correct.
+        if (rawReceipt.getPayloadLength() == 0) { //todo remote no longer knows about this stream conversation... This may be valid - or not. Currently we just treat it as correct.
             latestMissingRanges = null;
             remoteLatestReceivedDataOffset = -3;
             SyncHelp.notify(this);

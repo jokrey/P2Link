@@ -133,12 +133,10 @@ public class RendezvousServer implements AutoCloseable {
     }
 
     @Override public void close() { node.close(); }
-    //todo - do protocols async where possible
 
     /*
     SIMPLY DISCONNECT TO UNREGISTER
      */
-
     public static P2LFuture<Boolean> register(P2LNode node, P2Link.Direct rendezvousServerLink, IdentityTriple selfIdentity) throws IOException {
         return node.establishConnection(rendezvousServerLink).andThen(alwaysTrue -> {
             P2LConversation convo = node.convo(C_REGISTER, rendezvousServerLink);

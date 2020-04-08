@@ -12,9 +12,11 @@ import jokrey.utilities.network.link2peer.util.P2LFuture;
 import java.util.*;
 
 /**
- * TODO PROBLEM:
+ * NOTE:
  *   if someone expects a message - times out and THEN the message is received -> the message will remain in the maps  (solution timeouts for messages - given by client with max)
- *   if someone expects the same message later, it will find this message, despite it not being the expected message (stack mildly mitigates this problem, but not a lot)
+ *      CALLED EXPIRATION AND IS IMPLEMENTED
+ *   if someone expects the same message before it times out, it will find the previous message, despite it not being the expected message (stack mildly mitigates this problem, but not a lot)
+ *      also that new message will then remained in the maps for a while
  */
 public class P2LBroadcastMessageQueue {
     private final Map<HeaderIdentifier, Deque<P2LFuture<P2LBroadcastMessage>>> waitingReceivers = new HashMap<>();

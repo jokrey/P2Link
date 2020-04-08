@@ -74,7 +74,6 @@ class LongMessageHandler {
     }
 
 
-    //todo- receiver that writes to disk
     private static class MessagePartReceiver {
         private long lastMessageReceivedAtCtm = System.currentTimeMillis();
         private int numberOfPartsReceived = 0;
@@ -94,7 +93,7 @@ class LongMessageHandler {
                 numberOfPartsReceived++;
                 lastMessageReceivedAtCtm = System.currentTimeMillis();
             }
-            //else it is a resend message - ignore that it can happen, it is not that bad.. todo should not happen here... (unless conversation id is reused)
+            //else it is a resend message - ignore that it can happen, it is not that bad.. ----- should not happen here... (unless conversation id is reused)
         }
         boolean isFullyReceived() {
             return numberOfPartsReceived == parts.length;

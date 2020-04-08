@@ -746,7 +746,6 @@ public class P2LConversationImplV2 implements P2LConversation {
             finalResultCanceledHandler = () -> handler.remove(P2LConversationImplV2.this);
             attemptFunction = () -> {
                 latest = new P2LFuture<>();
-                //todo - is this a race condition? What if latest is set RIGHT between cancellation through AsyncTimeoutScheduler and setting it here?
                 latest.callMeBack(calcWaitBeforeRetryTime(counter), this); //HAS TO BE BEFORE SEND MESSAGE - For thread, deadlock and call cascade reasons
 
                 lastMessageSentAt = System.currentTimeMillis();//used to calculate avRTT later

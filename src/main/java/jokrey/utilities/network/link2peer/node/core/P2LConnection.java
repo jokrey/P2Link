@@ -36,7 +36,7 @@ public class P2LConnection {
         if(avRTT == -1)
             avRTT = latestTook;
         else
-            avRTT = (avRTT*5 + latestTook)/6; //todo - maybe use a not as idiotic system -
+            avRTT = (avRTT*5 + latestTook)/6; //FIXME heuristic (use so that the new avRTT has less of an impact)
     }
 
     @Override public String toString() {

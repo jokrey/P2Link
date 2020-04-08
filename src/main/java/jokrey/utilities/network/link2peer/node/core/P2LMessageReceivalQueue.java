@@ -12,9 +12,11 @@ import java.util.*;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.*;
 
 /**
- * TODO PROBLEM:
+ * NOTE:
  *   if someone expects a message - times out and THEN the message is received -> the message will remain in the maps  (solution timeouts for messages - given by client with max)
- *   if someone expects the same message later, it will find this message, despite it not being the expected message (stack mildly mitigates this problem, but not a lot)
+ *      CALLED EXPIRATION AND IS IMPLEMENTED
+ *   if someone expects the same message before it times out, it will find the previous message, despite it not being the expected message (stack mildly mitigates this problem, but not a lot)
+ *      also that new message will then remained in the maps for a while
  */
 public class P2LMessageReceivalQueue {
     private final Map<HeaderIdentifier, Deque<P2LFuture<ReceivedP2LMessage>>> waitingReceivers = new HashMap<>();
@@ -83,7 +85,7 @@ public class P2LMessageReceivalQueue {
     }
 
     public boolean handleNewMessage(ReceivedP2LMessage received) {
-        //todo - this seems dumb or overkill:
+        //this seems dumb or overkill:
         HeaderIdentifier answersRequest =
                 (received.header.isConversationPart()) ?
                         (

@@ -96,8 +96,6 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
                 lastReceiptSendAt = System.currentTimeMillis();
                 numPackagesReceivedInLastBatch=0;
             }
-
-//            if(isFullyReceived()) parent.unregister(this); //todo - yes, BUT the output stream on the other side might re request the acknowledgement, so we need to handle that somehow
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -118,7 +116,7 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
             sendReceipt(1024);//curtsy
         } else
             forceClosedByThis=true;
-        parent.unregister(this);
+        parent.unregister(this); //re-requested last receipts are handled by the default in stream message handler
     }
 
     private synchronized void sendReceipt(int receiptPackageMaxSize) throws IOException {

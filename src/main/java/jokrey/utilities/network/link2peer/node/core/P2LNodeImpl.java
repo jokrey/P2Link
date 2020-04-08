@@ -56,8 +56,8 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
             while(!incomingHandler.isClosed()) {
                 long now = System.currentTimeMillis();
                 try {
-                    //todo - this in the future will also be required to keep alive nat holes - therefore it may need to be called more than the current every two minutes
-                    //   however the default timeout appears to be 300 seconds, i.e. five minutes so it should be fine
+                    //this in the future required to keep nat holes alive - therefore it may need to be called more than the current every two minutes
+                    //   however the default timeout appears to be 120-300 seconds, i.e. two to five minutes so 90 seconds should be fine
 
                     List<InetSocketAddress> dormant = getDormantEstablishedConnections(now);
                     P2LFuture<Boolean>[] pingResults = new P2LFuture[dormant.size()];

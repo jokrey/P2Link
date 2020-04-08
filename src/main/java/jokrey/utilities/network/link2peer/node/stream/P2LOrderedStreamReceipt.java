@@ -27,7 +27,7 @@ class P2LOrderedStreamReceipt {
         BitHelper.writeInt32(raw, raw_i, latestReceived);
         raw_i+=4;
         for(int missingPart:missingParts) {
-            BitHelper.writeInt32(raw, raw_i, missingPart); //todo - firstly missing parts length will always be AT MOST 2 bytes
+            BitHelper.writeInt32(raw, raw_i, missingPart);
             raw_i+=4;
         }
         return new P2LMessage(header, null, raw, payloadLength);
