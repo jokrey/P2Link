@@ -234,7 +234,7 @@ public class P2LMessage extends MessageEncoder {
     }
 
     public static P2LMessage from(P2LMessageHeader header, MessageEncoder encoded) {
-        if(header.getSize() != encoded.offset) throw new IllegalArgumentException("given encoded message has an incorrect offset(!= header size)");
+        if(header.getSize() != encoded.offset) throw new IllegalArgumentException("given encoded message has an incorrect offset(!= header size) - ((used convo? try convo.encoder()))");
         header.writeTo(encoded.content, 0);
         return new P2LMessage(header, null, encoded.content, encoded.size-encoded.offset);
     }

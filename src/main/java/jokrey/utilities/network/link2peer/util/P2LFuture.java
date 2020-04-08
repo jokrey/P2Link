@@ -480,7 +480,7 @@ public class P2LFuture<T> {
     }
 
     /** if the given result is null, this future is canceled - if it is not null, this future is set to completed. */
-    protected void setCompletedOrCanceledBasedOn(T resultOrNull) {
+    public void setCompletedOrCanceledBasedOn(T resultOrNull) {
         if (resultOrNull == null) cancel();
         else setCompleted(resultOrNull);
     }

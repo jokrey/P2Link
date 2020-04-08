@@ -12,18 +12,18 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.toShort;
 
-class ConversationHandlerV1 {
+class ConversationHandlerV1 implements ConversationHandler {
     private IncomingHandler incomingHandler;
     ConversationHandlerV1(IncomingHandler incomingHandler) {
         this.incomingHandler = incomingHandler;
     }
 
     private final Map<Short, ConversationAnswererChangeThisName> conversationHandlers = new ConcurrentHashMap<>();
-    public void registerConversationHandlerFor(int type, ConversationAnswererChangeThisName handler) {
+    @Override public void registerConversationHandlerFor(int type, ConversationAnswererChangeThisName handler) {
         conversationHandlers.put(toShort(type), handler);
     }
 
-    public void received(P2LNodeInternal parent, InetSocketAddress from, ReceivedP2LMessage received) throws IOException {
+    @Override public void received(P2LNodeInternal parent, InetSocketAddress from, ReceivedP2LMessage received) throws IOException {
         boolean hasBeenHandled = incomingHandler.messageQueue.handleNewMessage(received);
         System.out.println("received = " + received+" - hasBeenHandled="+hasBeenHandled);
         if(!hasBeenHandled) {
@@ -40,9 +40,13 @@ class ConversationHandlerV1 {
             }
         }
     }
-    public void clean() { }
+    @Override public void clean() { }
 
-    public P2LConversation getConvoFor(P2LNodeInternal parent, P2LConnection con, InetSocketAddress to, short type, short conversationId) {
+    @Override public P2LConversation getOutgoingConvoFor(P2LNodeInternal parent, P2LConnection con, InetSocketAddress to, short type, short conversationId) {
         return new P2LConversationImplV1(parent, incomingHandler.messageQueue, con, to, type, conversationId);
+    }
+
+    @Override public void remove(P2LConversationImplV2 convo) {
+
     }
 }

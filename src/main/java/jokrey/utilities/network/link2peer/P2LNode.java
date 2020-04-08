@@ -472,12 +472,12 @@ public interface P2LNode {
      * The given listener will receive all newly established connections.
      * @param listener listener to add
      */
-    void addConnectionEstablishedListener(BiConsumer<InetSocketAddress, Integer> listener);
+    void addConnectionEstablishedListener(BiConsumer<P2LConnection, Integer> listener);
     /**
      * The given listener will receive all disconnected connections.
      * @param listener listener to add
      */
-    void addConnectionDroppedListener(Consumer<InetSocketAddress> listener);
+    void addConnectionDroppedListener(Consumer<P2LConnection> listener);
 
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
@@ -487,10 +487,10 @@ public interface P2LNode {
     void removeBroadcastListener(P2LMessageListener<P2LBroadcastMessage> listener);
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
-    void removeConnectionEstablishedListener(BiConsumer<InetSocketAddress, Integer> listener);
+    void removeConnectionEstablishedListener(BiConsumer<P2LConnection, Integer> listener);
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
-    void removeConnectionDroppedListener(Consumer<InetSocketAddress> listener);
+    void removeConnectionDroppedListener(Consumer<P2LConnection> listener);
     /** Trivial message listener - dual use for direct messages and broadcasts */
     interface P2LMessageListener<M extends P2LMessage> { void received(M message);}
 }

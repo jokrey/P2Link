@@ -26,7 +26,6 @@ public class DirectConnectionProtocol {
         return asInitiator(parent, to, NO_CONVERSATION_ID);
     }
     public static boolean asInitiator(P2LNodeInternal parent, InetSocketAddress to, short conversationIdOverride) {
-        System.out.println(parent.getSelfLink()+" - DirectConnectionProtocol.asInitiator - to = " + to);
         try {
             if (parent.connectionLimitReached()) return false;
 
@@ -41,11 +40,9 @@ public class DirectConnectionProtocol {
                 return false;
             } else if (result == ALREADY_CONNECTED) {
                 parent.graduateToEstablishedConnection(new P2LConnection(new P2Link.Direct(to), to, peerLinkMessage.nextInt(), convo.getAvRTT()), conversationId);
-                System.out.println(parent.getSelfLink()+" - asInitiatorDirect success because [ALREADY CONNECTED]");
                 return true;
             } else {
                 parent.graduateToEstablishedConnection(connectionFromMessage(peerLinkMessage, peerLinkMessage.sender, convo.getAvRTT()), conversationId);
-                System.out.println(parent.getSelfLink()+" - asInitiatorDirect success because received remote self link");
                 return true;
             }
         } catch (TimeoutException | IOException e) {
@@ -55,10 +52,8 @@ public class DirectConnectionProtocol {
 
 
     public static void asAnswerer(P2LNodeInternal parent, P2LConversation convo, ReceivedP2LMessage initialRequestMessage) throws IOException {
-        System.out.println(parent.getSelfLink()+" - DirectConnectionProtocol.asAnswerer");
         initialRequestMessage.nextByte();//skips the single byte up front
         P2LConnection newPeerConnection = connectionFromMessage(initialRequestMessage, initialRequestMessage.sender, -1);
-        System.out.println(parent.getSelfLink()+" - newPeerConnection = " + newPeerConnection);
 
         if (parent.connectionLimitReached()) {
             convo.answerClose(convo.encode(REFUSED));

@@ -3,7 +3,9 @@ package jokrey.utilities.network.link2peer.node.core;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.node.DebugStats;
+import jokrey.utilities.network.link2peer.node.conversation.ConversationHandler;
 import jokrey.utilities.network.link2peer.node.conversation.ConversationHandlerV2;
+import jokrey.utilities.network.link2peer.node.conversation.ConversationHandlerV2_2;
 import jokrey.utilities.network.link2peer.node.protocols.*;
 import jokrey.utilities.network.link2peer.node.stream.StreamMessageHandler;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
@@ -34,8 +36,7 @@ public class IncomingHandler {
     final BroadcastMessageProtocol.BroadcastState broadcastState = new BroadcastMessageProtocol.BroadcastState();
     final LongMessageHandler longMessageHandler = new LongMessageHandler();
     final StreamMessageHandler streamMessageHandler = new StreamMessageHandler();
-//    final ConversationHandlerV1 conversationMessageHandler = new ConversationHandlerV1(this);
-    final ConversationHandlerV2 conversationMessageHandler = new ConversationHandlerV2();
+    final ConversationHandler conversationMessageHandler = new ConversationHandlerV2_2();
 
     final P2LThreadPool handleReceivedMessagesPool = new P2LThreadPool(4, 64);
 

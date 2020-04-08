@@ -28,13 +28,15 @@ import java.net.InetSocketAddress;
  * todo - long message intermediate receipts / stream usage for long messages
  */
 public class P2LConversationImplV2 implements P2LConversation {
+    private static final short STEP_NOT_INITIATED = Short.MIN_VALUE;
+
     public static int DEFAULT_NUM_ATTEMPTS = 4;
     public static float DEFAULT_M = 1.25f;
     public static int DEFAULT_A = 25;
     public static int DEFAULT_rM = 100;
 
     public final P2LNodeInternal parent;
-    public final ConversationHandlerV2 handler;
+    public final ConversationHandler handler;
     private final P2LConnection con;
     public final InetSocketAddress peer;
     final short type;
@@ -57,7 +59,7 @@ public class P2LConversationImplV2 implements P2LConversation {
         if(rM < 0) throw new IllegalArgumentException("cannot be negative");
         this.rM = rM;
     }
-    public P2LConversationImplV2(P2LNodeInternal parent, ConversationHandlerV2 handler,
+    public P2LConversationImplV2(P2LNodeInternal parent, ConversationHandler handler,
                                  P2LConnection con, InetSocketAddress peer, short type, short conversationId) {
         //SHALL NOT HAVE SIDE EFFECTS, BECAUSE THE CONVERSATION MIGHT BE DESTROYED INSTANTLY
         this.parent = parent;
@@ -88,13 +90,13 @@ public class P2LConversationImplV2 implements P2LConversation {
 
 
 
-    private short step = -2;
+    private short step = STEP_NOT_INITIATED;
     private boolean pausedMode = false;
     private boolean pausedDoubleExpectMode = false;
 
-    private boolean isServer = false;
+    boolean isServer = false;
     public void notifyServerInit(ConversationAnswererChangeThisName handler, ReceivedP2LMessage m0) throws IOException {
-        if(step == -2) {
+        if(! isInitiated()) {
             step = 1;
             isServer = true;
             latest.setCompleted(m0);
@@ -119,23 +121,32 @@ public class P2LConversationImplV2 implements P2LConversation {
         }
     }
 
+    private boolean isInitiated() {return step != STEP_NOT_INITIATED;}
+    private boolean isClosed() {return step < 0 && isInitiated();}
     private void initIfPossible() {
         if(isServer) throw new IllegalStateException("not client (server init is automatic, use 'answerExpect')");
-        if(step != -2) throw new IllegalStateException("cannot init twice");
+        if(isInitiated()) throw new IllegalStateException("cannot init twice");
         step = 0;
     }
     private void ensureCanStep() {
-        if(step == -2) throw new IllegalStateException("please init");
-        if(step == -1) throw new IllegalStateException("already closed");
+        if(! isInitiated()) throw new IllegalStateException("please init");
+        if(isClosed()) throw new IllegalStateException("already closed");
     }
     private void ensureCanStepWith(MessageEncoder message) {
         ensureCanStep();
-        if (message.contentSize() > con.remoteBufferSize * 3)
-            System.err.println("message requires more than three packages - should use long message functionality");
+        if (message.contentSize() > con.remoteBufferSize * 3) System.err.println("message requires more than three packages - should use long message functionality");
     }
     private void resetLatest() {
         latest.tryCancel();
         latest = new P2LFuture<>();
+    }
+    private void markSelfClosed() {
+        if(isInitiated() && !isClosed()) {
+            step = (short) -step;
+            handler.remove(this);
+        } else {
+            throw new IllegalStateException("already closed or not yet initiated");
+        }
     }
 
 
@@ -187,8 +198,7 @@ public class P2LConversationImplV2 implements P2LConversation {
         ensureCanStep();
         //if this message is lost answerClose will resent, but the message will not be handled by a handler - requestReceipt hits and a receipt equal to this will be sent
         parent.sendInternalMessage(peer, latest.getResult().createReceipt());
-        step = -1;
-        handler.remove(this);
+        markSelfClosed();
     }
 
     //requires a close on the other side
@@ -208,8 +218,7 @@ public class P2LConversationImplV2 implements P2LConversation {
 
             if (result != null && result.validateIsReceiptFor(msg)) {
                 con.updateAvRTT((int) (System.currentTimeMillis() - lastMessageSentAt));
-                step = -1;
-                handler.remove(this);
+                markSelfClosed();
                 DebugStats.conversation_numValid.getAndIncrement();
                 return;
             } else {
@@ -228,11 +237,19 @@ public class P2LConversationImplV2 implements P2LConversation {
 
     //DIRECT CLOSE
     @Override public ReceivedP2LMessage initExpectClose(MessageEncoder message) throws IOException {
-        if(step != -2) throw new IllegalStateException("cannot init twice");
+        if(isInitiated()) throw new IllegalStateException("cannot init twice");
         step = 0;
         ReceivedP2LMessage result = answerExpect(message);
-        step = -1;
-        handler.remove(this);
+        markSelfClosed();
+        return result;
+    }
+    @Override public P2LFuture<ReceivedP2LMessage> initExpectCloseAsync(MessageEncoder message) {
+        if(isInitiated()) throw new IllegalStateException("cannot init twice");
+        step = 0;
+        P2LFuture<ReceivedP2LMessage> result = answerExpectAsync(message);
+        result.callMeBackFirst(received -> {
+            markSelfClosed();
+        });
         return result;
     }
     @Override public void closeWith(MessageEncoder message) throws IOException {
@@ -241,18 +258,21 @@ public class P2LConversationImplV2 implements P2LConversation {
         if(message.contentSize() > con.remoteBufferSize*3) System.err.println("message requires more than three packages - should use long message functionality");
         ConversationHeader header = new ConversationHeader(type, conversationId, step, false);
         P2LMessage msg = P2LMessage.from(header, message);
-        step = -1;
-        handler.remove(this);
+        markSelfClosed();
         parent.sendInternalMessage(peer, msg);
     }
     @Override public void initClose(MessageEncoder message) throws IOException {
         if(isServer) throw new IllegalStateException("init only possible on client side, server does this automatically, use closeWith or answerClose");
-        if(step != -2) throw new IllegalStateException("cannot init twice");
+        if(isInitiated()) throw new IllegalStateException("cannot init twice");
         step = 0;
         answerClose(message);
     }
-
-
+    @Override public P2LFuture<Boolean> initCloseAsync(MessageEncoder message) {
+        if(isServer) throw new IllegalStateException("init only possible on client side, server does this automatically, use closeWith or answerClose");
+        if(isInitiated()) throw new IllegalStateException("cannot init twice");
+        step = 0;
+        return answerCloseAsync(message);
+    }
 
 
 
@@ -415,9 +435,8 @@ public class P2LConversationImplV2 implements P2LConversation {
                 System.out.println("waiting for: step = " + step);
 //                ReceivedP2LMessage result = latest.getOrNull(adjustedTimeout); //NOT REQUIRED, BECAUSE THE STREAM HAD A RECEIPT WHICH IS SUFFICIENT - OTHER SIDE DOES NOT NEED TO SEND CLOSE (but it doesn't hurt too much)
 //                if (result != null) {
-                    step=-1;
-                    handler.remove(this);
-                    return;
+                markSelfClosed();
+                return;
 //                }
             }
         }
@@ -525,7 +544,7 @@ public class P2LConversationImplV2 implements P2LConversation {
         stepHandler.resultFunc = result -> {
             if (result != null && result.validateIsReceiptFor(msg)) {
                 con.updateAvRTT((int) (System.currentTimeMillis() - lastMessageSentAt));
-                step = -1;
+                markSelfClosed();
                 DebugStats.conversation_numValid.getAndIncrement();
 
                 return true;
@@ -674,8 +693,7 @@ public class P2LConversationImplV2 implements P2LConversation {
         resetLatest();
 
         out.send();
-        step=-1;
-        handler.remove(this);
+        markSelfClosed();
         return out.closeAsync();//todo - it might be more efficient to spawn a thread here than to use what close Async uses internally.....
     }
     @Override public P2LFuture<Boolean> longAnswerExpectLongAsync(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget) {

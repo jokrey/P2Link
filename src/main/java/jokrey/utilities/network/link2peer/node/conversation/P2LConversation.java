@@ -280,12 +280,20 @@ public interface P2LConversation {
     //empty init shortcuts
     byte[] EMPTY_BYTES = new byte[0];
     /** When the client wants to initiate a conversation, but does not have anything to say. */
-    default byte[] initExpect() throws IOException, TimeoutException {
+    default byte[] initExpectData() throws IOException, TimeoutException {
         return initExpectData(EMPTY_BYTES);
     }
+    /** When the client wants to initiate a conversation, but does not have anything to say. */
+    default ReceivedP2LMessage initExpect() throws IOException, TimeoutException {
+        return initExpect(EMPTY_BYTES);
+    }
     /** When the client wants to initiate a conversation, but does not have anything to say. AND additionally wants to close the conversation right away. */
-    default byte[] initExpectClose() throws IOException, TimeoutException {   //does not make sense for answer - if you answer with nothing you did something wrong..
+    default byte[] initExpectDataClose() throws IOException, TimeoutException {   //does not make sense for answer - if you answer with nothing you did something wrong..
         return initExpectDataClose(EMPTY_BYTES);
+    }
+    /** When the client wants to initiate a conversation, but does not have anything to say. AND additionally wants to close the conversation right away. */
+    default ReceivedP2LMessage initExpectClose() throws IOException, TimeoutException {   //does not make sense for answer - if you answer with nothing you did something wrong..
+        return initExpectClose(EMPTY_BYTES);
     }
 
 
@@ -301,7 +309,7 @@ public interface P2LConversation {
     /** bytes using shortcut for {@link #answerClose(MessageEncoder)} */
     default void answerClose(byte[] bytes) throws IOException, TimeoutException { answerClose(MessageEncoder.from(getHeaderSize(), bytes)); }
     /** bytes using shortcut for {@link #initClose(MessageEncoder)} */
-    @Deprecated default void initClose(byte[] bytes) throws IOException, TimeoutException { initClose(MessageEncoder.from(getHeaderSize(), bytes)); }
+    default void initClose(byte[] bytes) throws IOException, TimeoutException { initClose(MessageEncoder.from(getHeaderSize(), bytes)); }
     /** bytes using shortcut for {@link #initExpectClose(MessageEncoder)} */
     default ReceivedP2LMessage initExpectClose(byte[] bytes) throws IOException, TimeoutException { return initExpectClose(MessageEncoder.from(getHeaderSize(), bytes)); }
     /** bytes using shortcut for {@link #closeWith(MessageEncoder)} */
@@ -329,28 +337,35 @@ public interface P2LConversation {
 
     //todo - proper comments for the new methods
 
-    void initExpectLong(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
-    void answerExpectLong(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
-//    ReceivedP2LMessage longInitExpect(TransparentBytesStorage messageSource, int timeout) throws IOException; //LONG INIT NOT POSSIBLE
-    ReceivedP2LMessage longAnswerExpect(TransparentBytesStorage messageSource, int timeout) throws IOException;
-    void longAnswerClose(TransparentBytesStorage messageSource, int timeout) throws IOException;
-//    void longInitExpectLong(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException; //LONG INIT NOT POSSIBLE
-    void longAnswerExpectLong(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException;
-    void initExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
-    void answerExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
-//    ReceivedP2LMessage longAnswerExpectAfterPause(TransparentBytesStorage messageSource, int timeout) throws IOException;//NOT REQUIRED - a long answer can always include a pause
-//    void longAnswerExpectLongAfterPause(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException;//NOT REQUIRED - a long answer can always include a pause
 
 
     // important rule for using async methods: Before the next async method in the conversation chain is called, the former one HAS TO HAVE COMPLETED
     //     ensure using either p2lfuture.get() - or p2lfuture.callmeback
     //     DO NOT USE callmebackfirst - internal structures might be required to run first
     //     unless otherwise noted canceling the returned future will cancel the entire conversation (asap)
+    P2LFuture<Boolean> initCloseAsync(MessageEncoder message);
+    P2LFuture<ReceivedP2LMessage> initExpectCloseAsync(MessageEncoder message);
     P2LFuture<ReceivedP2LMessage> initExpectAsync(MessageEncoder message);
     P2LFuture<ReceivedP2LMessage> answerExpectAsync(MessageEncoder message);
     P2LFuture<Boolean> answerCloseAsync(MessageEncoder message);
     P2LFuture<ReceivedP2LMessage> initExpectAsyncAfterPause(MessageEncoder message);
     P2LFuture<ReceivedP2LMessage> answerExpectAsyncAfterPause(MessageEncoder message);
+
+
+
+
+    void initExpectLong(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
+    void answerExpectLong(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
+    //    ReceivedP2LMessage longInitExpect(TransparentBytesStorage messageSource, int timeout) throws IOException; //LONG INIT NOT POSSIBLE
+    ReceivedP2LMessage longAnswerExpect(TransparentBytesStorage messageSource, int timeout) throws IOException;
+    void longAnswerClose(TransparentBytesStorage messageSource, int timeout) throws IOException;
+    //    void longInitExpectLong(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException; //LONG INIT NOT POSSIBLE
+    void longAnswerExpectLong(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException;
+    void initExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
+    void answerExpectLongAfterPause(MessageEncoder message, TransparentBytesStorage messageTarget, int timeout) throws IOException;
+//    ReceivedP2LMessage longAnswerExpectAfterPause(TransparentBytesStorage messageSource, int timeout) throws IOException;//NOT REQUIRED - a long answer can always include a pause
+//    void longAnswerExpectLongAfterPause(TransparentBytesStorage messageSource, TransparentBytesStorage messageTarget, int timeout) throws IOException;//NOT REQUIRED - a long answer can always include a pause
+
 
     P2LFuture<Boolean> initExpectLongAsync(MessageEncoder message, TransparentBytesStorage messageTarget);
     P2LFuture<Boolean> answerExpectLongAsync(MessageEncoder message, TransparentBytesStorage messageTarget);

@@ -149,7 +149,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
 
     @Override public P2LConversation internalConvo(int type, int conversationId, InetSocketAddress to) {
-        return incomingHandler.conversationMessageHandler.getConvoFor(this, establishedConnections.getBy1(to), to, toShort(type), toShort(conversationId));
+        return incomingHandler.conversationMessageHandler.getOutgoingConvoFor(this, establishedConnections.getBy1(to), to, toShort(type), toShort(conversationId));
     }
 
     //DIRECT MESSAGING:
@@ -295,7 +295,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         boolean previouslyConnected = establishedConnections.put(peer.address, peer.link, peer) != null;
         historicConnections.removeBy2(peer.link);
         if(!previouslyConnected)
-            notifyConnectionEstablished(peer.address, conversationId);
+            notifyConnectionEstablished(peer, conversationId);
     }
     @Override public void markBrokenConnection(InetSocketAddress address, boolean retry) {
         P2LConnection wasRemoved = address==null?null:establishedConnections.removeBy1(address);
@@ -303,7 +303,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
             System.err.println(address+" is not an established connection - could not mark as broken (already marked??)");
         } else {
             historicConnections.put(address, wasRemoved.link, new HistoricConnection(wasRemoved.link, address, retry, wasRemoved.remoteBufferSize, wasRemoved.avRTT));
-            notifyConnectionDisconnected(address);
+            notifyConnectionDisconnected(wasRemoved);
         }
     }
     @Override public void notifyPacketReceivedFrom(InetSocketAddress from) {
@@ -349,16 +349,16 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     //LISTENERS:
     private final ArrayList<P2LMessageListener<ReceivedP2LMessage>> individualMessageListeners = new ArrayList<>();
     private final ArrayList<P2LMessageListener<P2LBroadcastMessage>> broadcastMessageListeners = new ArrayList<>();
-    private final ArrayList<BiConsumer<InetSocketAddress, Integer>> newConnectionEstablishedListeners = new ArrayList<>();
-    private final ArrayList<Consumer<InetSocketAddress>> connectionDisconnectedListeners = new ArrayList<>();
+    private final ArrayList<BiConsumer<P2LConnection, Integer>> newConnectionEstablishedListeners = new ArrayList<>();
+    private final ArrayList<Consumer<P2LConnection>> connectionDisconnectedListeners = new ArrayList<>();
     @Override public void addMessageListener(P2LMessageListener<ReceivedP2LMessage> listener) { individualMessageListeners.add(listener); }
     @Override public void addBroadcastListener(P2LMessageListener<P2LBroadcastMessage> listener) { broadcastMessageListeners.add(listener); }
-    @Override public void addConnectionEstablishedListener(BiConsumer<InetSocketAddress, Integer> listener) { newConnectionEstablishedListeners.add(listener); }
-    @Override public void addConnectionDroppedListener(Consumer<InetSocketAddress> listener) { connectionDisconnectedListeners.add(listener); }
+    @Override public void addConnectionEstablishedListener(BiConsumer<P2LConnection, Integer> listener) { newConnectionEstablishedListeners.add(listener); }
+    @Override public void addConnectionDroppedListener(Consumer<P2LConnection> listener) { connectionDisconnectedListeners.add(listener); }
     @Override public void removeMessageListener(P2LMessageListener<ReceivedP2LMessage> listener) { individualMessageListeners.remove(listener); }
     @Override public void removeBroadcastListener(P2LMessageListener<P2LBroadcastMessage> listener) { broadcastMessageListeners.remove(listener); }
-    @Override public void removeConnectionEstablishedListener(BiConsumer<InetSocketAddress, Integer> listener) { newConnectionEstablishedListeners.remove(listener); }
-    @Override public void removeConnectionDroppedListener(Consumer<InetSocketAddress> listener) { connectionDisconnectedListeners.remove(listener); }
+    @Override public void removeConnectionEstablishedListener(BiConsumer<P2LConnection, Integer> listener) { newConnectionEstablishedListeners.remove(listener); }
+    @Override public void removeConnectionDroppedListener(Consumer<P2LConnection> listener) { connectionDisconnectedListeners.remove(listener); }
 
     @Override public void notifyUserBroadcastMessageReceived(P2LBroadcastMessage message) {
         for (P2LMessageListener<P2LBroadcastMessage> l : broadcastMessageListeners) { l.received(message); }
@@ -367,15 +367,16 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         for (P2LMessageListener<ReceivedP2LMessage> l : individualMessageListeners) { l.received(message); }
     }
 
-    private void notifyConnectionEstablished(InetSocketAddress newAddress, int conversationId) {
-        for (BiConsumer<InetSocketAddress, Integer> l : (List<BiConsumer<InetSocketAddress, Integer>>) newConnectionEstablishedListeners.clone()) { l.accept(newAddress, conversationId); }
+    private void notifyConnectionEstablished(P2LConnection newAddress, int conversationId) {
+        for (BiConsumer<P2LConnection, Integer> l : (List<BiConsumer<P2LConnection, Integer>>) newConnectionEstablishedListeners.clone()) { l.accept(newAddress, conversationId); }
     }
-    private void notifyConnectionDisconnected(InetSocketAddress newAddress) {
-        for (Consumer<InetSocketAddress> l : connectionDisconnectedListeners) { l.accept(newAddress); }
+    private void notifyConnectionDisconnected(P2LConnection newAddress) {
+        for (Consumer<P2LConnection> l : connectionDisconnectedListeners) { l.accept(newAddress); }
     }
 
 
     private AtomicInteger runningConversationId = new AtomicInteger(NO_CONVERSATION_ID + 1);
+//    private AtomicInteger runningConversationId = new AtomicInteger(ThreadLocalRandom.current().nextInt(Short.MAX_VALUE/2));
     @Override public short createUniqueConversationId() {
         //Lock free - i hope
         while(true) {

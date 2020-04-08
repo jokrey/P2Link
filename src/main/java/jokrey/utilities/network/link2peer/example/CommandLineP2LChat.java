@@ -46,8 +46,8 @@ public class CommandLineP2LChat {
 
         node.addMessageListener(message -> System.out.println(rawLink+" received message(from "+message.sender+"):\n"+message.asString()));
         node.addBroadcastListener(message -> System.out.println(rawLink+" received broadcast(from "+message.source+"):\n"+message.asString()));
-        node.addConnectionEstablishedListener((newAddress, cId) -> System.out.println(rawLink+" established a new connection to "+newAddress));
-        node.addConnectionDroppedListener(disconnected -> System.out.println(rawLink+" connection to "+disconnected +" disconnected"));
+        node.addConnectionEstablishedListener((newAddress, cId) -> System.out.println(rawLink+" established a new connection to "+newAddress.link));
+        node.addConnectionDroppedListener(disconnected -> System.out.println(rawLink+" connection to "+disconnected.link +" disconnected"));
 
         CommandLoop loop = new CommandLoop();
         loop.addCommand("connectTo", "Connects to peer at link(args[0]) of the form [ip/dns]:[port]", Argument.with(String.class), args -> {

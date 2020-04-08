@@ -15,7 +15,7 @@ import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTyp
 public class WhoAmIProtocol {
     public static P2Link.Direct asInitiator(P2LNodeInternal parent, InetSocketAddress to) throws IOException {
         P2LConversation convo = parent.internalConvo(SL_WHO_AM_I, to);
-        return (P2Link.Direct) P2Link.from(convo.initExpectClose());
+        return (P2Link.Direct) P2Link.from(convo.initExpectDataClose());
 //        return P2Link.from(parent.tryReceive(P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_COUNT, P2LHeuristics.DEFAULT_PROTOCOL_ATTEMPT_INITIAL_TIMEOUT, () ->
 //                P2LFuture.before(() ->
 //                                parent.sendInternalMessage(to, P2LMessage.Factory.createSendMessageWith(SL_WHO_AM_I)),

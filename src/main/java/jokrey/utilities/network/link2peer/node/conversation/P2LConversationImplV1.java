@@ -222,6 +222,15 @@ public class P2LConversationImplV1 implements P2LConversation {
         step = -1;
         return result;
     }
+    @Override public P2LFuture<ReceivedP2LMessage> initExpectCloseAsync(MessageEncoder message) {
+        if(step != -2) throw new IllegalStateException("cannot init twice");
+        step = 0;
+        P2LFuture<ReceivedP2LMessage> result = answerExpectAsync(message, true);
+        result.callMeBackFirst(bytes -> {
+            step = -1;
+        });
+        return result;
+    }
     @Override public void closeWith(MessageEncoder encoded) throws IOException {
         if(!isServer) throw new IllegalStateException("can only be used when server");
         if(step != 1) throw new IllegalStateException("can only be used as first instruction");
@@ -235,9 +244,13 @@ public class P2LConversationImplV1 implements P2LConversation {
         if(step != -2) throw new IllegalStateException("cannot init twice");
         step = 0;
         answerClose(encoded, true);
-        step = -1;
     }
-
+    @Override public P2LFuture<Boolean> initCloseAsync(MessageEncoder message) {
+        if(isServer) throw new IllegalStateException("init only possible on client side, server does this automatically, use closeWith or answerClose");
+        if(step != -2) throw new IllegalStateException("cannot init twice");
+        step = 0;
+        return answerCloseAsync(message, true);
+    }
 
 
 

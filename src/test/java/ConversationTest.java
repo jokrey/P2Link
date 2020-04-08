@@ -1,6 +1,7 @@
 import jokrey.utilities.debug_analysis_helper.TimeDiffMarker;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
+import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.conversation.ConversationAnswererChangeThisName;
 import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
@@ -130,11 +131,53 @@ public class ConversationTest {
         byte[][] rm = rand(1, 1000);
         testEnvConversation(true, 60, 100, false, true,
                 (convo, no) -> {//client
-                     convo.initClose(rm[0]);
+                    convo.initClose(rm[0]);
                 },
                 (convo, m0) -> {//server
                     assertArrayEquals(rm[0], m0.asBytes());
                     convo.close();
+                });
+    }
+    @Test void convTest_initExpectClose() throws IOException {
+        byte[][] rm = rand(2, 1000);
+        testEnvConversation(true, 60, 100, false, true,
+                (convo, no) -> {//client
+                    ReceivedP2LMessage m1 = convo.initExpectClose(rm[0]);
+                    assertArrayEquals(rm[1], m1.asBytes());
+                },
+                (convo, m0) -> {//server
+                    assertArrayEquals(rm[0], m0.asBytes());
+                    convo.closeWith(rm[1]);
+                });
+    }
+
+    @Test void convTest_initCloseAsync() throws IOException {
+        byte[][] rm = rand(1, 1000);
+        P2LFuture<Boolean> success = new P2LFuture<>();
+        testEnvConversation(true, 60, 100, false, false,
+                (convo, no) -> {//client
+                    convo.initCloseAsync(convo.encodeSingle(rm[0])).callMeBack(success::setCompletedOrCanceledBasedOn);
+                    assertTrue(success.get(3000));
+                },
+                (convo, m0) -> {//server
+                    assertArrayEquals(rm[0], m0.asBytes());
+                    convo.close();
+                });
+    }
+    @Test void convTest_initExpectCloseAsync() throws IOException {
+        byte[][] rm = rand(2, 1000);
+        P2LFuture<Boolean> success = new P2LFuture<>();
+        testEnvConversation(true, 60, 100, false, true,
+                (convo, no) -> {//client
+                    convo.initExpectCloseAsync(convo.encodeSingle(rm[0])).callMeBack(m1 -> {
+                        assertArrayEquals(rm[1], m1.asBytes());
+                        success.setCompleted(true);
+                    });
+                    assertTrue(success.get(3000));
+                },
+                (convo, m0) -> {//server
+                    assertArrayEquals(rm[0], m0.asBytes());
+                    convo.closeWith(rm[1]);
                 });
     }
 
@@ -702,7 +745,7 @@ public class ConversationTest {
                     serverLogic.converse(convo, m0);
                     if (!firstServerAnswerIsCloseOrCloseWith && bool.isCompleted())
                         serverCompletedMultipleTimes.setCompleted(true);
-                    bool.setCompleted(true);
+                    bool.trySetCompleted(true);
                 } catch (Exception e) {e.printStackTrace();bool.cancel();}
             });
 
