@@ -103,7 +103,9 @@ public class RelayedConnectionProtocol {
         boolean isRequestComingFromPubliclyAvailableLink = m0.nextBool();
         String nameOfSecondPeer = m0.nextVariableString();
 
+        System.out.println(parent.getSelfLink()+" - before resolveByName("+nameOfSecondPeer+")");
         InetSocketAddress rawAddressSecondPeer = parent.resolveByName(nameOfSecondPeer);
+        System.out.println(parent.getSelfLink()+" - after resolveByName("+nameOfSecondPeer+")");
         if(rawAddressSecondPeer == null) {
             convo.closeWith(convo.encode(NAME_UNKNOWN));
             return;
@@ -121,6 +123,7 @@ public class RelayedConnectionProtocol {
             P2LConversation convoWithSecondPeer = parent.internalConvo(SL_REQUEST_DIRECT_CONNECT_TO, connectionId, rawAddressSecondPeer);
             convoWithSecondPeer.initClose(convoWithSecondPeer.encodeSingle(directLinkToRequesterPeerBytes));
         } else {
+            System.out.println(parent.getSelfLink()+" - else");
 
             boolean isRequesterPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressRequesterPeer.getAddress(), parent.getLocalIPv4InterfaceAddress());
             boolean isSecondPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressSecondPeer.getAddress(), parent.getLocalIPv4InterfaceAddress());
