@@ -1,15 +1,13 @@
 package jokrey.utilities.network.link2peer.node.message_headers;
 
-import java.net.InetSocketAddress;
-
 /**
  * @author jokrey
  */
 public class ConversationHeader extends MinimalHeader {
     private final short conversationId;
     public short step;
-    public ConversationHeader(InetSocketAddress sender, short type, short conversationId, short step, boolean requestReceipt) {
-        super(sender, type, requestReceipt);
+    public ConversationHeader(short type, short conversationId, short step, boolean requestReceipt) {
+        super(type, requestReceipt);
         this.conversationId = conversationId;
         this.step = step;
     }

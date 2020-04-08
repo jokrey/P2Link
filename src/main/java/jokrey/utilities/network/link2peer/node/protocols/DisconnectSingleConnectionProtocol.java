@@ -12,7 +12,7 @@ public class DisconnectSingleConnectionProtocol {
     public static void asInitiator(P2LNodeInternal parent, InetSocketAddress to) {
         parent.markBrokenConnection(to, false);
         try {
-            parent.sendInternalMessage(to, P2LMessage.Factory.createSendMessage(SC_DISCONNECT)); //if this message fails, the other node will ping and it will automatically disconnect then ( this is just a courtesy)
+            parent.sendInternalMessage(to, P2LMessage.with(SC_DISCONNECT)); //if this message fails, the other node will ping and it will automatically disconnect then ( this is just a courtesy)
         } catch (IOException ignored) { }
     }
 

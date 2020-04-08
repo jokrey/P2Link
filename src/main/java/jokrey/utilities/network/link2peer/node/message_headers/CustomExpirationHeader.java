@@ -8,8 +8,8 @@ import java.net.InetSocketAddress;
 public class CustomExpirationHeader extends MinimalHeader {
     private final short expiresAfter;
     private final long createdAtCtm;
-    public CustomExpirationHeader(InetSocketAddress sender, short type, short expiresAfter, boolean requestReceipt) {
-        super(sender, type, requestReceipt);
+    public CustomExpirationHeader(short type, short expiresAfter, boolean requestReceipt) {
+        super(type, requestReceipt);
         this.expiresAfter = expiresAfter;
         createdAtCtm = System.currentTimeMillis();
     }

@@ -7,8 +7,8 @@ import java.net.InetSocketAddress;
  */
 public class FullShortMessageHeader extends CustomExpirationHeader {
     private final short conversationId;
-    public FullShortMessageHeader(InetSocketAddress sender, short type, short conversationId, short expiresAfter, boolean requestReceipt) {
-        super(sender, type, expiresAfter, requestReceipt);
+    public FullShortMessageHeader(short type, short conversationId, short expiresAfter, boolean requestReceipt) {
+        super(type, expiresAfter, requestReceipt);
         this.conversationId = conversationId;
     }
 

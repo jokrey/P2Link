@@ -3,6 +3,8 @@ package jokrey.utilities.network.link2peer.node.protocols;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 
+import java.net.InetSocketAddress;
+
 /**
  * IDEA:
  *   a new node does only need an internet connection and know the link of a single node with a public link
@@ -38,14 +40,23 @@ import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
  //   todo - literally only a check if connection is in historic connections => then ping it...
  */
 public class EstablishConnectionProtocol {
-    public static boolean asInitiator(P2LNodeInternal parent, P2Link to) {
-        if(to.isRelayed()) {
-            return RelayedConnectionProtocol.asInitiator(parent, (P2Link.Relayed) to);
-        } else if(to.isOnlyLocal()) {
-            System.err.println("Note: "+to+" is a local link, can only be used if to actually local and the link will not be distributed to peers - connect to local almost exclusively used during development");
-            return DirectConnectionProtocol.asInitiator(parent, to.resolve());
-        } else {//if(to.isDirect()) {
-            return DirectConnectionProtocol.asInitiator(parent, to.resolve());
+    /**
+     * Either 'to' or resolved can be null. If resolved is not null a direct connection attempt will be made.
+     */
+    public static boolean asInitiator(P2LNodeInternal parent, P2Link to, InetSocketAddress resolved) {
+        if(resolved != null) {
+            return DirectConnectionProtocol.asInitiator(parent, resolved);
+        } else if(to != null) {
+            if(to.isRelayed()) {
+                return RelayedConnectionProtocol.asInitiator(parent, (P2Link.Relayed) to);
+            } else if(to.isOnlyLocal()) {
+                System.err.println("Note: "+to+" is a local link, can only be used if to actually local and the link will not be distributed to peers - connect to local almost exclusively used during development");
+                return DirectConnectionProtocol.asInitiator(parent, parent.resolve(to));
+            } else {//if(to.isDirect()) {
+                return DirectConnectionProtocol.asInitiator(parent, parent.resolve(to));
+            }
+        } else {
+            throw new NullPointerException("both to and resolved were null");
         }
     }
 }

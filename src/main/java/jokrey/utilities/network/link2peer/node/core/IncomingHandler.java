@@ -1,6 +1,7 @@
 package jokrey.utilities.network.link2peer.node.core;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.conversation.ConversationHandlerV2;
 import jokrey.utilities.network.link2peer.node.protocols.*;
@@ -28,8 +29,8 @@ public class IncomingHandler {
     DatagramSocket serverSocket;
     P2LNodeInternal parent;
 
-    public final P2LMessageQueue messageQueue = new P2LMessageQueue();
-    final P2LMessageQueue brdMessageQueue = new P2LMessageQueue();
+    public final P2LMessageReceivalQueue messageQueue = new P2LMessageReceivalQueue();
+    final P2LBroadcastMessageQueue brdMessageQueue = new P2LBroadcastMessageQueue();
     final BroadcastMessageProtocol.BroadcastState broadcastState = new BroadcastMessageProtocol.BroadcastState();
     final LongMessageHandler longMessageHandler = new LongMessageHandler();
     final StreamMessageHandler streamMessageHandler = new StreamMessageHandler();
@@ -41,7 +42,7 @@ public class IncomingHandler {
 
     private void handleReceivedMessage(DatagramPacket receivedPacket) throws Throwable {
         InetSocketAddress from = (InetSocketAddress) receivedPacket.getSocketAddress();
-        P2LMessage message = P2LMessage.fromPacket(from, receivedPacket);
+        ReceivedP2LMessage message = P2LMessage.fromPacket(from, receivedPacket);
         if(DebugStats.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE>0) {
             boolean dropped = ThreadLocalRandom.current().nextInt(0, 100) < DebugStats.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE;
             if (dropped) {
@@ -116,8 +117,8 @@ public class IncomingHandler {
 
         conversationMessageHandler.registerConversationHandlerFor(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS, (convo, no) ->
                 RequestPeerLinksProtocol.asAnswerer(parent, convo));
-        conversationMessageHandler.registerConversationHandlerFor(SL_WHO_AM_I,
-                WhoAmIProtocol::asAnswerer);
+        conversationMessageHandler.registerConversationHandlerFor(SL_WHO_AM_I, (convo, no) ->
+                WhoAmIProtocol.asAnswerer(convo));
         conversationMessageHandler.registerConversationHandlerFor(SC_BROADCAST_WITHOUT_HASH, (convo, m0) -> {
             if(parent.isConnectedTo(convo.getPeer()))
                 BroadcastMessageProtocol.asAnswererWithoutHash(parent, convo, m0, brdMessageQueue, broadcastState);
@@ -150,7 +151,7 @@ public class IncomingHandler {
                 DatagramPacket receivedPacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
                 try {
                     serverSocket.receive(receivedPacket);
-                    System.out.println("received packet from: "+receivedPacket.getSocketAddress());
+//                    System.out.println("received packet from: "+receivedPacket.getSocketAddress());
 
                     handleReceivedMessagesPool.execute(() -> {
                         //has to be on a thread, because most protocols also wait for an answer - that has to be done outside of the thread that receives the answer (the outer thread here...)

@@ -4,6 +4,7 @@ import jokrey.utilities.bitsandbytes.BitHelper;
 import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
+import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
@@ -49,11 +50,11 @@ public class DirectConnectionProtocol {
                 System.out.println(parent.getSelfLink()+" - asInitiatorDirect success because verify nonce == 4 - [ALREADY CONNECTED]");
                 return true;
             } else {
-                P2LMessage peerLinkMessage = convo.answerExpect(verifyNonce);
+                ReceivedP2LMessage peerLinkMessage = convo.answerExpect(verifyNonce);
                 convo.close();
 
                 if (peerLinkMessage.getPayloadLength() > 0) {
-                    parent.graduateToEstablishedConnection(connectionFromMessage(peerLinkMessage, peerLinkMessage.header.getSender(), convo.getAvRTT()), conversationId);
+                    parent.graduateToEstablishedConnection(connectionFromMessage(peerLinkMessage, peerLinkMessage.sender, convo.getAvRTT()), conversationId);
                     System.out.println(parent.getSelfLink()+" - asInitiatorDirect success because received remote self link");
                     return true;
                 } else
@@ -65,9 +66,9 @@ public class DirectConnectionProtocol {
     }
 
 
-    public static void asAnswerer(P2LNodeInternal parent, P2LConversation convo, P2LMessage initialRequestMessage) throws IOException {
+    public static void asAnswerer(P2LNodeInternal parent, P2LConversation convo, ReceivedP2LMessage initialRequestMessage) throws IOException {
         System.out.println(parent.getSelfLink()+" - DirectConnectionProtocol.asAnswerer");
-        P2LConnection newPeerConnection = connectionFromMessage(initialRequestMessage, initialRequestMessage.header.getSender(), -1);
+        P2LConnection newPeerConnection = connectionFromMessage(initialRequestMessage, initialRequestMessage.sender, -1);
         System.out.println(parent.getSelfLink()+" - newPeerConnection = " + newPeerConnection);
 
         if (parent.connectionLimitReached()) {

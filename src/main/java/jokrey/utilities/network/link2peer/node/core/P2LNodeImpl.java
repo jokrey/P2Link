@@ -1,8 +1,6 @@
 package jokrey.utilities.network.link2peer.node.core;
 
-import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.P2LNode;
-import jokrey.utilities.network.link2peer.P2Link;
+import jokrey.utilities.network.link2peer.*;
 import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
 import jokrey.utilities.network.link2peer.node.conversation.ConversationAnswererChangeThisName;
@@ -98,7 +96,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         this.selfLink = selfLink;
     }
 
-    @Override public P2LFuture<P2Link> whoAmI(InetSocketAddress requestFrom) {
+    @Override public P2LFuture<P2Link.Direct> whoAmI(InetSocketAddress requestFrom) {
         return outgoingPool.execute(() -> WhoAmIProtocol.asInitiator(P2LNodeImpl.this, requestFrom));
     }
 
@@ -138,7 +136,6 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
 
     @Override public P2LFuture<Integer> sendBroadcastWithReceipts(P2LMessage message) {
-        if(message.header.getSender() == null) throw new IllegalArgumentException("sender of message has to be attached in broadcasts");
         validateMsgTypeNotInternal(message.header.getType());
 
         incomingHandler.broadcastState.markAsKnown(message.getContentHash());
@@ -157,8 +154,6 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
 
     //DIRECT MESSAGING:
     @Override public void sendInternalMessage(InetSocketAddress to, P2LMessage message) throws IOException {
-        if(message.header.getSender() != null) throw new IllegalArgumentException("sender of message has to be this null and will be automatically set by the sender");
-
         if(message.canBeSentInSinglePacket()) {
             if(DebugStats.MSG_PRINTS_ACTIVE)
                 System.out.println(getSelfLink()+" - sendInternalMessage - to = [" + to + "], message = " + message);
@@ -192,19 +187,23 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         return sendInternalMessageWithRetries(message, to, attempts, (int) (con.avRTT*1.1));
     }
 
-    @Override public P2LFuture<P2LMessage> expectMessage(int messageType) {
+    @Override public P2LFuture<ReceivedP2LMessage> expectMessage(int messageType) {
         validateMsgTypeNotInternal(messageType);
         return incomingHandler.messageQueue.futureFor(toShort(messageType));
     }
-    @Override public P2LFuture<P2LMessage> expectInternalMessage(InetSocketAddress from, int messageType) {
+    @Override public P2LFuture<ReceivedP2LMessage> expectInternalMessage(InetSocketAddress from, int messageType) {
         return incomingHandler.messageQueue.futureFor(from, toShort(messageType));
     }
-    @Override public P2LFuture<P2LMessage> expectInternalMessage(InetSocketAddress from, int messageType, int conversationId) {
+    @Override public P2LFuture<ReceivedP2LMessage> expectInternalMessage(InetSocketAddress from, int messageType, int conversationId) {
         return incomingHandler.messageQueue.futureFor(from, toShort(messageType), toShort(conversationId));
     }
-    @Override public P2LFuture<P2LMessage> expectBroadcastMessage(int messageType) {
+    @Override public P2LFuture<P2LBroadcastMessage> expectBroadcastMessage(int messageType) {
         validateMsgTypeNotInternal(messageType);
         return incomingHandler.brdMessageQueue.futureFor(toShort(messageType));
+    }
+    @Override public P2LFuture<P2LBroadcastMessage> expectBroadcastMessage(P2Link source, int messageType) {
+        validateMsgTypeNotInternal(messageType);
+        return incomingHandler.brdMessageQueue.futureFor(source, toShort(messageType));
     }
     @Override public P2LOrderedInputStream createInputStream(InetSocketAddress from, int messageType, int conversationId) {
         validateMsgTypeNotInternal(messageType);
@@ -348,24 +347,24 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
 
     //LISTENERS:
-    private final ArrayList<P2LMessageListener> individualMessageListeners = new ArrayList<>();
-    private final ArrayList<P2LMessageListener> broadcastMessageListeners = new ArrayList<>();
+    private final ArrayList<P2LMessageListener<ReceivedP2LMessage>> individualMessageListeners = new ArrayList<>();
+    private final ArrayList<P2LMessageListener<P2LBroadcastMessage>> broadcastMessageListeners = new ArrayList<>();
     private final ArrayList<BiConsumer<InetSocketAddress, Integer>> newConnectionEstablishedListeners = new ArrayList<>();
     private final ArrayList<Consumer<InetSocketAddress>> connectionDisconnectedListeners = new ArrayList<>();
-    @Override public void addMessageListener(P2LMessageListener listener) { individualMessageListeners.add(listener); }
-    @Override public void addBroadcastListener(P2LMessageListener listener) { broadcastMessageListeners.add(listener); }
+    @Override public void addMessageListener(P2LMessageListener<ReceivedP2LMessage> listener) { individualMessageListeners.add(listener); }
+    @Override public void addBroadcastListener(P2LMessageListener<P2LBroadcastMessage> listener) { broadcastMessageListeners.add(listener); }
     @Override public void addConnectionEstablishedListener(BiConsumer<InetSocketAddress, Integer> listener) { newConnectionEstablishedListeners.add(listener); }
     @Override public void addConnectionDroppedListener(Consumer<InetSocketAddress> listener) { connectionDisconnectedListeners.add(listener); }
-    @Override public void removeMessageListener(P2LMessageListener listener) { individualMessageListeners.remove(listener); }
-    @Override public void removeBroadcastListener(P2LMessageListener listener) { broadcastMessageListeners.remove(listener); }
+    @Override public void removeMessageListener(P2LMessageListener<ReceivedP2LMessage> listener) { individualMessageListeners.remove(listener); }
+    @Override public void removeBroadcastListener(P2LMessageListener<P2LBroadcastMessage> listener) { broadcastMessageListeners.remove(listener); }
     @Override public void removeConnectionEstablishedListener(BiConsumer<InetSocketAddress, Integer> listener) { newConnectionEstablishedListeners.remove(listener); }
     @Override public void removeConnectionDroppedListener(Consumer<InetSocketAddress> listener) { connectionDisconnectedListeners.remove(listener); }
 
-    @Override public void notifyUserBroadcastMessageReceived(P2LMessage message) {
-        for (P2LMessageListener l : broadcastMessageListeners) { l.received(message); }
+    @Override public void notifyUserBroadcastMessageReceived(P2LBroadcastMessage message) {
+        for (P2LMessageListener<P2LBroadcastMessage> l : broadcastMessageListeners) { l.received(message); }
     }
-    @Override public void notifyUserMessageReceived(P2LMessage message) {
-        for (P2LMessageListener l : individualMessageListeners) { l.received(message); }
+    @Override public void notifyUserMessageReceived(ReceivedP2LMessage message) {
+        for (P2LMessageListener<ReceivedP2LMessage> l : individualMessageListeners) { l.received(message); }
     }
 
     private void notifyConnectionEstablished(InetSocketAddress newAddress, int conversationId) {

@@ -2,6 +2,7 @@ package jokrey.utilities.network.link2peer.example;
 
 import jokrey.utilities.command.line.helper.Argument;
 import jokrey.utilities.command.line.helper.CommandLoop;
+import jokrey.utilities.network.link2peer.P2LBroadcastMessage;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
@@ -9,6 +10,7 @@ import jokrey.utilities.network.link2peer.node.P2LHeuristics;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
@@ -43,8 +45,8 @@ public class CommandLineP2LChat {
 
         P2LNode node = P2LNode.create(P2Link.from(rawLink));
 
-        node.addMessageListener(message -> System.out.println(rawLink+" received message(from "+message.header.getSender()+"):\n"+message.asString()));
-        node.addBroadcastListener(message -> System.out.println(rawLink+" received broadcast(from "+message.header.getSender()+"):\n"+message.asString()));
+        node.addMessageListener(message -> System.out.println(rawLink+" received message(from "+message.sender+"):\n"+message.asString()));
+        node.addBroadcastListener(message -> System.out.println(rawLink+" received broadcast(from "+message.source+"):\n"+message.asString()));
         node.addConnectionEstablishedListener((newAddress, cId) -> System.out.println(rawLink+" established a new connection to "+newAddress));
         node.addConnectionDroppedListener(disconnected -> System.out.println(rawLink+" connection to "+disconnected +" disconnected"));
 
@@ -80,12 +82,12 @@ public class CommandLineP2LChat {
         loop.addCommand("printSelf", "Prints own nodes link", Argument.noargs(), args -> System.out.println(node.getSelfLink()),
                 "self", "me");
         loop.addCommand("sendBroadcast", "Sends a string(args[0]) as a broadcast", Argument.with(String.class), args ->
-                node.sendBroadcastWithReceipts(P2LMessage.Factory.createBroadcast(node.getSelfLink().resolve(), 0, args[0].getRaw())), "broadcast", "brd");
+                node.sendBroadcastWithReceipts(P2LMessage.with(0, args[1].getRaw().getBytes(StandardCharsets.UTF_8))), "broadcast", "brd");
         loop.addCommand("sendIndividualMessage", "Sends a string(args[1]) as an individual message to an active peer link(args[0])", Argument.with(String.class, String.class), args -> {
             P2Link to = P2Link.from(args[0].getRaw()); //unresolved, maybe
 //            InetSocketAddress realTo = node.getConnection(to);
             try {
-                P2LFuture<Boolean> successFut = node.sendMessageWithReceipt(to, P2LMessage.Factory.createSendMessage(0, args[1].getRaw()));
+                P2LFuture<Boolean> successFut = node.sendMessageWithReceipt(to, P2LMessage.with(0, args[1].getRaw().getBytes(StandardCharsets.UTF_8)));
                 Boolean success = successFut.getOrNull(P2LHeuristics.DEFAULT_PROTOCOL_ANSWER_RECEIVE_TIMEOUT * 2);
                 System.out.println(success!=null&&success?"successfully send":"no response (peer did not receive)");
             } catch (IOException e) {

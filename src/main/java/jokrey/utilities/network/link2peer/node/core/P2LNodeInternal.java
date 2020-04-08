@@ -1,14 +1,15 @@
 package jokrey.utilities.network.link2peer.node.core;
 
+import jokrey.utilities.network.link2peer.P2LBroadcastMessage;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
+import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.node.conversation.ConversationAnswererChangeThisName;
 import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
 import jokrey.utilities.network.link2peer.node.stream.P2LFragmentInputStream;
 import jokrey.utilities.network.link2peer.node.stream.P2LFragmentOutputStream;
 import jokrey.utilities.network.link2peer.node.stream.P2LInputStream;
 import jokrey.utilities.network.link2peer.node.stream.P2LOutputStream;
-import jokrey.utilities.network.link2peer.util.NetUtil;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
@@ -29,8 +30,8 @@ public interface P2LNodeInternal extends P2LNode {
     P2LFuture<Boolean> sendInternalMessageWithReceipt(InetSocketAddress to, P2LMessage message) throws IOException;
     boolean sendInternalMessageWithRetries(InetSocketAddress to, P2LMessage message, int attempts) throws IOException;
 
-    P2LFuture<P2LMessage> expectInternalMessage(InetSocketAddress from, int type);
-    P2LFuture<P2LMessage> expectInternalMessage(InetSocketAddress from, int type, int conversationId);
+    P2LFuture<ReceivedP2LMessage> expectInternalMessage(InetSocketAddress from, int type);
+    P2LFuture<ReceivedP2LMessage> expectInternalMessage(InetSocketAddress from, int type, int conversationId);
 
     P2LFuture<Integer> executeAllOnSendThreadPool(P2LThreadPool.Task... tasks);
     @Override default P2LFuture<Integer> executeThreaded(P2LThreadPool.Task... tasks) {
@@ -43,8 +44,8 @@ public interface P2LNodeInternal extends P2LNode {
 
     P2LConversation internalConvo(int type, int conversationId, InetSocketAddress to);
 
-    void notifyUserBroadcastMessageReceived(P2LMessage message);
-    void notifyUserMessageReceived(P2LMessage message);
+    void notifyUserBroadcastMessageReceived(P2LBroadcastMessage message);
+    void notifyUserMessageReceived(ReceivedP2LMessage message);
 
     P2LFragmentInputStream createFragmentInputStream(InetSocketAddress from, short type, short conversationId, short step);
     default P2LFragmentInputStream createFragmentInputStream(InetSocketAddress from, int messageType, int conversationId) {
@@ -95,11 +96,11 @@ public interface P2LNodeInternal extends P2LNode {
         validateMsgTypeNotInternal(message.header.getType());
         return sendInternalMessageWithRetries(message, to, attempts, initialTimeout);
     }
-    default P2LFuture<P2LMessage> expectMessage(InetSocketAddress from, int type) {
+    default P2LFuture<ReceivedP2LMessage> expectMessage(InetSocketAddress from, int type) {
         validateMsgTypeNotInternal(type);
         return expectInternalMessage(from, type);
     }
-    default P2LFuture<P2LMessage> expectMessage(InetSocketAddress from, int type, int conversationId) {
+    default P2LFuture<ReceivedP2LMessage> expectMessage(InetSocketAddress from, int type, int conversationId) {
         validateMsgTypeNotInternal(type);
         return expectInternalMessage(from, type, conversationId);
     }

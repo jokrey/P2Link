@@ -62,7 +62,7 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
     public P2LOrderedOutputStreamImplV1(P2LNodeInternal parent, InetSocketAddress to, int bufferSizeWithoutHeader, short type, short conversationId) {
         super(parent, to, null, type, conversationId, NO_STEP);
 
-        headerSize = new StreamPartHeader(null, toShort(type), toShort(conversationId), NO_STEP,0, false, false).getSize();
+        headerSize = new StreamPartHeader(toShort(type), toShort(conversationId), NO_STEP,0, false, false).getSize();
         unsendBuffer = new byte[bufferSizeWithoutHeader - headerSize];
     }
 
@@ -131,7 +131,7 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
         if (!hasUnconfirmedParts() || requestRecentlyMade()) return;
         lastReceiptRequest = System.currentTimeMillis();
         if (isClosed()) {
-            StreamPartHeader header = new StreamPartHeader(null, toShort(type), toShort(conversationId), NO_STEP, -1, true, false);
+            StreamPartHeader header = new StreamPartHeader(toShort(type), toShort(conversationId), NO_STEP, -1, true, false);
             parent.sendInternalMessage(to, new P2LMessage(header, null, header.generateRaw(0), 0));
         } else{
             send(earliestUnconfirmedPartIndex, true);
@@ -180,10 +180,10 @@ public class P2LOrderedOutputStreamImplV1 extends P2LOrderedOutputStream {
         boolean eof = eofAtIndex == partIndexToSend;
         boolean thisPartIsLastInUnconfirmedBuffer = partIndexToSend + 1 >= earliestUnconfirmedPartIndex + unconfirmedSendPackages.length;
         boolean requestReceipt = forceRequestReceipt || eof || thisPartIsLastInUnconfirmedBuffer; //eof always requests a receipt, because the close method will not
-        StreamPartHeader header = new StreamPartHeader(null, toShort(type), toShort(conversationId), NO_STEP, partIndexToSend, requestReceipt, eof);
+        StreamPartHeader header = new StreamPartHeader(toShort(type), toShort(conversationId), NO_STEP, partIndexToSend, requestReceipt, eof);
         if(requestReceipt)
             lastReceiptRequest=System.currentTimeMillis();
-        header.writeTo(chunk.content); //if request receipt was changed...
+        header.writeTo(chunk.content, 0); //if request receipt was changed...
         parent.sendInternalMessage(to, new P2LMessage(header, null, chunk.content, (int) (chunk.contentSize() - headerSize)));
     }
 

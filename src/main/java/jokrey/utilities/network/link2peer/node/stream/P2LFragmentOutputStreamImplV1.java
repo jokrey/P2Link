@@ -65,7 +65,7 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
     private final BatchSizeCalculator batchSizeCalculator;
     protected P2LFragmentOutputStreamImplV1(P2LNodeInternal parent, InetSocketAddress to, P2LConnection con, short type, short conversationId, short step) {
         super(parent, to, con, type, conversationId, step);
-        int headerSize = new StreamPartHeader(null, type, conversationId, step,0, false, false).getSize();
+        int headerSize = new StreamPartHeader(type, conversationId, step,0, false, false).getSize();
         packageSize = con==null?1024:con.remoteBufferSize - headerSize;
         batch_delay_ms = con==null? DEFAULT_BATCH_DELAY :Math.max(con.avRTT, DEFAULT_BATCH_DELAY);
 
@@ -384,7 +384,7 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
         boolean lastPackage = packageContent.realEndIndex == source.totalNumBytes();
 //        System.out.println("lastPackage = " + lastPackage);
 //        System.out.println("packageContent.asString() = " + new String(packageContent.getContent(), StandardCharsets.UTF_8));
-        StreamPartHeader header = new StreamPartHeader(null, type, conversationId, step, (int) (packageContent.realStartIndex), false, lastPackage);
+        StreamPartHeader header = new StreamPartHeader(type, conversationId, step, (int) (packageContent.realStartIndex), false, lastPackage);
 //        System.out.println("content.length = " + content.length);
         return header.generateMessage(packageContent.content());
     }

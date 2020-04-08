@@ -1,6 +1,7 @@
 package jokrey.utilities.network.link2peer.node.stream;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.HeaderIdentifier;
@@ -17,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class StreamMessageHandler {
     private final ConcurrentHashMap<HeaderIdentifier, P2LInputStream> inputStreams = new ConcurrentHashMap<>();
-    public void receivedPart(P2LNodeInternal parent, P2LMessage message) throws IOException {
+    public void receivedPart(P2LNodeInternal parent, ReceivedP2LMessage message) throws IOException {
         P2LInputStream stream = getInputStream(message);
         if(stream != null)
             stream.received(message);
@@ -25,12 +26,12 @@ public class StreamMessageHandler {
             //todo - this default handling is technically a ddos issue - since the sender ip can be spoofed and we will send this package to anyone.
             //todo - also we will send a package for a received package without knowledge of whether that is valid.
             System.out.println("received message for unknown in stream");
-            P2LMessage defaultReceipt = new StreamReceiptHeader(null, message.header.getType(), message.header.getConversationId(), message.header.getStep(), true).generateMessage(new byte[0]);
-            parent.sendInternalMessage(message.header.getSender(), defaultReceipt);
+            P2LMessage defaultReceipt = new StreamReceiptHeader(message.header.getType(), message.header.getConversationId(), message.header.getStep(), true).generateMessage(new byte[0]);
+            parent.sendInternalMessage(message.sender, defaultReceipt);
         }
         //potentially a delayed package, after a new stream of the same type and conversation id has been created (very, very unlikely in context)
     }
-    private P2LInputStream getInputStream(P2LMessage m) {
+    private P2LInputStream getInputStream(ReceivedP2LMessage m) {
         return inputStreams.get(new SenderTypeConversationIdStepIdentifier(m));
     }
     public P2LOrderedInputStream createInputStream(P2LNodeInternal parent, InetSocketAddress from, P2LConnection con, short type, short conversationId, short step) {
@@ -53,14 +54,14 @@ public class StreamMessageHandler {
 
 
     private final ConcurrentHashMap<HeaderIdentifier, P2LOutputStream> outputStreams = new ConcurrentHashMap<>();
-    public void receivedReceipt(P2LMessage rawReceipt) {
+    public void receivedReceipt(ReceivedP2LMessage rawReceipt) {
         P2LOutputStream stream = getOutputStream(rawReceipt);
         if(stream != null)
             stream.receivedReceipt(rawReceipt);
         else
             System.out.println("received receipt message for unknown out stream("+new SenderTypeConversationIdStepIdentifier(rawReceipt)+")"); //todo - default handling?
     }
-    private P2LOutputStream getOutputStream(P2LMessage m) {
+    private P2LOutputStream getOutputStream(ReceivedP2LMessage m) {
         return outputStreams.get(new SenderTypeConversationIdStepIdentifier(m));
     }
     public P2LOrderedOutputStream createOutputStream(P2LNodeInternal parent, InetSocketAddress to, P2LConnection con, short type, short conversationId, short step) {

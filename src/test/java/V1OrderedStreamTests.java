@@ -1,5 +1,6 @@
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
+import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
@@ -43,10 +44,10 @@ public class V1OrderedStreamTests {
         boolean successConnect = nodes[0].establishConnection(nodes[1].getSelfLink()).get(5000); //TODO TOO SLOW FOR SOME VERY COMPLEX REASON
         assertTrue(successConnect);
 
-        P2LOrderedInputStreamImplV1 in = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().resolve(), (short) 5, (short) 0);
-        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().resolve(), 5, NO_CONVERSATION_ID, in);
-        P2LOrderedOutputStreamImplV1 out = new P2LOrderedOutputStreamImplV1((P2LNodeInternal) nodes[1], nodes[0].getSelfLink().resolve(), P2LMessage.CUSTOM_RAW_SIZE_LIMIT, (short) 5, (short) 0);
-        nodes[1].registerCustomOutputStream(nodes[0].getSelfLink().resolve(), 5, NO_CONVERSATION_ID, out);
+        P2LOrderedInputStreamImplV1 in = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], ((P2Link.Direct)nodes[1].getSelfLink()).resolve(), (short) 5, (short) 0);
+        nodes[0].registerCustomInputStream(((P2Link.Direct)nodes[1].getSelfLink()).resolve(), 5, NO_CONVERSATION_ID, in);
+        P2LOrderedOutputStreamImplV1 out = new P2LOrderedOutputStreamImplV1((P2LNodeInternal) nodes[1], ((P2Link.Direct)nodes[0].getSelfLink()).resolve(), P2LMessage.CUSTOM_RAW_SIZE_LIMIT, (short) 5, (short) 0);
+        nodes[1].registerCustomOutputStream(((P2Link.Direct)nodes[0].getSelfLink()).resolve(), 5, NO_CONVERSATION_ID, out);
 
 //        byte[] toSend = new byte[10_000];//10kb
         byte[] toSend = new byte[100_000_000];//100mb
@@ -82,8 +83,8 @@ public class V1OrderedStreamTests {
         P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
         P2LNode[] nodes = IntermediateTests.generateNodes(2, 62820);
 
-        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().resolve(), (short) 1, (short) 0);
-        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
+        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], ((P2Link.Direct)nodes[1].getSelfLink()).resolve(), (short) 1, (short) 0);
+        nodes[0].registerCustomInputStream(((P2Link.Direct)nodes[1].getSelfLink()).resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
 
@@ -113,8 +114,8 @@ public class V1OrderedStreamTests {
         P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =128;
         P2LNode[] nodes = IntermediateTests.generateNodes(2, 62830);
 
-        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().resolve(), (short) 1, (short) 0);
-        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
+        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], ((P2Link.Direct)nodes[1].getSelfLink()).resolve(), (short) 1, (short) 0);
+        nodes[0].registerCustomInputStream(((P2Link.Direct)nodes[1].getSelfLink()).resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
 
         String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
         new Thread(() -> {
@@ -144,29 +145,31 @@ public class V1OrderedStreamTests {
 
         P2LNode[] nodes = IntermediateTests.generateNodes(2, 62840);
 
-        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().resolve(), (short) 1, (short) 0);
-        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
+        try {
+            InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], ((P2Link.Direct) nodes[1].getSelfLink()).resolve(), (short) 1, (short) 0);
+            nodes[0].registerCustomInputStream(((P2Link.Direct) nodes[1].getSelfLink()).resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
 
-        String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
-        new Thread(() -> {
-            try {
-                int packetCount = P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE -1;
-                List<P2LMessage> randomlySplit = IntermediateTests.toBytesAndSplitRandomly(toSend, packetCount);
-                Collections.reverse(randomlySplit);
+            String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
+            new Thread(() -> {
+                try {
+                    int packetCount = P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE - 1;
+                    List<P2LMessage> randomlySplit = IntermediateTests.toBytesAndSplitRandomly(toSend, packetCount);
+                    Collections.reverse(randomlySplit);
 
-                for(P2LMessage m:randomlySplit) {
-                    nodes[1].sendMessage(nodes[0].getSelfLink(), m);
-                    sleep(5);//form of congestion control
+                    for (P2LMessage m : randomlySplit) {
+                        nodes[1].sendMessage(nodes[0].getSelfLink(), m);
+                        sleep(5);//form of congestion control
+                    }
+
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
+            }).start();
 
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }).start();
-
-        IntermediateTests.streamSplitAssertions(stream, toSend, false);
-
-        IntermediateTests.close(nodes);
+            IntermediateTests.streamSplitAssertions(stream, toSend, false);
+        } finally {
+            IntermediateTests.close(nodes);
+        }
     }
 
     @Test
@@ -175,76 +178,80 @@ public class V1OrderedStreamTests {
 
         P2LNode[] nodes = IntermediateTests.generateNodes(2, 62850);
 
-        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().resolve(), (short) 1, (short) 0);
-        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
-
-        String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
-        new Thread(() -> {
-            try {
-                int packetCount = P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE *3;
-                List<P2LMessage> randomlySplit = IntermediateTests.toBytesAndSplitRandomly(toSend, packetCount);
-//                Collections.reverse(randomlySplit);
-
-                for(P2LMessage m:randomlySplit) {
-                    nodes[1].sendMessage(nodes[0].getSelfLink(), m);
-                    sleep(500);
+        try {
+            InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], ((P2Link.Direct)nodes[1].getSelfLink()).resolve(), (short) 1, (short) 0);
+            nodes[0].registerCustomInputStream(((P2Link.Direct)nodes[1].getSelfLink()).resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
+    
+            String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
+            new Thread(() -> {
+                try {
+                    int packetCount = P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE *3;
+                    List<P2LMessage> randomlySplit = IntermediateTests.toBytesAndSplitRandomly(toSend, packetCount);
+    //                Collections.reverse(randomlySplit);
+    
+                    for(P2LMessage m:randomlySplit) {
+                        nodes[1].sendMessage(nodes[0].getSelfLink(), m);
+                        sleep(500);
+                    }
+    
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }).start();
-
-        IntermediateTests.streamSplitAssertions(stream, toSend, false);
-
-        IntermediateTests.close(nodes);
-
-        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =128;
+            }).start();
+    
+            IntermediateTests.streamSplitAssertions(stream, toSend, false);
+        } finally {
+            IntermediateTests.close(nodes);
+            P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =128;
+        }
     }
 
     @Test void streamTest_orderGuaranteedUpUntilBufferSize_twiceThanBufferSizePacketsSend_noDrops() throws IOException {
         P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
         P2LNode[] nodes = IntermediateTests.generateNodes(2, 62860);
 
-        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().resolve(), (short) 1, (short) 0);
-        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
-
-        String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
-        new Thread(() -> {
-            try {
-                int partsCount = 3;
-                int packetCount = P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE *partsCount;
-                List<P2LMessage> randomlySplit = IntermediateTests.toBytesAndSplitRandomly(toSend, packetCount);
-                List<List<P2LMessage>> parts = new ArrayList<>();
-                for(int i=0;i<partsCount;i++)
-                    parts.add(new ArrayList<>(P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE));
-
-                int messagesSend = 0;
-                int inPart = 0;
-                for(P2LMessage m:randomlySplit) {
-                    parts.get(inPart).add(m);
-                    messagesSend++;
-                    if(messagesSend%(P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE)==0) {
-                        Collections.shuffle(parts.get(inPart));
-                        inPart++;
+        try {
+            InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], ((P2Link.Direct)nodes[1].getSelfLink()).resolve(), (short) 1, (short) 0);
+            nodes[0].registerCustomInputStream(((P2Link.Direct)nodes[1].getSelfLink()).resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
+    
+            String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
+            new Thread(() -> {
+                try {
+                    int partsCount = 3;
+                    int packetCount = P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE *partsCount;
+                    List<P2LMessage> randomlySplit = IntermediateTests.toBytesAndSplitRandomly(toSend, packetCount);
+                    List<List<P2LMessage>> parts = new ArrayList<>();
+                    for(int i=0;i<partsCount;i++)
+                        parts.add(new ArrayList<>(P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE));
+    
+                    int messagesSend = 0;
+                    int inPart = 0;
+                    for(P2LMessage m:randomlySplit) {
+                        parts.get(inPart).add(m);
+                        messagesSend++;
+                        if(messagesSend%(P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE)==0) {
+                            Collections.shuffle(parts.get(inPart));
+                            inPart++;
+                        }
                     }
+    
+                    for(List<P2LMessage> messages:parts)
+                        for(P2LMessage message:messages) {
+                            nodes[1].sendMessage(nodes[0].getSelfLink(), message);
+                            sleep(5);//form of congestion control
+                        }
+    
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-
-                for(List<P2LMessage> messages:parts)
-                    for(P2LMessage message:messages) {
-                        nodes[1].sendMessage(nodes[0].getSelfLink(), message);
-                        sleep(5);//form of congestion control
-                    }
-
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }).start();
-
-        IntermediateTests.streamSplitAssertions(stream, toSend, false);
-
-        IntermediateTests.close(nodes);
-        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =128;
+            }).start();
+    
+            IntermediateTests.streamSplitAssertions(stream, toSend, false);
+    
+        } finally {
+            IntermediateTests.close(nodes);
+            P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE = 128;
+        }
     }
 
     @Test @Disabled
@@ -252,36 +259,38 @@ public class V1OrderedStreamTests {
         P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =4;
         P2LNode[] nodes = IntermediateTests.generateNodes(2, 62870);
 
-        InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], nodes[1].getSelfLink().resolve(), (short) 1, (short) 0);
-        nodes[0].registerCustomInputStream(nodes[1].getSelfLink().resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
+        try {
+            InputStream stream = new P2LOrderedInputStreamImplV1((P2LNodeInternal) nodes[0], ((P2Link.Direct) nodes[1].getSelfLink()).resolve(), (short) 1, (short) 0);
+            nodes[0].registerCustomInputStream(((P2Link.Direct) nodes[1].getSelfLink()).resolve(), 1, NO_CONVERSATION_ID, (P2LInputStream) stream);
 
-        String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
-        new Thread(() -> {
-            try {
+            String toSend = "hallo\nDies ist ein Test\nDieser String wurde in zufällige Packete aufgespalten und über das stream Protocol gesendet.\nHow do you read?\n";
+            new Thread(() -> {
+                try {
 
-                int packetCount = P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE *3;
-                List<P2LMessage> randomlySplit = IntermediateTests.toBytesAndSplitRandomly(toSend, packetCount);
-                Collections.shuffle(randomlySplit);
+                    int packetCount = P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE * 3;
+                    List<P2LMessage> randomlySplit = IntermediateTests.toBytesAndSplitRandomly(toSend, packetCount);
+                    Collections.shuffle(randomlySplit);
 //                Collections.reverse(randomlySplit);
 
 //                int messagesSend = 0;
-                for(P2LMessage m:randomlySplit) {
-                    nodes[1].sendMessage(nodes[0].getSelfLink(), m);
-                    sleep(5);
+                    for (P2LMessage m : randomlySplit) {
+                        nodes[1].sendMessage(nodes[0].getSelfLink(), m);
+                        sleep(5);
 
 //                    messagesSend++;
 //                    if(messagesSend%(P2LHeuristics.STREAM_CHUNK_BUFFER_ARRAY_SIZE)==0)
 //                        sleep(250);
+                    }
+
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
+            }).start();
 
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }).start();
-
-        IntermediateTests.streamSplitAssertions(stream, toSend, false);
-
-        IntermediateTests.close(nodes);
-        P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =128;
+            IntermediateTests.streamSplitAssertions(stream, toSend, false);
+        } finally {
+            IntermediateTests.close(nodes);
+            P2LHeuristics.ORDERED_STREAM_CHUNK_BUFFER_ARRAY_SIZE =128;
+        }
     }
 }

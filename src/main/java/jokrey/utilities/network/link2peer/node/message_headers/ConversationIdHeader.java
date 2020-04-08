@@ -7,8 +7,8 @@ import java.net.InetSocketAddress;
  */
 public class ConversationIdHeader extends MinimalHeader {
     private final short conversationId;
-    public ConversationIdHeader(InetSocketAddress sender, short type, short conversationId, boolean requestReceipt) {
-        super(sender, type, requestReceipt);
+    public ConversationIdHeader(short type, short conversationId, boolean requestReceipt) {
+        super(type, requestReceipt);
         this.conversationId = conversationId;
     }
 

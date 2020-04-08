@@ -27,7 +27,7 @@ public class P2LFragmentInputStreamImplV1 extends P2LFragmentInputStream {
     long receipt_delay_ms;
     protected P2LFragmentInputStreamImplV1(P2LNodeInternal parent, InetSocketAddress to, P2LConnection con, short type, short conversationId, short step) {
         super(parent, to, con, type, conversationId, step);
-        int headerSize = new StreamReceiptHeader(null, type, conversationId, step,false).getSize();
+        int headerSize = new StreamReceiptHeader(type, conversationId, step,false).getSize();
         receiptPackageMaxSize = con==null?1024:con.remoteBufferSize - headerSize;
         long batch_delay_ms = con==null? DEFAULT_BATCH_DELAY :Math.max(con.avRTT, DEFAULT_BATCH_DELAY);
         receipt_delay_ms = batch_delay_ms * RECEIPT_DELAY_MULTIPLIER;//con==null?50:con.avRTT/2;

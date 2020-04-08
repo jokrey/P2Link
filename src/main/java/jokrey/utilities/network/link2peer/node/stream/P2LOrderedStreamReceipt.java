@@ -20,7 +20,7 @@ class P2LOrderedStreamReceipt {
     }
 
     static P2LMessage encode(int type, int conversationId, int step, boolean eof, int latestReceived, int... missingParts) {
-        StreamReceiptHeader header = new StreamReceiptHeader(null, toShort(type), toShort(conversationId), toShort(step), eof);
+        StreamReceiptHeader header = new StreamReceiptHeader(toShort(type), toShort(conversationId), toShort(step), eof);
         int payloadLength = missingParts.length*4 + 4;
         byte[] raw = header.generateRaw(payloadLength);
         int raw_i = header.getSize();

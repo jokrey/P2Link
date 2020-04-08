@@ -1,6 +1,7 @@
 package jokrey.utilities.network.link2peer.node.conversation;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
@@ -21,7 +22,7 @@ public class ConversationHandlerV2 {
 
     private final Map<SenderTypeConversationIdentifier, P2LConversationImplV2> activeConversations = new ConcurrentHashMap<>();
 
-    public void received(P2LNodeInternal parent, InetSocketAddress from, P2LMessage received) throws IOException {
+    public void received(P2LNodeInternal parent, InetSocketAddress from, ReceivedP2LMessage received) throws IOException {
         if(!received.header.isReceipt() && received.header.getStep() == 0) {
             P2LConversationImplV2 convo = (P2LConversationImplV2) parent.internalConvo(received.header.getType(), received.header.getConversationId(), from);
             convo.notifyServerInit(conversationHandlers.get(received.header.getType()), received); //if was previous active, then the conversation can at least log that this is a double receival.

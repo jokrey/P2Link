@@ -17,9 +17,6 @@ import java.util.Objects;
  * @author jokrey
  */
 public class P2LMessageHeaderFull implements P2LMessageHeader {
-    private final InetSocketAddress sender;
-    @Override public InetSocketAddress getSender() { return sender; }
-
     private final short type;
     @Override public short getType() { return type; }
     private final short conversationId;
@@ -66,11 +63,9 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
 
 
 
-    public P2LMessageHeaderFull(InetSocketAddress sender,
-                                short type, short conversationId, short expiresAfter, short step,
+    public P2LMessageHeaderFull(short type, short conversationId, short expiresAfter, short step,
                                 int partIndex, int partNumberOfParts,
                                 boolean isReceipt, boolean isLongPart, boolean isStreamPart, boolean isStreamEof) {
-        this.sender = sender;
         this.type = type;
         this.conversationId = conversationId;
         this.expiresAfter = expiresAfter;
@@ -95,8 +90,8 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
 
 
     @Override public String toString() {
-        return "P2LMessageHeaderFull{sender='" + sender + '\'' +
-                ", type=" + type + ", conversationId=" + conversationId + ", partIndex=" + partIndex + ", partNumberOfParts=" + partNumberOfParts +
+        return "P2LMessageHeaderFull{" +
+                "type=" + type + ", conversationId=" + conversationId + ", partIndex=" + partIndex + ", partNumberOfParts=" + partNumberOfParts +
                 ", requestReceipt=" + requestReceipt + ", isReceipt=" + isReceipt + ", isLongPart=" + isLongPart + ", isStreamPart=" + isStreamPart +
                 ", isStreamEof=" + isStreamEof +
                 ", expiresAfter=" + expiresAfter + ", createdAtCtm=" + createdAtCtm + '}';
@@ -105,9 +100,9 @@ public class P2LMessageHeaderFull implements P2LMessageHeader {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         P2LMessageHeaderFull that = (P2LMessageHeaderFull) o;
-        return Objects.equals(sender, that.sender) && createdAtCtm == that.createdAtCtm && equalsIgnoreVolatile(that);
+        return createdAtCtm == that.createdAtCtm && equalsIgnoreVolatile(that);
     }
     @Override public int hashCode() {
-        return Objects.hash(sender, type, conversationId, partIndex,  partNumberOfParts, requestReceipt, isReceipt, isLongPart, expiresAfter, createdAtCtm);
+        return Objects.hash(type, conversationId, partIndex,  partNumberOfParts, requestReceipt, isReceipt, isLongPart, expiresAfter, createdAtCtm);
     }
 }

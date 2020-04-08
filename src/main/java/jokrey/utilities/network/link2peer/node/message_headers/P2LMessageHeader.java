@@ -1,13 +1,16 @@
 package jokrey.utilities.network.link2peer.node.message_headers;
 
 import jokrey.utilities.bitsandbytes.BitHelper;
-import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.P2LNode;
+import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
+import jokrey.utilities.network.link2peer.*;
 import jokrey.utilities.network.link2peer.util.Hash;
+import jokrey.utilities.transparent_storage.bytes.TransparentBytesStorage;
 
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Objects;
 
 import static jokrey.utilities.network.link2peer.P2LMessage.EXPIRE_INSTANTLY;
@@ -29,13 +32,6 @@ import static jokrey.utilities.network.link2peer.P2LMessage.EXPIRE_INSTANTLY;
 public interface P2LMessageHeader {
     short NO_CONVERSATION_ID = 0;
     short NO_STEP = -1;
-
-    /**
-     * Sender of the message
-     * for individual messages this will be the peer the message was received from (automatically determined from the udp package sender address)
-     * for broadcast messages this will be the peer that originally began distributing the message
-     */
-    InetSocketAddress getSender();
 
     /**
      * Type of the message. A shortcut for applications to determine what this message represents without decoding the data field.
@@ -103,94 +99,80 @@ public interface P2LMessageHeader {
                 requestReceipt() == that.requestReceipt() && isReceipt() == that.isReceipt() && isLongPart() == that.isLongPart() &&
                 getExpiresAfter() == that.getExpiresAfter();
     }
-    default Hash contentHashFrom(byte[] raw, int payloadLength) {
-        return contentHashFrom(getSender(), raw, payloadLength);
+
+
+
+
+
+
+
+
+
+    default P2LBroadcastMessage generateBroadcastMessage(P2Link source, byte[] payload) {
+        return new P2LBroadcastMessage(this, source, null, generateRaw(payload), payload.length);
     }
-    default Hash contentHashFromIgnoreSender(byte[] raw, int payloadLength) {
-        return contentHashFrom(null, raw, payloadLength);
-    }
-    default Hash contentHashFrom(InetSocketAddress sender, byte[] raw, int payloadLength) {
-        //fixme speed ok?
-        try {
-            MessageDigest hashFunction = MessageDigest.getInstance("SHA-1");
-            if(sender!=null) {
-                hashFunction.update(sender.getAddress().getAddress());
-                hashFunction.update(BitHelper.getBytes(sender.getPort()));
-            }
-            hashFunction.update(raw, HEADER_BYTES_OFFSET_TYPE, 4); //type
-            if(getConversationIdFieldOffset() != -1)
-                hashFunction.update(raw, getConversationIdFieldOffset(), 4); //conversation id
-            if(payloadLength > 0)
-                hashFunction.update(raw, getSize(), payloadLength); //only payload
-            return new Hash(hashFunction.digest());
-        } catch (NoSuchAlgorithmException e) {
-            throw new Error("missing critical algorithm");
-        }
-    }
-
-
-
-
-
-
-
-
-
-
     default P2LMessage generateMessage(byte[] payload) {
         return new P2LMessage(this, null, generateRaw(payload), payload.length);
     }
+    default P2LMessage generateMessage(int payloadLength) {
+        return new P2LMessage(this, null, generateRaw(payloadLength), payloadLength);
+    }
+    default ReceivedP2LMessage generateMockReceived(InetSocketAddress mockSender) {
+        return new ReceivedP2LMessage(mockSender, this, null, generateRaw(0), 0);
+    }
     default byte[] generateRaw(byte[] payload) {
         byte[] raw = generateRaw(payload.length);
-        writeTo(raw);
+        writeTo(raw, 0);
         System.arraycopy(payload, 0, raw, getSize(), payload.length);
         return raw;
     }
     default byte[] generateRaw(int payloadLength) {
         byte[] raw = new byte[getSize() + payloadLength];
-        writeTo(raw);
+        writeTo(raw, 0);
         return raw;
     }
     default byte[] generateRaw(int payloadLength, int maxRawSize) {
         byte[] raw = new byte[Math.min(maxRawSize, getSize() + payloadLength)];
-        writeTo(raw);
+        writeTo(raw, 0);
         return raw;
     }
     static short toShort(int i) {
         if(i<Short.MIN_VALUE || i>Short.MAX_VALUE) throw new IllegalArgumentException("integer("+i+") was illegally out of short value range");
         return (short) i;
     }
-    default void writeTo(byte[] raw) {
-        BitHelper.writeInt16(raw, HEADER_BYTES_OFFSET_TYPE, getType());
-        int conversationIdFieldOffset = getConversationIdFieldOffset();
-        int expirationFieldOffset = getExpirationFieldOffset();
-        int stepFieldOffset = getStepFieldOffset();
-        int indexFieldOffset = getPartIndexFieldOffset();
-        int numPartsFieldOffset = getLongNumPartsFieldOffset();
+    default int writeTo(byte[] raw, int offset) {
+        int highestByteWritten = offset+3; //wrote type
+        BitHelper.writeInt16(raw, HEADER_BYTES_OFFSET_TYPE + offset, getType());
+        int conversationIdFieldOffset = getConversationIdFieldOffset() + offset;
+        int expirationFieldOffset = getExpirationFieldOffset() + offset;
+        int stepFieldOffset = getStepFieldOffset() + offset;
+        int indexFieldOffset = getPartIndexFieldOffset() + offset;
+        int numPartsFieldOffset = getLongNumPartsFieldOffset() + offset;
 
         byte flagByte = 0;
 
-        if(conversationIdFieldOffset != -1) {
+        if(isConversationIdPresent()) {
             flagByte = BitHelper.setBit(flagByte, HEADER_FLAG_BIT_OFFSET_IS_CONVERSATION_ID_PRESENT);
             BitHelper.writeInt16(raw, conversationIdFieldOffset, getConversationId());
+            highestByteWritten = Math.max(highestByteWritten, conversationIdFieldOffset+2);
         }
-        if(expirationFieldOffset != -1) {
+        if(isExpirationPresent()) {
             flagByte = BitHelper.setBit(flagByte, HEADER_FLAG_BIT_OFFSET_IS_EXPIRATION_PRESENT);
             BitHelper.writeInt16(raw, expirationFieldOffset, getExpiresAfter());
+            highestByteWritten = Math.max(highestByteWritten, expirationFieldOffset+2);
         }
-        if(stepFieldOffset!=-1) {
+        if(isStepPresent()) {
             flagByte = BitHelper.setBit(flagByte, HEADER_FLAG_BIT_OFFSET_IS_STEP_PRESENT);
             BitHelper.writeInt16(raw, stepFieldOffset, getStep());
+            highestByteWritten = Math.max(highestByteWritten, stepFieldOffset+2);
         }
-        if(indexFieldOffset != -1) {
+        if(isPartIndexFieldPresent()) {
             BitHelper.writeInt32(raw, indexFieldOffset, getPartIndex()); //todo do not encode if is receipt, stream receipt does not need to have an index field
-//            System.out.println("indexFieldOffset = " + indexFieldOffset);
-//            System.out.println("getPartIndex() = " + getPartIndex());
+            highestByteWritten = Math.max(highestByteWritten, indexFieldOffset+4);
         }
-        if(numPartsFieldOffset != -1) {
+        if(isLongPart()) {
             BitHelper.writeInt32(raw, numPartsFieldOffset, getNumberOfParts());
-//            System.out.println("numPartsFieldOffset = " + numPartsFieldOffset);
-//            System.out.println("getNumberOfParts() = " + getNumberOfParts());
+            highestByteWritten = Math.max(highestByteWritten, numPartsFieldOffset+4);
         }
 
         if(isLongPart()) flagByte = BitHelper.setBit(flagByte, HEADER_FLAG_BIT_OFFSET_IS_LONG_PART);
@@ -198,11 +180,13 @@ public interface P2LMessageHeader {
         if(isStreamEof()) flagByte = BitHelper.setBit(flagByte, HEADER_FLAG_BIT_OFFSET_IS_STREAM_EOF);
         if(isReceipt()) flagByte = BitHelper.setBit(flagByte, HEADER_FLAG_BIT_OFFSET_IS_RECEIPT);
         if(requestReceipt()) flagByte = BitHelper.setBit(flagByte, HEADER_FLAG_BIT_OFFSET_REQUEST_RECEIPT);
-        raw[HEADER_OFFSET_FLAG_BYTE] = flagByte;
+        raw[HEADER_OFFSET_FLAG_BYTE + offset] = flagByte;
+
+        return highestByteWritten;
     }
-    static P2LMessageHeader from(byte[] raw, InetSocketAddress from) {
-        short type = readTypeFromHeader(raw);
-        byte flagByte = raw[HEADER_OFFSET_FLAG_BYTE];
+    static P2LMessageHeader from(byte[] raw, int offset) {
+        short type = readTypeFromHeader(raw, offset);
+        byte flagByte = raw[HEADER_OFFSET_FLAG_BYTE + offset];
 
         boolean conversationIdFieldPresent = readConversationIdPresentFromHeader(flagByte);
         boolean expirationFieldPresent = readExpirationPresentFromHeader(flagByte);
@@ -213,40 +197,33 @@ public interface P2LMessageHeader {
         boolean isStreamPart = readIsStreamPartFromHeader(flagByte);
         boolean isStreamEof = readIsStreamEofFromHeader(flagByte);
 
-        short conversationId = readConversationIdFromHeader(raw, conversationIdFieldPresent);
-        short expiresAfter = readExpirationFromHeader(raw, conversationIdFieldPresent, expirationFieldPresent);
-        short step = readStepFromHeader(raw, conversationIdFieldPresent, expirationFieldPresent, stepFieldPresent);
-        int partIndex = readPartIndexFromHeader(raw, conversationIdFieldPresent, expirationFieldPresent, stepFieldPresent, isLongPart, isStreamPart, isReceipt);
-        int partNumberOfParts = readPartSizeFromHeader(raw, conversationIdFieldPresent, expirationFieldPresent, stepFieldPresent, isLongPart);
+        short conversationId = readConversationIdFromHeader(raw, offset, conversationIdFieldPresent);
+        short expiresAfter = readExpirationFromHeader(raw, offset, conversationIdFieldPresent, expirationFieldPresent);
+        short step = readStepFromHeader(raw, offset, conversationIdFieldPresent, expirationFieldPresent, stepFieldPresent);
+        int partIndex = readPartIndexFromHeader(raw, offset, conversationIdFieldPresent, expirationFieldPresent, stepFieldPresent, isLongPart, isStreamPart, isReceipt);
+        int partNumberOfParts = readPartSizeFromHeader(raw, offset, conversationIdFieldPresent, expirationFieldPresent, stepFieldPresent, isLongPart);
 
-//        if(isLongPart) {
-//            System.out.println("partIndex = " + partIndex);
-//            System.out.println("partNumberOfParts = " + partNumberOfParts);
-//        }
-        return from(from, type, conversationId, expiresAfter, step, partIndex, partNumberOfParts, requestReceipt, isReceipt, isLongPart, isStreamPart, isStreamEof);
+        return from(type, conversationId, expiresAfter, step, partIndex, partNumberOfParts, requestReceipt, isReceipt, isLongPart, isStreamPart, isStreamEof);
     }
-    static P2LMessageHeader from(InetSocketAddress sender,
-                                 short type, short conversationId, short expiresAfter) {
-        return from(sender, type, conversationId, expiresAfter, NO_STEP, false);
+    static P2LMessageHeader from(short type, short conversationId, short expiresAfter) {
+        return from(type, conversationId, expiresAfter, NO_STEP, false);
     }
-    static P2LMessageHeader from(InetSocketAddress sender,
-                                 short type, short conversationId, short expiresAfter, short step, boolean requestReceipt) {
+    static P2LMessageHeader from(short type, short conversationId, short expiresAfter, short step, boolean requestReceipt) {
         boolean conversationIdFieldPresent = conversationId != NO_CONVERSATION_ID;
         boolean expirationFieldPresent = expiresAfter != EXPIRE_INSTANTLY;
         boolean stepFieldPresent = step != NO_STEP;
 
         if(stepFieldPresent)
-            return new ConversationHeader(sender, type, conversationId, step, requestReceipt);
+            return new ConversationHeader(type, conversationId, step, requestReceipt);
         if(conversationIdFieldPresent && expirationFieldPresent)
-            return new FullShortMessageHeader(sender, type, conversationId, expiresAfter, requestReceipt);
+            return new FullShortMessageHeader(type, conversationId, expiresAfter, requestReceipt);
         if(conversationIdFieldPresent)
-            return new ConversationIdHeader(sender, type, conversationId, requestReceipt);
+            return new ConversationIdHeader(type, conversationId, requestReceipt);
         if(expirationFieldPresent)
-            return new CustomExpirationHeader(sender, type, expiresAfter, requestReceipt);
-        return new MinimalHeader(sender, type, requestReceipt);
+            return new CustomExpirationHeader(type, expiresAfter, requestReceipt);
+        return new MinimalHeader(type, requestReceipt);
     }
-    static P2LMessageHeader from(InetSocketAddress sender,
-                                 short type, short conversationId, short expiresAfter, short step,
+    static P2LMessageHeader from(short type, short conversationId, short expiresAfter, short step,
                                  int partIndex, int partNumberOfParts,
                                  boolean requestReceipt, boolean isReceipt, boolean isLongPart, boolean isStreamPart, boolean isStreamEof) {
         boolean conversationIdFieldPresent = conversationId != NO_CONVERSATION_ID;
@@ -255,39 +232,39 @@ public interface P2LMessageHeader {
 
         if(isStreamPart) {
             if(isReceipt)
-                return new StreamReceiptHeader(sender, type, conversationId, step, isStreamEof);
+                return new StreamReceiptHeader(type, conversationId, step, isStreamEof);
             else {
-                return new StreamPartHeader(sender, type, conversationId, step, partIndex, requestReceipt, isStreamEof);
+                return new StreamPartHeader(type, conversationId, step, partIndex, requestReceipt, isStreamEof);
             }
         }
 
         if(isReceipt) {
             if (stepFieldPresent)
-                return new ReceiptHeader(sender, type, conversationId, step, requestReceipt);
+                return new ReceiptHeader(type, conversationId, step, requestReceipt);
             else
-                return new ReceiptHeader(sender, type, conversationId, NO_STEP, requestReceipt);
+                return new ReceiptHeader(type, conversationId, NO_STEP, requestReceipt);
         } else if(isLongPart) {
-            return new LongMessagePartHeader(sender, type, conversationId, expiresAfter, step, partIndex, partNumberOfParts, requestReceipt);
+            return new LongMessagePartHeader(type, conversationId, expiresAfter, step, partIndex, partNumberOfParts, requestReceipt);
         } else if(stepFieldPresent) {
-            return new ConversationHeader(sender, type, conversationId, step, requestReceipt);
+            return new ConversationHeader(type, conversationId, step, requestReceipt);
         }
 
         if(conversationIdFieldPresent && expirationFieldPresent)
-            return new FullShortMessageHeader(sender, type, conversationId, expiresAfter, requestReceipt);
+            return new FullShortMessageHeader(type, conversationId, expiresAfter, requestReceipt);
         if(conversationIdFieldPresent)
-            return new ConversationIdHeader(sender, type, conversationId, requestReceipt);
+            return new ConversationIdHeader(type, conversationId, requestReceipt);
         if(expirationFieldPresent)
-            return new CustomExpirationHeader(sender, type, expiresAfter, requestReceipt);
+            return new CustomExpirationHeader(type, expiresAfter, requestReceipt);
 //        if(!conversationIdFieldPresent && !expirationFieldPresent) //no need, always true
-            return new MinimalHeader(sender, type, requestReceipt);
-        
-//        return new P2LMessageHeaderFull(sender, type, conversationId, expiresAfter, partIndex, partNumberOfParts, isReceipt, isLongPart, isStreamPart, isStreamEof);
+            return new MinimalHeader(type, requestReceipt);
+
+//        return new P2LMessageHeaderFull(type, conversationId, expiresAfter, partIndex, partNumberOfParts, isReceipt, isLongPart, isStreamPart, isStreamEof);
     }
     default P2LMessageHeader toShortMessageHeader() {
-        return P2LMessageHeader.from(getSender(), getType(), getConversationId(), getExpiresAfter(), getStep(), requestReceipt());
+        return P2LMessageHeader.from(getType(), getConversationId(), getExpiresAfter(), getStep(), requestReceipt());
     }
     default P2LMessageHeader toMessagePartHeader(int index, int size) {
-        return new LongMessagePartHeader(getSender(), getType(), getConversationId(), getExpiresAfter(), getStep(), index, size, requestReceipt());
+        return new LongMessagePartHeader(getType(), getConversationId(), getExpiresAfter(), getStep(), index, size, requestReceipt());
     }
 
 
@@ -336,6 +313,9 @@ public interface P2LMessageHeader {
         return MIN_SIZE;
     }
 
+    default boolean isPartIndexFieldPresent() {
+        return isLongPart()||(isStreamPart()&&!isReceipt());
+    }
     default int getPartIndexFieldOffset() {
         return getPartIndexFieldOffset(isConversationIdPresent(), isExpirationPresent(), isStepPresent(), isLongPart(), isStreamPart(), isReceipt());
     }
@@ -357,29 +337,29 @@ public interface P2LMessageHeader {
         return MIN_SIZE+4;
     }
 
-    static short readTypeFromHeader(byte[] raw) {
-        return BitHelper.getInt16From(raw, HEADER_BYTES_OFFSET_TYPE);
+    static short readTypeFromHeader(byte[] raw, int offset) {
+        return BitHelper.getInt16From(raw, HEADER_BYTES_OFFSET_TYPE + offset);
     }
-    static short readConversationIdFromHeader(byte[] raw, boolean conversationIdFieldPresent) {
+    static short readConversationIdFromHeader(byte[] raw, int offset, boolean conversationIdFieldPresent) {
         if(!conversationIdFieldPresent) return NO_CONVERSATION_ID;
-        return BitHelper.getInt16From(raw, getConversationIdFieldOffset(conversationIdFieldPresent));
+        return BitHelper.getInt16From(raw, getConversationIdFieldOffset(conversationIdFieldPresent) + offset);
     }
-    static short readExpirationFromHeader(byte[] raw, boolean conversationIdFieldPresent, boolean expirationFieldPresent) {
+    static short readExpirationFromHeader(byte[] raw, int offset, boolean conversationIdFieldPresent, boolean expirationFieldPresent) {
         if(!expirationFieldPresent) return EXPIRE_INSTANTLY;
-        return BitHelper.getInt16From(raw, getExpirationFieldOffset(conversationIdFieldPresent, expirationFieldPresent));
+        return BitHelper.getInt16From(raw, getExpirationFieldOffset(conversationIdFieldPresent, expirationFieldPresent) + offset);
     }
-    static short readStepFromHeader(byte[] raw, boolean conversationIdFieldPresent, boolean expirationFieldPresent, boolean stepFieldPresent) {
+    static short readStepFromHeader(byte[] raw, int offset, boolean conversationIdFieldPresent, boolean expirationFieldPresent, boolean stepFieldPresent) {
         if(!stepFieldPresent) return -1;
-        return BitHelper.getInt16From(raw, getStepFieldOffset(conversationIdFieldPresent, expirationFieldPresent, stepFieldPresent));
+        return BitHelper.getInt16From(raw, getStepFieldOffset(conversationIdFieldPresent, expirationFieldPresent, stepFieldPresent) + offset);
     }
 
-    static int readPartIndexFromHeader(byte[] raw, boolean conversationIdFieldPresent, boolean expirationFieldPresent, boolean stepFieldPresent, boolean isLongPart, boolean isStreamPart, boolean isReceipt) {
+    static int readPartIndexFromHeader(byte[] raw, int offset, boolean conversationIdFieldPresent, boolean expirationFieldPresent, boolean stepFieldPresent, boolean isLongPart, boolean isStreamPart, boolean isReceipt) {
         if(!isLongPart && (!isStreamPart||isReceipt)) return 0;
-        return BitHelper.getInt32From(raw, getPartIndexFieldOffset(conversationIdFieldPresent, expirationFieldPresent, stepFieldPresent, isLongPart, isStreamPart, isReceipt));
+        return BitHelper.getInt32From(raw, getPartIndexFieldOffset(conversationIdFieldPresent, expirationFieldPresent, stepFieldPresent, isLongPart, isStreamPart, isReceipt) + offset);
     }
-    static int readPartSizeFromHeader(byte[] raw, boolean conversationIdFieldPresent, boolean expirationFieldPresent, boolean stepFieldPresent, boolean isLongPart) {
+    static int readPartSizeFromHeader(byte[] raw, int offset, boolean conversationIdFieldPresent, boolean expirationFieldPresent, boolean stepFieldPresent, boolean isLongPart) {
         if(!isLongPart) return 0;
-        return BitHelper.getInt32From(raw, getLongNumPartsFieldOffset(conversationIdFieldPresent, expirationFieldPresent, stepFieldPresent, isLongPart));
+        return BitHelper.getInt32From(raw, getLongNumPartsFieldOffset(conversationIdFieldPresent, expirationFieldPresent, stepFieldPresent, isLongPart) + offset);
     }
     
     
@@ -422,6 +402,28 @@ public interface P2LMessageHeader {
     int HEADER_FLAG_BIT_OFFSET_IS_STEP_PRESENT = 7;
 
 
+
+    /** Encodes the given string as sole content of a newly created message encoder (to be decoded using {@link MessageEncoder#asString()} */
+    default MessageEncoder encodeSingle(String payload) {
+        return encodeSingle(payload.getBytes(StandardCharsets.UTF_8));
+    }
+    /** Encodes the given bytes as sole content of a newly created message encoder (to be decoded using {@link MessageEncoder#asBytes()} */
+    default MessageEncoder encodeSingle(byte[] bytes) {
+        MessageEncoder me = new MessageEncoder(getSize(), getSize() + bytes.length);
+        me.setBytes(bytes);
+        return me;
+    }
+    /** Encodes the given payloads into a new message encoder object with the correct offset for it to be directly passed into this conversations methods */
+    default MessageEncoder encode(Object... payloads) { return MessageEncoder.encodeAll(getSize(), payloads); }
+    /** {@link #encoder(int)}, with initial capacity set to 64 bytes */
+    default MessageEncoder encoder() {return encoder( 64);}
+    /**
+     * Creates a new message encoder with the correct offset for it to be directly passed into this conversations methods with arbitrary encoded data.
+     * @param initial_capacity the initial capacity of the byte array backing the encoded data
+     */
+    default MessageEncoder encoder(int initial_capacity) {return new MessageEncoder(getSize(), initial_capacity);}
+
+
     abstract class HeaderIdentifier {
         public abstract boolean equals(Object o);
         public abstract int hashCode();
@@ -446,18 +448,60 @@ public interface P2LMessageHeader {
             return "TypeIdentifier{messageType=" + messageType + '}';
         }
     }
-    class SenderTypeConversationIdentifier extends TypeIdentifier {
+    class SenderTypeIdentifier extends TypeIdentifier {
         public final InetSocketAddress from;
-        public final short conversationId;
-        public SenderTypeConversationIdentifier(InetSocketAddress from, short messageType, short conversationId) {
+        public SenderTypeIdentifier(InetSocketAddress from, short messageType) {
             super(messageType);
             this.from = from;
-            this.conversationId = conversationId;
         }
-        public SenderTypeConversationIdentifier(P2LMessage msg) {
-            this(msg.header.getSender(), msg.header.getType(), msg.header.getConversationId());
+        public SenderTypeIdentifier(ReceivedP2LMessage msg) {
+            this(msg.sender, msg.header.getType());
         }
 
+        @Override public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            if (!super.equals(o)) return false;
+            SenderTypeIdentifier that = (SenderTypeIdentifier) o;
+            return Objects.equals(from, that.from);
+        }
+        @Override public int hashCode() { return Objects.hash(super.hashCode(), from); }
+        @Override public String toString() {
+            return "SenderTypeIdentifier{from=" + from + ", messageType=" + super.messageType + '}';
+        }
+    }
+    class BroadcastSourceTypeIdentifier extends TypeIdentifier {
+        public final P2Link source;
+        public BroadcastSourceTypeIdentifier(P2Link source, short messageType) {
+            super(messageType);
+            this.source = source;
+        }
+        public BroadcastSourceTypeIdentifier(P2LBroadcastMessage msg) {
+            this(msg.source, msg.header.getType());
+        }
+
+        @Override public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            if (!super.equals(o)) return false;
+            BroadcastSourceTypeIdentifier that = (BroadcastSourceTypeIdentifier) o;
+            return Objects.equals(source, that.source);
+        }
+        @Override public int hashCode() { return Objects.hash(super.hashCode(), source); }
+        @Override public String toString() {
+            return "BroadcastSourceTypeIdentifier{source=" + source + ", messageType=" + super.messageType + '}';
+        }
+    }
+    class SenderTypeConversationIdentifier extends SenderTypeIdentifier {
+        public final short conversationId;
+        public SenderTypeConversationIdentifier(InetSocketAddress from, short messageType, short conversationId) {
+            super(from, messageType);
+            this.conversationId = conversationId;
+        }
+        public SenderTypeConversationIdentifier(ReceivedP2LMessage msg) {
+            super(msg);
+            this.conversationId = msg.header.getConversationId();
+        }
         @Override public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
@@ -465,7 +509,7 @@ public interface P2LMessageHeader {
             SenderTypeConversationIdentifier that = (SenderTypeConversationIdentifier) o;
             return conversationId == that.conversationId && Objects.equals(from, that.from);
         }
-        @Override public int hashCode() { return Objects.hash(super.hashCode(), from, conversationId); }
+        @Override public int hashCode() { return Objects.hash(super.hashCode(), conversationId); }
         @Override public String toString() {
             return "SenderTypeConversationIdentifier{from=" + from + ", messageType=" + super.messageType + ", conversationId=" + conversationId + '}';
         }
@@ -476,7 +520,7 @@ public interface P2LMessageHeader {
             super(from, messageType, conversationId);
             this.step = step;
         }
-        public SenderTypeConversationIdStepIdentifier(P2LMessage msg) {
+        public SenderTypeConversationIdStepIdentifier(ReceivedP2LMessage msg) {
             super(msg);
             this.step = msg.header.getStep();
         }
@@ -494,7 +538,7 @@ public interface P2LMessageHeader {
         public StepReceiptIdentifier(InetSocketAddress from, short messageType, short conversationId, short step) {
             super(from, messageType, conversationId, step);
         }
-        public StepReceiptIdentifier(P2LMessage msg) {
+        public StepReceiptIdentifier(ReceivedP2LMessage msg) {
             super(msg);
         }
         @Override public boolean equals(Object o) {
@@ -511,7 +555,7 @@ public interface P2LMessageHeader {
         public ReceiptIdentifier(InetSocketAddress from, short messageType, short conversationId) {
             super(from, messageType, conversationId);
         }
-        public ReceiptIdentifier(P2LMessage msg) {
+        public ReceiptIdentifier(ReceivedP2LMessage msg) {
             super(msg);
         }
         @Override public boolean equals(Object o) {

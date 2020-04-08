@@ -1,12 +1,13 @@
 package jokrey.utilities.network.link2peer.node.protocols;
 
 import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
+import jokrey.utilities.network.link2peer.P2LBroadcastMessage;
 import jokrey.utilities.network.link2peer.P2LMessage;
-import jokrey.utilities.network.link2peer.P2Link;
+import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
 import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
+import jokrey.utilities.network.link2peer.node.core.P2LBroadcastMessageQueue;
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
-import jokrey.utilities.network.link2peer.node.core.P2LMessageQueue;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.util.Hash;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
@@ -31,29 +32,35 @@ import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTyp
  *     Solution: master node algorithm
  *           Request from peer the highest known id, send broadcast, until a broadcast anouncing own id is received - assume own id is valid, if one is received.. Contact that node directly
  *
+ * TODO - adjust source of broadcast if it is local
+ *        There are a bunch of problems with that though if the first receiver is not public and therefore a relay link candidate...
+ *
  * @author jokrey
  */
 public class BroadcastMessageProtocol {
-    private static void asInitiator(P2LNodeInternal parent, P2LMessage broadcastMessage, P2LConnection con, InetSocketAddress to) throws IOException {
+    private static final byte ALREADY_KNOWN = 1;
+    private static final byte BROADCAST_UNKNOWN = 0;
+
+    private static void asInitiator(P2LNodeInternal parent, P2LBroadcastMessage message, P2LConnection con, InetSocketAddress to) throws IOException {
         int threshold = con==null?P2LHeuristics.BROADCAST_USES_HASH_DETOUR_RAW_SIZE_THRESHOLD:con.remoteBufferSize;
-        if(broadcastMessage.requiredRawSize() <= threshold) {
-            asInitiatorWithoutHash(parent, broadcastMessage, to);
+        if(message.requiredRawSize() <= threshold) {
+            asInitiatorWithoutHash(parent, message, to);
         } else {
-            asInitiatorWithHash(parent, broadcastMessage, to);
+            asInitiatorWithHash(parent, message, to);
         }
     }
 
-    private static void asInitiatorWithoutHash(P2LNodeInternal parent, P2LMessage message, InetSocketAddress to) throws IOException {
+    private static void asInitiatorWithoutHash(P2LNodeInternal parent, P2LBroadcastMessage broadcastMessage, InetSocketAddress to) throws IOException {
         P2LConversation convo = parent.internalConvo(SC_BROADCAST_WITHOUT_HASH, to);
-        byte[] packed = packBroadcastMessage(message);//todo - this constant unpacking and packing seems useless or redundant.
-//        System.err.println("ini packed = " + Arrays.toString(packed));
-        convo.initClose(packed);
+        MessageEncoder encoder = convo.encoder();
+        broadcastMessage.packInto(encoder);
+        convo.initClose(encoder);
     }
-    public static void asAnswererWithoutHash(P2LNodeInternal parent, P2LConversation convo, P2LMessage m0, P2LMessageQueue userBrdMessageQueue, BroadcastState state) throws IOException {
+    public static void asAnswererWithoutHash(P2LNodeInternal parent, P2LConversation convo, ReceivedP2LMessage m0, P2LBroadcastMessageQueue userBrdMessageQueue, BroadcastState state) throws IOException {
         convo.close();
 
 //        System.err.println("ans packed = " + Arrays.toString(m0.asBytes()));
-        P2LMessage receivedBroadcastMessage = unpackBroadcastMessage(m0);
+        P2LBroadcastMessage receivedBroadcastMessage = P2LBroadcastMessage.unpackFrom(m0);
         if(receivedBroadcastMessage==null ||
                 state.markAsKnown(receivedBroadcastMessage.getContentHash())) //if message invalid or message was known
             return;
@@ -67,23 +74,26 @@ public class BroadcastMessageProtocol {
         }
     }
 
-    private static void asInitiatorWithHash(P2LNodeInternal parent, P2LMessage broadcastMessage, InetSocketAddress to) throws IOException {
+    private static void asInitiatorWithHash(P2LNodeInternal parent, P2LBroadcastMessage broadcastMessage, InetSocketAddress to) throws IOException {
         P2LConversation convo = parent.internalConvo(SC_BROADCAST_WITH_HASH, to);
         boolean peerHashKnowledgeOfMessage = convo.initExpect(broadcastMessage.getContentHash().raw()).nextBool();
-        if(!peerHashKnowledgeOfMessage) {
-            convo.answerClose(packBroadcastMessage(broadcastMessage));
-        } else {
+        if (peerHashKnowledgeOfMessage) {
             convo.close();
+        } else {
+            MessageEncoder encoder = convo.encoder();
+            broadcastMessage.packInto(encoder);
+            convo.longAnswerClose(encoder, 10000); //FIXME HEURISTIC
         }
     }
 
-    public static void asAnswererWithHash(P2LNodeInternal parent, P2LConversation convo, P2LMessage m0, P2LMessageQueue userBrdMessageQueue, BroadcastState state) throws IOException {
+    public static void asAnswererWithHash(P2LNodeInternal parent, P2LConversation convo, P2LMessage m0, P2LBroadcastMessageQueue userBrdMessageQueue, BroadcastState state) throws IOException {
         Hash brdMessageHash = new Hash(m0.asBytes());
         if(state.isKnown(brdMessageHash)) {
-            convo.answerClose(new byte[] {1}); //indicates true
+            convo.answerClose(convo.encode(ALREADY_KNOWN)); //indicates true
         } else {
-            P2LMessage raw = convo.answerExpect(new byte[] {0}); //indicates false
-            P2LMessage receivedBroadcastMessage = unpackBroadcastMessage(raw);
+            MessageEncoder broadcastMessageStorage = new MessageEncoder(P2LHeuristics.BROADCAST_USES_HASH_DETOUR_RAW_SIZE_THRESHOLD * 2);
+            convo.answerExpectLong(convo.encode(BROADCAST_UNKNOWN), broadcastMessageStorage, 10000); //FIXME HEURISTIC
+            P2LBroadcastMessage receivedBroadcastMessage = P2LBroadcastMessage.unpackFrom(broadcastMessageStorage);
             if(receivedBroadcastMessage == null || state.markAsKnown(brdMessageHash)) ////if message invalid or message was known - while receiving this message, this node has received it from somewhere else
                 return;
 
@@ -100,14 +110,15 @@ public class BroadcastMessageProtocol {
 
 
     public static P2LFuture<Integer> relayBroadcast(P2LNodeInternal parent, P2LMessage message) {
-        return relayBroadcast(parent, message, null);
+        P2LBroadcastMessage broadcastMessage = P2LBroadcastMessage.from(parent.getSelfLink(), message);
+        return relayBroadcast(parent, broadcastMessage, null);
     }
-    private static P2LFuture<Integer> relayBroadcast(P2LNodeInternal parent, P2LMessage message, InetSocketAddress directlyReceivedFrom) {
+    private static P2LFuture<Integer> relayBroadcast(P2LNodeInternal parent, P2LBroadcastMessage message, InetSocketAddress directlyReceivedFrom) {
         P2LConnection[] originallyEstablishedConnections = parent.getEstablishedConnections();
 
         ArrayList<InetSocketAddress> establishedConnectionsExcept = new ArrayList<>(originallyEstablishedConnections.length);
         for(P2LConnection established:originallyEstablishedConnections)
-            if(!established.address.equals(message.header.getSender()) && !Objects.equals(established.address, directlyReceivedFrom))
+            if(!established.link.equals(message.source) && !Objects.equals(established.address, directlyReceivedFrom))
                 establishedConnectionsExcept.add(established.address);
 
         if(establishedConnectionsExcept.isEmpty())
@@ -120,22 +131,6 @@ public class BroadcastMessageProtocol {
         }
 
         return parent.executeAllOnSendThreadPool(tasks); //required, because send also waits for a response...
-    }
-
-
-    //the broadcast algorithm requires the message to be packed before sending - this is required to allow header information such as type and expiresAfter to differ from the carrying message
-    //    additionally the sender needs to be explicitly stored - as it is omitted/automatically determined in normal messages
-    private static byte[] packBroadcastMessage(P2LMessage broadcastMessage) {
-        byte[] senderBytes = new P2Link.Direct(broadcastMessage.header.getSender()).toBytes();
-        return MessageEncoder.encodeAll(0, broadcastMessage.header.getType(), broadcastMessage.header.getExpiresAfter(), senderBytes, broadcastMessage.asBytes()).asBytes();
-    }
-    private static P2LMessage unpackBroadcastMessage(P2LMessage packedMessage) {
-        short brdMsgType = packedMessage.nextShort();
-        short expiresAfter = packedMessage.nextShort();
-        P2Link sender = P2Link.from(packedMessage.nextVariableString());
-        byte[] data = packedMessage.nextVariable();
-        if(sender == null || data == null) return null;
-        return P2LMessage.Factory.createBroadcast(sender.resolve(), brdMsgType, expiresAfter, data);
     }
 
     public static class BroadcastState {

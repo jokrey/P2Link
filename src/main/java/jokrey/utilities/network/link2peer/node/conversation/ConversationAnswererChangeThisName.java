@@ -1,6 +1,7 @@
 package jokrey.utilities.network.link2peer.node.conversation;
 
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 
 import java.io.IOException;
 
@@ -9,5 +10,5 @@ import java.io.IOException;
  */
 @FunctionalInterface
 public interface ConversationAnswererChangeThisName {
-    void converse(P2LConversation convo, P2LMessage m0) throws IOException;
+    void converse(P2LConversation convo, ReceivedP2LMessage m0) throws IOException;
 }

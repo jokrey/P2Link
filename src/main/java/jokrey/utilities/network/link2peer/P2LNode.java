@@ -212,7 +212,7 @@ public interface P2LNode {
      * @return a future for the requested self link as seen by the specified peer
      * @throws IOException if the send went to garbage
      */
-    P2LFuture<P2Link> whoAmI(InetSocketAddress requestFrom) throws IOException;
+    P2LFuture<P2Link.Direct> whoAmI(InetSocketAddress requestFrom) throws IOException;
 
     /**
      * Sends the given message to the given address.
@@ -278,16 +278,16 @@ public interface P2LNode {
      * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
      * @return the created future
      */
-    P2LFuture<P2LMessage> expectMessage(int messageType);
+    P2LFuture<ReceivedP2LMessage> expectMessage(int messageType);
     /**
      * Creates a future for an expected message with the given sender and messageType.
      * @param from the sender of the broadcast message (decoded from the raw ip packet)
      * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
      * @return the created future
      */
-    P2LFuture<P2LMessage> expectMessage(InetSocketAddress from, int messageType);
+    P2LFuture<ReceivedP2LMessage> expectMessage(InetSocketAddress from, int messageType);
     /**@see #expectMessage(InetSocketAddress, int)*/
-    default P2LFuture<P2LMessage> expectMessage(P2Link from, int messageType) {
+    default P2LFuture<ReceivedP2LMessage> expectMessage(P2Link from, int messageType) {
         return expectMessage(resolve(from), messageType);
     }
 
@@ -298,9 +298,9 @@ public interface P2LNode {
      * @param conversationId the conversation id of the message
      * @return the created future
      */
-    P2LFuture<P2LMessage> expectMessage(InetSocketAddress from, int type, int conversationId);
+    P2LFuture<ReceivedP2LMessage> expectMessage(InetSocketAddress from, int type, int conversationId);
     /**@see #expectMessage(InetSocketAddress, int, int)*/
-    default P2LFuture<P2LMessage> expectMessage(P2Link from, int messageType, int conversationId) {
+    default P2LFuture<ReceivedP2LMessage> expectMessage(P2Link from, int messageType, int conversationId) {
         return expectMessage(resolve(from), messageType, conversationId);
     }
 
@@ -315,7 +315,14 @@ public interface P2LNode {
      * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
      * @return the created future
      */
-    P2LFuture<P2LMessage> expectBroadcastMessage(int messageType);
+    P2LFuture<P2LBroadcastMessage> expectBroadcastMessage(int messageType);
+    /**
+     * Creates a future for an expected broadcast message with the given source and messageType.
+     * @param source source of the expected message if a relayed link of some name is expected the local link can also be used, since they equal when their names equal
+     * @param messageType a message type of user privileges (i.e. that {@link P2LInternalMessageTypes#isInternalMessageId(int)} does not hold)
+     * @return the created future
+     */
+    P2LFuture<P2LBroadcastMessage> expectBroadcastMessage(P2Link source, int messageType);
 //    /**
 //     * Creates a future for an expected broadcast message with the given sender and messageType.
 //     * @param from the self named sender of the broadcast message (never validated to be anything)
@@ -459,14 +466,14 @@ public interface P2LNode {
      * The message will nonetheless remain receivable by the more exact 'expect' futures.
      * @param listener listener to add
      */
-    void addMessageListener(P2LMessageListener listener);
+    void addMessageListener(P2LMessageListener<ReceivedP2LMessage> listener);
     /**
      * This method provides another possibility of asynchronously receiving broadcasts.
      * All user level broadcasts will be received by the given listener.
      * The broadcast will nonetheless remain receivable by the more exact 'expect' futures.
      * @param listener listener to add
      */
-    void addBroadcastListener(P2LMessageListener listener);
+    void addBroadcastListener(P2LMessageListener<P2LBroadcastMessage> listener);
     /**
      * The given listener will receive all newly established connections.
      * @param listener listener to add
@@ -480,10 +487,10 @@ public interface P2LNode {
 
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
-    void removeMessageListener(P2LMessageListener listener);
+    void removeMessageListener(P2LMessageListener<ReceivedP2LMessage> listener);
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
-    void removeBroadcastListener(P2LMessageListener listener);
+    void removeBroadcastListener(P2LMessageListener<P2LBroadcastMessage> listener);
     /** Removes a previously assigned listener, by raw reference (i.e. ==)
      * @param listener listener to remove */
     void removeConnectionEstablishedListener(BiConsumer<InetSocketAddress, Integer> listener);
@@ -491,5 +498,5 @@ public interface P2LNode {
      * @param listener listener to remove */
     void removeConnectionDroppedListener(Consumer<InetSocketAddress> listener);
     /** Trivial message listener - dual use for direct messages and broadcasts */
-    interface P2LMessageListener { void received(P2LMessage message);}
+    interface P2LMessageListener<M extends P2LMessage> { void received(M message);}
 }

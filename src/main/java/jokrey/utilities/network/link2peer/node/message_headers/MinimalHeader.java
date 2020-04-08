@@ -10,17 +10,11 @@ import java.util.Objects;
  * @author jokrey
  */
 public class MinimalHeader implements P2LMessageHeader {
-    private final InetSocketAddress sender;
     private final short type;
     public boolean requestReceipt;
-    public MinimalHeader(InetSocketAddress sender, short type, boolean requestReceipt) {
-        this.sender = sender;
+    public MinimalHeader(short type, boolean requestReceipt) {
         this.type = type;
         this.requestReceipt = requestReceipt;
-    }
-
-    @Override public InetSocketAddress getSender() {
-        return sender;
     }
 
     @Override public short getType() {
@@ -40,13 +34,13 @@ public class MinimalHeader implements P2LMessageHeader {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         MinimalHeader that = (MinimalHeader) o;
-        return Objects.equals(sender, that.sender) && equalsIgnoreVolatile(that);
+        return equalsIgnoreVolatile(that);
     }
     @Override public int hashCode() {
-        return Objects.hash(sender, type, requestReceipt, isReceipt(), isStreamEof(), isLongPart(), isStreamPart(), getConversationId(), getExpiresAfter(), getPartIndex(), getNumberOfParts());
+        return Objects.hash(type, requestReceipt, isReceipt(), isStreamEof(), isLongPart(), isStreamPart(), getConversationId(), getExpiresAfter(), getPartIndex(), getNumberOfParts());
     }
     @Override public String toString() {
-        return getClass().getSimpleName()+"{" + "sender='" + sender + '\'' + ", type=" + type + (isConversationIdPresent()?", conversationId=" + getConversationId():"") +
+        return getClass().getSimpleName()+"{" + ", type=" + type + (isConversationIdPresent()?", conversationId=" + getConversationId():"") +
                 (isExpirationPresent()?", expiresAfter=" + getExpiresAfter():"") +
                 (isStepPresent()?", step=" + getStep():"") +
                 (isLongPart()?", l-index=" + getPartIndex()+", l-size=" + getNumberOfParts():"") +

@@ -49,7 +49,7 @@ public class RelayedConnectionProtocol {
                     P2Link.Direct directLinkOfRequestedName = (P2Link.Direct) P2Link.Direct.from(m1.nextVariable());
 
                     //before we close we will send a packet to the link, just so we create a hole in our own firewall.. We need no response, as it is too likely that it at least reached our router - creating the hole.
-                    parent.sendInternalMessage(directLinkOfRequestedName.resolve(), P2LMessage.Factory.createNatHolePacket());
+                    parent.sendInternalMessage(directLinkOfRequestedName.resolve(), P2LMessage.createNatHolePacket());
 
                     P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, conversationId);
 
@@ -60,7 +60,7 @@ public class RelayedConnectionProtocol {
                     P2Link.Direct directLinkOfRequestedName = new P2Link.Direct(to.relayLink.dnsOrIp, m1.nextInt());
 
                     //before we close we will send a packet to the link, just so we create a hole in our own firewall.. We need no response, as it is too likely that it at least reached our router - creating the hole.
-                    parent.sendInternalMessage(directLinkOfRequestedName.resolve(), P2LMessage.Factory.createNatHolePacket());
+                    parent.sendInternalMessage(directLinkOfRequestedName.resolve(), P2LMessage.createNatHolePacket());
 
                     P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, conversationId);
 

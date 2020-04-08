@@ -2,9 +2,10 @@ package jokrey.utilities.network.link2peer.node.conversation;
 
 import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
 import jokrey.utilities.network.link2peer.P2LMessage;
+import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
-import jokrey.utilities.network.link2peer.node.core.P2LMessageQueue;
+import jokrey.utilities.network.link2peer.node.core.P2LMessageReceivalQueue;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.node.message_headers.ConversationHeader;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
@@ -30,7 +31,7 @@ public class P2LConversationImplV1 implements P2LConversation {
     public static int DEFAULT_rM = 100;
 
     public final P2LNodeInternal parent;
-    private final P2LMessageQueue conversationQueue;
+    private final P2LMessageReceivalQueue conversationQueue;
     private final P2LConnection con;
     public final InetSocketAddress peer;
     private final short type, conversationId;
@@ -56,7 +57,7 @@ public class P2LConversationImplV1 implements P2LConversation {
         if(rM < 0) throw new IllegalArgumentException("cannot be negative");
         this.rM = rM;
     }
-    public P2LConversationImplV1(P2LNodeInternal parent, P2LMessageQueue conversationQueue, P2LConnection con, InetSocketAddress peer, short type, short conversationId) {
+    public P2LConversationImplV1(P2LNodeInternal parent, P2LMessageReceivalQueue conversationQueue, P2LConnection con, InetSocketAddress peer, short type, short conversationId) {
         this.parent = parent;
         this.conversationQueue = conversationQueue;
         this.type = type;
@@ -67,7 +68,7 @@ public class P2LConversationImplV1 implements P2LConversation {
         else
             this.con = con;
 
-        headerSize = new ConversationHeader(peer, type, conversationId, step, false).getSize();
+        headerSize = new ConversationHeader(type, conversationId, step, false).getSize();
     }
 
     @Override public InetSocketAddress getPeer() { return peer; }
@@ -85,31 +86,31 @@ public class P2LConversationImplV1 implements P2LConversation {
     }
 
     private boolean isServer = false;
-    void serverInit(P2LMessage m0) {
+    void serverInit(ReceivedP2LMessage m0) {
         step=1;
         isServer = true;
         lastMessageReceived = m0;
     }
 
     private long lastMessageSentAt = 0;
-    private P2LMessage lastMessageReceived = null;
+    private ReceivedP2LMessage lastMessageReceived = null;
     //ONLY ON CLIENT as first convo call, requires an answerExpect on the other side after
-    @Override public P2LMessage initExpect(MessageEncoder encoded) throws IOException {
+    @Override public ReceivedP2LMessage initExpect(MessageEncoder encoded) throws IOException {
         if(isServer) throw new IllegalStateException("not client (server init is automatic, use 'answerExpect')");
         if(step != -2) throw new IllegalStateException("cannot init twice");
         step = 0;
         return answerExpect(encoded, true);
     }
     //requires and answerExpect or initExpect on the other side before, and an answerExpect or answerClose after
-    @Override public P2LMessage answerExpect(MessageEncoder encoded) throws IOException {
+    @Override public ReceivedP2LMessage answerExpect(MessageEncoder encoded) throws IOException {
         return answerExpect(encoded, false);
     }
 
-    private P2LMessage answerExpect(MessageEncoder encoded, boolean init) throws IOException {
+    private ReceivedP2LMessage answerExpect(MessageEncoder encoded, boolean init) throws IOException {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
 
-        ConversationHeader header = new ConversationHeader(null, type, conversationId, step, false);
+        ConversationHeader header = new ConversationHeader(type, conversationId, step, false);
         P2LMessage msg = P2LMessage.from(header, encoded);
 
         step++;
@@ -119,14 +120,14 @@ public class P2LConversationImplV1 implements P2LConversation {
         for(int i=0;i<maxAttempts;i++) {
             //previous is the message we are currently answering to - so it has already been received - however it might be resend by the peer if the message sent below is lost
             //   it is important the message is handled so that the conversation handler sees that it is expected and does not initiate a new conversation on m0 resend..
-            P2LFuture<P2LMessage> previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) 0);
-            P2LFuture<P2LMessage> next = conversationQueue.futureFor(peer, type, conversationId, step);
+            P2LFuture<ReceivedP2LMessage> previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) 0);
+            P2LFuture<ReceivedP2LMessage> next = conversationQueue.futureFor(peer, type, conversationId, step);
 
 
             parent.sendInternalMessage(peer, msg);
             lastMessageSentAt = System.currentTimeMillis();
 
-            P2LMessage result = next.getOrNull(calcWaitBeforeRetryTime(i));
+            ReceivedP2LMessage result = next.getOrNull(calcWaitBeforeRetryTime(i));
             if(previous != null) {
                 boolean wasCompleted = ! previous.cancelIfNotCompleted();
                 if(wasCompleted)
@@ -174,7 +175,7 @@ public class P2LConversationImplV1 implements P2LConversation {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
         //always requests receipt, but only receives it through that if the remote was not waiting for it. Otherwise answerExpect returns and sends close
-        ConversationHeader header = new ConversationHeader(null, type, conversationId, step, true);
+        ConversationHeader header = new ConversationHeader(type, conversationId, step, true);
         P2LMessage msg = P2LMessage.from(header, encoded);
 
         step++;
@@ -182,13 +183,13 @@ public class P2LConversationImplV1 implements P2LConversation {
         for(int i=0;i<maxAttempts;i++) {
             //previous is the message we are currently answering to - so it has already been received - however it might be resend by the peer if the message sent below is lost
             //   it is important the message is handled so that the conversation handler sees that it is expected and does not initiate a new conversation on m0 resend..
-            P2LFuture<P2LMessage> previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) 0);
-            P2LFuture<P2LMessage> last = conversationQueue.receiptFutureFor(peer, type, conversationId, (short) (step - 1));
+            P2LFuture<ReceivedP2LMessage> previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) 0);
+            P2LFuture<ReceivedP2LMessage> last = conversationQueue.receiptFutureFor(peer, type, conversationId, (short) (step - 1));
 
             lastMessageSentAt = System.currentTimeMillis();//used to calculate avRTT
             parent.sendInternalMessage(peer, msg);
 
-            P2LMessage result = last.getOrNull(calcWaitBeforeRetryTime(i));
+            ReceivedP2LMessage result = last.getOrNull(calcWaitBeforeRetryTime(i));
             if(previous != null) {
                 boolean wasCompleted = ! previous.cancelIfNotCompleted();
                 if(wasCompleted)
@@ -214,17 +215,17 @@ public class P2LConversationImplV1 implements P2LConversation {
 
 
     //DIRECT CLOSE
-    @Override public P2LMessage initExpectClose(MessageEncoder encoded) throws IOException {
+    @Override public ReceivedP2LMessage initExpectClose(MessageEncoder encoded) throws IOException {
         if(step != -2) throw new IllegalStateException("cannot init twice");
         step = 0;
-        P2LMessage result = answerExpect(encoded, true);
+        ReceivedP2LMessage result = answerExpect(encoded, true);
         step = -1;
         return result;
     }
     @Override public void closeWith(MessageEncoder encoded) throws IOException {
         if(!isServer) throw new IllegalStateException("can only be used when server");
         if(step != 1) throw new IllegalStateException("can only be used as first instruction");
-        ConversationHeader header = new ConversationHeader(null, type, conversationId, step, false);
+        ConversationHeader header = new ConversationHeader(type, conversationId, step, false);
         P2LMessage msg = P2LMessage.from(header, encoded);
         step = -1;
         parent.sendInternalMessage(peer, msg);
@@ -243,20 +244,20 @@ public class P2LConversationImplV1 implements P2LConversation {
 
     //PAUSE
 
-    @Override public P2LMessage initExpectAfterPause(MessageEncoder encoded, int timeout) throws IOException {
+    @Override public ReceivedP2LMessage initExpectAfterPause(MessageEncoder encoded, int timeout) throws IOException {
         if(isServer) throw new IllegalStateException("not client (server init is automatic, use 'answerExpect')");
         if(step != -2) throw new IllegalStateException("cannot init twice");
         step = 0;
         return answerExpectAfterPause(encoded, timeout, true);
     }
-    @Override public P2LMessage answerExpectAfterPause(MessageEncoder encoded, int timeout) throws IOException {
+    @Override public ReceivedP2LMessage answerExpectAfterPause(MessageEncoder encoded, int timeout) throws IOException {
         return answerExpectAfterPause(encoded, timeout, false);
     }
-    private P2LMessage answerExpectAfterPause(MessageEncoder encoded, int timeout, boolean init) throws IOException {
+    private ReceivedP2LMessage answerExpectAfterPause(MessageEncoder encoded, int timeout, boolean init) throws IOException {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
         //does not request a receipt, but expects to receive a receipt. - resends shall not trigger automatic receipt resends(compare to close, where that is desired)
-        ConversationHeader header = new ConversationHeader(null, type, conversationId, step, true); //to-do - requesting a receipt here is technically wrong. this side can not distinguish between the other side having ended the conversation (which would be a dev. bug) and a pause. However. For correct conversations this is correct.
+        ConversationHeader header = new ConversationHeader(type, conversationId, step, true); //to-do - requesting a receipt here is technically wrong. this side can not distinguish between the other side having ended the conversation (which would be a dev. bug) and a pause. However. For correct conversations this is correct.
         P2LMessage msg = P2LMessage.from(header, encoded);
 
         step++;
@@ -266,13 +267,13 @@ public class P2LConversationImplV1 implements P2LConversation {
         for(int i=0;i<maxAttempts;i++) {
             //previous is the message we are currently answering to - so it has already been received - however it might be resend by the peer if the message sent below is lost
             //   it is important the message is handled so that the conversation handler sees that it is expected and does not initiate a new conversation on m0 resend..
-            P2LFuture<P2LMessage> previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) 0);
-            P2LFuture<P2LMessage> ack = conversationQueue.receiptFutureFor(peer, type, conversationId, (short) (step - 1));
+            P2LFuture<ReceivedP2LMessage> previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) 0);
+            P2LFuture<ReceivedP2LMessage> ack = conversationQueue.receiptFutureFor(peer, type, conversationId, (short) (step - 1));
 
             lastMessageSentAt = System.currentTimeMillis();//used to calculate avRTT
             parent.sendInternalMessage(peer, msg);
 
-            P2LMessage result = ack.getOrNull(calcWaitBeforeRetryTime(i));
+            ReceivedP2LMessage result = ack.getOrNull(calcWaitBeforeRetryTime(i));
             if(previous != null) {
                 boolean wasCompleted = ! previous.cancelIfNotCompleted();
                 if(wasCompleted)
@@ -286,7 +287,7 @@ public class P2LConversationImplV1 implements P2LConversation {
                 step++;
                 DebugStats.conversation_numValid.getAndIncrement();
 
-                P2LFuture<P2LMessage> next = conversationQueue.futureFor(peer, type, conversationId, (short) (step - 1));
+                P2LFuture<ReceivedP2LMessage> next = conversationQueue.futureFor(peer, type, conversationId, (short) (step - 1));
 
                 result = next.get(adjustedTimeout); //will throw the same timeout exception timeout is reached, -1 means timeout is never reached
                 lastMessageReceived = result;
@@ -315,7 +316,7 @@ public class P2LConversationImplV1 implements P2LConversation {
     @Override public void answerExpectLong(MessageEncoder encode, TransparentBytesStorage messageTarget, int timeout)  {
         throw new UnsupportedOperationException();
     }
-    @Override public P2LMessage longAnswerExpect(TransparentBytesStorage messageSource, int timeout)  {
+    @Override public ReceivedP2LMessage longAnswerExpect(TransparentBytesStorage messageSource, int timeout)  {
         throw new UnsupportedOperationException();
     }
     @Override public void longAnswerClose(TransparentBytesStorage messageSource, int timeout)  {
@@ -338,30 +339,30 @@ public class P2LConversationImplV1 implements P2LConversation {
 
 
     //SAME STUFF, BUT ASYNC IMPLEMENTATIONS
-    @Override public P2LFuture<P2LMessage> initExpectAsync(MessageEncoder encoded)  {
+    @Override public P2LFuture<ReceivedP2LMessage> initExpectAsync(MessageEncoder encoded)  {
         if(isServer) throw new IllegalStateException("not client (server init is automatic, use 'answerExpect')");
         if(step != -2) throw new IllegalStateException("cannot init twice");
         step = 0;
         return answerExpectAsync(encoded, true);
     }
-    @Override public P2LFuture<P2LMessage> answerExpectAsync(MessageEncoder encoded) {
+    @Override public P2LFuture<ReceivedP2LMessage> answerExpectAsync(MessageEncoder encoded) {
         return answerExpectAsync(encoded, false);
     }
-    private P2LFuture<P2LMessage> answerExpectAsync(MessageEncoder encoded, boolean init) {
+    private P2LFuture<ReceivedP2LMessage> answerExpectAsync(MessageEncoder encoded, boolean init) {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
 
-        ConversationHeader header = new ConversationHeader(null, type, conversationId, step, false);
+        ConversationHeader header = new ConversationHeader(type, conversationId, step, false);
         P2LMessage msg = P2LMessage.from(header, encoded);
 
         step++;
 
-        Retryer<P2LMessage> stepHandler = new Retryer<>();
+        Retryer<ReceivedP2LMessage> stepHandler = new Retryer<>();
         stepHandler.makeAttemptFunc = () -> {
             //previous is the message we are currently answering to - so it has already been received - however it might be resend by the peer if the message sent below is lost
             //   it is important the message is handled so that the conversation handler sees that it is expected and does not initiate a new conversation on m0 resend..
             stepHandler.previous = init ? null : conversationQueue.futureFor(peer, type, conversationId, (short) 0);
-            P2LFuture<P2LMessage> next = conversationQueue.futureFor(peer, type, conversationId, step);
+            P2LFuture<ReceivedP2LMessage> next = conversationQueue.futureFor(peer, type, conversationId, step);
 
             next.callMeBack(calcWaitBeforeRetryTime(stepHandler.counter), stepHandler);
             // HAS to be before send message,
@@ -405,7 +406,7 @@ public class P2LConversationImplV1 implements P2LConversation {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
 
-        ConversationHeader header = new ConversationHeader(null, type, conversationId, step, true);
+        ConversationHeader header = new ConversationHeader(type, conversationId, step, true);
         P2LMessage msg = P2LMessage.from(header, encoded);
 
         step++;
@@ -413,7 +414,7 @@ public class P2LConversationImplV1 implements P2LConversation {
         Retryer<Boolean> stepHandler = new Retryer<>();
         stepHandler.makeAttemptFunc = () -> {
             stepHandler.previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) 0);
-            P2LFuture<P2LMessage> last = conversationQueue.receiptFutureFor(peer, type, conversationId, (short) (step - 1));
+            P2LFuture<ReceivedP2LMessage> last = conversationQueue.receiptFutureFor(peer, type, conversationId, (short) (step - 1));
 
             last.callMeBack(calcWaitBeforeRetryTime(stepHandler.counter), stepHandler); //HAS TO BE BEFORE SEND MESSAGE - For thread, deadlock and call cascade reasons
 
@@ -444,13 +445,13 @@ public class P2LConversationImplV1 implements P2LConversation {
         return stepHandler.finalResultFuture;
     }
 
-    @Override public P2LFuture<P2LMessage> initExpectAsyncAfterPause(MessageEncoder encoded) {
+    @Override public P2LFuture<ReceivedP2LMessage> initExpectAsyncAfterPause(MessageEncoder encoded) {
         if(isServer) throw new IllegalStateException("not client (server init is automatic, use 'answerExpect')");
         if(step != -2) throw new IllegalStateException("cannot init twice");
         step = 0;
         return answerExpectAsyncAfterPause(encoded, true);
     }
-    @Override public P2LFuture<P2LMessage> answerExpectAsyncAfterPause(MessageEncoder encoded) {
+    @Override public P2LFuture<ReceivedP2LMessage> answerExpectAsyncAfterPause(MessageEncoder encoded) {
         return answerExpectAsyncAfterPause(encoded, false);
     }
 
@@ -462,7 +463,7 @@ public class P2LConversationImplV1 implements P2LConversation {
         throw new UnsupportedOperationException();
     }
 
-    @Override public P2LFuture<P2LMessage> longAnswerExpectAsync(TransparentBytesStorage messageSource) {
+    @Override public P2LFuture<ReceivedP2LMessage> longAnswerExpectAsync(TransparentBytesStorage messageSource) {
         throw new UnsupportedOperationException();
     }
 
@@ -482,12 +483,12 @@ public class P2LConversationImplV1 implements P2LConversation {
         throw new UnsupportedOperationException();
     }
 
-    private P2LFuture<P2LMessage> answerExpectAsyncAfterPause(MessageEncoder encoded, boolean init)  {
+    private P2LFuture<ReceivedP2LMessage> answerExpectAsyncAfterPause(MessageEncoder encoded, boolean init)  {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
 
         //does not request a receipt, but expects to receive a receipt. - resends shall not trigger automatic receipt resends(compare to close, where that is desired)
-        ConversationHeader header = new ConversationHeader(null, type, conversationId, step, true);
+        ConversationHeader header = new ConversationHeader(type, conversationId, step, true);
         //to-do -
         // requesting a receipt here is technically wrong.
         // this side can not distinguish between the other side having ended the conversation
@@ -496,10 +497,10 @@ public class P2LConversationImplV1 implements P2LConversation {
 
         step++;
 
-        Retryer<P2LMessage> stepHandler = new Retryer<>();
+        Retryer<ReceivedP2LMessage> stepHandler = new Retryer<>();
         stepHandler.makeAttemptFunc = () -> {
             stepHandler.previous = init?null:conversationQueue.futureFor(peer, type, conversationId, (short) 0);
-            P2LFuture<P2LMessage> ack = conversationQueue.receiptFutureFor(peer, type, conversationId, (short) (step - 1));
+            P2LFuture<ReceivedP2LMessage> ack = conversationQueue.receiptFutureFor(peer, type, conversationId, (short) (step - 1));
 
             ack.callMeBack(calcWaitBeforeRetryTime(stepHandler.counter), stepHandler); //HAS TO BE BEFORE SEND MESSAGE - For thread, deadlock and call cascade reasons
 
@@ -518,7 +519,7 @@ public class P2LConversationImplV1 implements P2LConversation {
                 step++;
                 DebugStats.conversation_numValid.getAndIncrement();
 
-                P2LFuture<P2LMessage> next = conversationQueue.futureFor(peer, type, conversationId, (short) (step - 1));
+                P2LFuture<ReceivedP2LMessage> next = conversationQueue.futureFor(peer, type, conversationId, (short) (step - 1));
 
                 next.callMeBack(actualMessage -> { //will throw the same timeout exception timeout is reached, -1 means timeout is never reached
                     if(actualMessage == null) {
@@ -543,15 +544,15 @@ public class P2LConversationImplV1 implements P2LConversation {
     }
 
 
-    private class Retryer<T> implements Consumer<P2LMessage> {
+    private class Retryer<T> implements Consumer<ReceivedP2LMessage> {
         private final P2LFuture<T> finalResultFuture = new P2LFuture<>();
 
         private int counter = 0;
-        private P2LFuture<P2LMessage> previous;
+        private P2LFuture<ReceivedP2LMessage> previous;
         private ResultHandler resultFunc;
         private RunnableThatThrowsIOException makeAttemptFunc;
 
-        @Override public void accept(P2LMessage msg) {
+        @Override public void accept(ReceivedP2LMessage msg) {
             try {
 
                 boolean success = resultFunc.handle(msg);
@@ -591,6 +592,6 @@ public class P2LConversationImplV1 implements P2LConversation {
     }
     interface ResultHandler {
         /**@return whether the result was accepted */
-        boolean handle(P2LMessage result) throws IOException;
+        boolean handle(ReceivedP2LMessage result) throws IOException;
     }
 }

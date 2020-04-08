@@ -23,7 +23,7 @@ class P2LFragmentStreamReceipt {
     }
 
     static P2LMessage encode(int type, int conversationId, int step, boolean eof, long latestReceived, LongTupleList missingParts, int receiptID, int maxPackageSize) {
-        StreamReceiptHeader header = new StreamReceiptHeader(null, toShort(type), toShort(conversationId), toShort(step), eof);
+        StreamReceiptHeader header = new StreamReceiptHeader(toShort(type), toShort(conversationId), toShort(step), eof);
         int maxPayloadLength = missingParts.size()*2 *8 + 8 + 4;
         byte[] raw = header.generateRaw(maxPayloadLength, maxPackageSize); //this max package size enforces that only the first x fitting packages are packed, the rest is just discarded
         int raw_i = header.getSize();

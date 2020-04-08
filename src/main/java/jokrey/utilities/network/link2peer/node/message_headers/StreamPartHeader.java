@@ -10,8 +10,8 @@ import java.net.InetSocketAddress;
 public class StreamPartHeader extends ConversationHeader {
     public int index;
     private final boolean eofIndicator;
-    public StreamPartHeader(InetSocketAddress sender, short type, short conversationId, short step, int index, boolean requestReceipt, boolean eofIndicator) {
-        super(sender, type, conversationId, step, requestReceipt);
+    public StreamPartHeader(short type, short conversationId, short step, int index, boolean requestReceipt, boolean eofIndicator) {
+        super(type, conversationId, step, requestReceipt);
 
         this.index = index;
         this.eofIndicator = eofIndicator;

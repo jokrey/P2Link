@@ -2,6 +2,7 @@ import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.P2Link.Local;
+import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.node.core.NodeCreator;
 import jokrey.utilities.network.link2peer.rendevouz.RendezvousServer;
 import jokrey.utilities.network.link2peer.rendevouz.RendezvousServer.IdentityTriple;
@@ -107,9 +108,9 @@ class RendezvousTest {
     private void shortBackAndForthTest(P2LNode node1, P2LNode node2, IdentityTriple idOf1KnownTo2, IdentityTriple idOf2KnownTo1) throws IOException {
         node1.establishConnection(idOf2KnownTo1.link);
 
-        P2LFuture<P2LMessage> msgFut = node1.expectMessage(123);
+        P2LFuture<ReceivedP2LMessage> msgFut = node1.expectMessage(123);
 
-        P2LMessage msgToSend = P2LMessage.Factory.createSendMessage(123);
+        P2LMessage msgToSend = P2LMessage.with(123);
         msgToSend.encode(-432);
         node2.sendMessage(idOf1KnownTo2.link, msgToSend);
 
