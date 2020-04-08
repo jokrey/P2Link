@@ -121,7 +121,7 @@ public class RelayedConnectionProtocol {
         } else {
 
             InterfaceAddress localIPv4InterfaceAddress = NetUtil.getLocalIPv4InterfaceAddress();
-            boolean isRequesterPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressSecondPeer.getAddress(), localIPv4InterfaceAddress);
+            boolean isRequesterPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressRequesterPeer.getAddress(), localIPv4InterfaceAddress);
             boolean isSecondPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressSecondPeer.getAddress(), localIPv4InterfaceAddress);
 
             if(isRequesterPeerInLocalSubnet == isSecondPeerInLocalSubnet) { //i.e. either both in WAN or both in LAN - i.e. nat punch is either not required but works anyways or is required and hopefully works(nat config)
