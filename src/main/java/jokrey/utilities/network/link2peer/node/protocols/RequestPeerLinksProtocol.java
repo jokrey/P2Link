@@ -17,6 +17,7 @@ import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTyp
 public class RequestPeerLinksProtocol {
     public static List<P2Link> asInitiator(P2LNodeInternal parent, InetSocketAddress to) throws IOException {
         P2LConversation convo = parent.internalConvo(SL_REQUEST_KNOWN_ACTIVE_PEER_LINKS, to);
+        convo.setRM(300);
         P2LMessage message = convo.initExpectClose(new byte[0]);
 
         ArrayList<P2Link> peers = new ArrayList<>();
