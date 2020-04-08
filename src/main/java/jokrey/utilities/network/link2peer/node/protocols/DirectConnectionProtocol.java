@@ -15,6 +15,8 @@ import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessage
 import static jokrey.utilities.network.link2peer.node.protocols.RelayedConnectionProtocol.createConversationForInitialDirect;
 
 /**
+ * TODO async protocol
+ *
  * @author jokrey
  */
 public class DirectConnectionProtocol {
