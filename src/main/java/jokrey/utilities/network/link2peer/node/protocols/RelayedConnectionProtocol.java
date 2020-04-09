@@ -16,6 +16,12 @@ import java.util.function.BiConsumer;
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.*;
 
 /**
+ * TODO
+ *   Note: There is a single logical scenario that still creates issues.
+ *       (Though it is fringe(app depended), should kinda work[router config thing] and maybe not solvable programmatically)
+ *       If two computers in the same subnet as the relay server, attempt to connect over the relay server's public ip (if one of them does it, that is enough):
+ *          then the nat punch would go over the router's gateway address which is somehow not possible
+ *
  * @author jokrey
  */
 public class RelayedConnectionProtocol {
