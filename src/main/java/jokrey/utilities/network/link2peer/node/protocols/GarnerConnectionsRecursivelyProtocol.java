@@ -3,12 +3,12 @@ package jokrey.utilities.network.link2peer.node.protocols;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
-import jokrey.utilities.network.link2peer.util.P2LThreadPool;
-import jokrey.utilities.network.link2peer.util.TimeoutException;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 
 public class GarnerConnectionsRecursivelyProtocol {
     /**

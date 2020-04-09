@@ -7,7 +7,6 @@ import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.util.NetUtil;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
-import jokrey.utilities.network.link2peer.util.TimeoutException;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;

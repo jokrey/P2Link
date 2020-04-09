@@ -8,8 +8,10 @@ import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
+
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.SL_DIRECT_CONNECTION_REQUEST;
 import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader.NO_CONVERSATION_ID;
 import static jokrey.utilities.network.link2peer.node.protocols.RelayedConnectionProtocol.createConversationForInitialDirect;

@@ -4,7 +4,6 @@ import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.conversation.ConversationHandler;
-import jokrey.utilities.network.link2peer.node.conversation.ConversationHandlerV2;
 import jokrey.utilities.network.link2peer.node.conversation.ConversationHandlerV2_2;
 import jokrey.utilities.network.link2peer.node.protocols.*;
 import jokrey.utilities.network.link2peer.node.stream.StreamMessageHandler;

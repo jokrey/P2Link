@@ -1,13 +1,11 @@
 package jokrey.utilities.network.link2peer.node.protocols;
 
 import jokrey.utilities.encoder.as_union.li.bytes.LIbae;
-import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
-import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
