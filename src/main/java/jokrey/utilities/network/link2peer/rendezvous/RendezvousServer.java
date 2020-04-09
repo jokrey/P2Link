@@ -90,8 +90,6 @@ public class RendezvousServer implements AutoCloseable {
                 String name = m0.nextVariableString();
                 byte[] publicKey = m0.nextVariable();
                 P2Link link = registeringConversation.link;
-                if(link.isOnlyLocal())
-                    link = ((P2Link.Local) link).withRelay(selfLink);
                 IdentityTriple decodedIdentityTriple = new IdentityTriple(name, publicKey, link);
                 registeredIdentities.put(name, convo.getPeer(), decodedIdentityTriple);
             } else {
@@ -153,8 +151,10 @@ public class RendezvousServer implements AutoCloseable {
         if(reply.nextByte() == SUCCESS) {
             ArrayList<IdentityTriple> foundIdentities = new ArrayList<>();
             IdentityTriple foundIdentity;
-            while (reply.hasAnyMore() && (foundIdentity = IdentityTriple.decodeNextOrNull(reply)) != null)
+            while (reply.hasAnyMore() && (foundIdentity = IdentityTriple.decodeNextOrNull(reply)) != null) {
+                foundIdentity = foundIdentity.linkWithRelayIfRequired(rendezvousServerLink);
                 foundIdentities.add(foundIdentity);
+            }
             return foundIdentities.toArray(new IdentityTriple[0]);
         } else {
             throw new IOException("denied answering - are you connected?");

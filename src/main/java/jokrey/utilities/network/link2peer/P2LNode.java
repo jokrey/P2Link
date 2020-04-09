@@ -163,11 +163,14 @@ public interface P2LNode {
      * Additionally it marks from as a broken connection and removes it from established connections.
      * @param from node address to disconnect from
      */
-    void disconnectFrom(P2LConnection from);
+    default void disconnectFrom(P2LConnection from) {
+        disconnectFrom(from.address);
+    }
     /**@see #disconnectFrom(P2LConnection) */
     default void disconnectFrom(P2Link link) {
-        disconnectFrom(getConnection(link));
+        disconnectFrom(resolve(link));
     }
+    void disconnectFrom(InetSocketAddress address);
 
     /**
      * Gracefully closes all connections to peers and makes sure to add them to the list of historic connections.

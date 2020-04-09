@@ -52,6 +52,8 @@ public class RelayedConnectionProtocol {
                     if (result == CONTINUE_WITH_NAT_PUNCH) {
                         P2Link.Direct directLinkOfRequestedName = (P2Link.Direct) P2Link.Direct.from(m1.nextVariable());
 
+                        System.out.println("directLinkOfRequestedName = " + directLinkOfRequestedName);
+
                         //before we close we will send a packet to the link, just so we create a hole in our own firewall.. We need no response, as it is too likely that it at least reached our router - creating the hole.
                         parent.sendInternalMessage(directLinkOfRequestedName.resolve(), P2LMessage.createNatHolePacket());
 
@@ -128,6 +130,8 @@ public class RelayedConnectionProtocol {
         }
         byte[] directLinkToSecondPeerBytes = new P2Link.Direct(rawAddressSecondPeer).toBytes();
         byte[] directLinkToRequesterPeerBytes = new P2Link.Direct(rawAddressRequesterPeer).toBytes();
+        System.out.println("rawAddressSecondPeer = " + rawAddressSecondPeer);
+        System.out.println("rawAddressRequesterPeer = " + rawAddressRequesterPeer);
 
         //we do not inform the peer that requested the relay of the result, nor does the second peer inform us whether it accepted the request.
         //  the initially requesting peer will notice via timeout that no one connected to it.

@@ -44,4 +44,11 @@ public class IdentityTriple {
     @Override public int hashCode() {
         return 31 * Objects.hash(name, link) + Arrays.hashCode(publicKey);
     }
+
+    public IdentityTriple linkWithRelayIfRequired(P2Link.Direct relay) {
+        if(link.isOnlyLocal())
+            return new IdentityTriple(name, publicKey, ((P2Link.Local) link).withRelay(relay));
+        else
+            return this;
+    }
 }

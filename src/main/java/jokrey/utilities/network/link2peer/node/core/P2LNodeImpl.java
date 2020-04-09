@@ -115,8 +115,8 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
             connectionResults.addLast(EstablishConnectionProtocol.asInitiator(this, link, null).toType(success -> success?link:null));
         return P2LFuture.oneForAll(connectionResults);
     }
-    @Override public void disconnectFrom(P2LConnection from) {
-        DisconnectSingleConnectionProtocol.asInitiator(this, from.address);
+    @Override public void disconnectFrom(InetSocketAddress address) {
+        DisconnectSingleConnectionProtocol.asInitiator(this, address);
     }
 
     @Override public P2LFuture<List<P2Link>> recursiveGarnerConnections(int newConnectionLimit, int newConnectionLimitPerRecursion, P2Link... setupLinks) {
