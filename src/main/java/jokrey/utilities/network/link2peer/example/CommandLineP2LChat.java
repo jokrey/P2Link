@@ -85,7 +85,7 @@ public class CommandLineP2LChat {
         loop.addCommand("toggleDebugPrintouts", "All Debug Messages Will Be Printed", Argument.noargs(), args -> DebugStats.MSG_PRINTS_ACTIVE = !DebugStats.MSG_PRINTS_ACTIVE,
                 "printAll");
         loop.addCommand("sendBroadcast", "Sends a string(args[0]) as a broadcast", Argument.with(String.class), args ->
-                node.sendBroadcastWithReceipts(P2LMessage.with(0, args[1].getRaw().getBytes(StandardCharsets.UTF_8))), "broadcast", "brd");
+                node.sendBroadcastWithReceipts(P2LMessage.with(0, args[0].getRaw().getBytes(StandardCharsets.UTF_8))), "broadcast", "brd");
         loop.addCommand("sendIndividualMessage", "Sends a string(args[1]) as an individual message to an active peer link(args[0])", Argument.with(String.class, String.class), args -> {
             P2Link to = P2Link.from(args[0].getRaw()); //unresolved, maybe
             try {

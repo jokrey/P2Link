@@ -245,12 +245,14 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     @Override public InetSocketAddress resolve(P2Link link) {
         if (link.isDirect()) {
             return ((P2Link.Direct) link).resolve();
-        } else if(link.isOnlyLocal()) {
-            return ((P2Link.Local) link).unsafeAsDirect().resolve();
         } else {
-            System.out.println("link = " + link);
             P2LConnection con = establishedConnections.getBy2(link);
-            return con == null? null: con.address;
+            if(con != null)
+                return con.address;
+            else if(link.isOnlyLocal())
+                return ((P2Link.Local) link).unsafeAsDirect().resolve();
+            else
+                return null;
         }
     }
 
