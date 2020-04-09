@@ -441,12 +441,32 @@ public class P2LFuture<T> {
     }
 
     /**
+     * Converts the this future to a future of type R, if this future is not canceled the result will be the parameter resultIfSuccess.
+     * If the returned future is canceled, the underlying (i.e. this) future is also canceled.
+     * If the returned future is completed directly(not automatically through completing the underlying future), then behaviour is undefined.
+     *
+     * The returned future will ALWAYS be waited upon, additionally the original future will automatically be waited upon from now on
+     *    unlike before, where {@link #isWaiting()} could be used to determine whether the 'user' is still waiting on it - this is no longer possible
+     *
+     * @param resultIfSuccess result of type R
+     * @return the newly created future of type R
+     */
+    public <R> P2LFuture<R> to(R resultIfSuccess) {
+        P2LFuture<R> f = new P2LFuture<>();
+        callMeBack(t -> f.setCompletedOrCanceledBasedOn(t == null ? null : resultIfSuccess));
+        f.callMeBack(t -> { if(t == null) tryCancel(); }); //if f is canceled, the underlying needs to be canceled as well - might be a short loop(i.e. the other callback canceled f, but that is not a problem)
+        return f;
+    }
+
+    /**
      * Converts the this future to a future of type R using the given converter function
      * If the returned future is canceled, the underlying (i.e. this) future is also canceled.
      * If the returned future is completed directly(not automatically through completing the underlying future), then behaviour is undefined.
      *
      * The returned future will ALWAYS be waited upon, additionally the original future will automatically be waited upon from now on
      *    unlike before, where {@link #isWaiting()} could be used to determine whether the 'user' is still waiting on it - this is no longer possible
+     *
+     * The converter function is only called with non null values. If the converter function returns null the returned future is canceled. However 'this', the original future remains uncanceled.
      *
      * @param converter T to R converter function
      * @return the newly created future of type R

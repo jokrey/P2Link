@@ -15,10 +15,7 @@ import jokrey.utilities.simple.data_structure.BadConcurrentMultiKeyMap;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.InterfaceAddress;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
@@ -107,21 +104,13 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
 
     @Override public P2LFuture<Boolean> establishConnection(P2Link to) {
-        return outgoingPool.execute(() -> isConnectedTo(to) || EstablishConnectionProtocol.asInitiator(P2LNodeImpl.this, to, null));
+        return EstablishConnectionProtocol.asInitiator(this, to, null);
     }
-    @Override public P2LFuture<Set<P2Link>> establishConnections(P2Link... addresses) {
-        P2LThreadPool.Task[] tasks = new P2LThreadPool.Task[addresses.length];
-
-        Set<P2Link> successes = ConcurrentHashMap.newKeySet(tasks.length);
-        for(int i=0;i<addresses.length;i++) {
-            P2Link link = addresses[i];
-            tasks[i] = () -> {
-                if(isConnectedTo(link) || EstablishConnectionProtocol.asInitiator(this, link, null))
-                    successes.add(link);
-            };
-        }
-
-        return outgoingPool.execute(tasks).toType(i -> successes);
+    @Override public P2LFuture<Collection<P2Link>> establishConnections(P2Link... links) {
+        LinkedList<P2LFuture<P2Link>> connectionResults = new LinkedList<>();
+        for(P2Link link : links)
+            connectionResults.addLast(EstablishConnectionProtocol.asInitiator(this, link, null).toType(success -> success?link:null));
+        return P2LFuture.oneForAll(connectionResults);
     }
     @Override public void disconnectFrom(P2LConnection from) {
         DisconnectSingleConnectionProtocol.asInitiator(this, from.address);

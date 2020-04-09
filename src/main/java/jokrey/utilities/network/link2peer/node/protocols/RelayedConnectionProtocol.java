@@ -24,54 +24,73 @@ public class RelayedConnectionProtocol {
     private static final byte CONTINUE_WITH_NAT_PUNCH = 2;
     private static final byte CONTINUE_WITH_NAT_PUNCH_MODIFY_DESTINATION_IP_TO_RELAY_IP = 3;
 
-    public static boolean asInitiator(P2LNodeInternal parent, P2Link.Relayed to) {
-        try {
-            short conversationId = createConversationForRelay(parent);
-            P2LConversation convo = parent.internalConvo(SL_CONNECTION_RELAY, conversationId, to.relayLink.resolve());
-            convo.setRM(300); //for some reason the first packet takes a while to complete - so lets wait a little longer
+    public static P2LFuture<Boolean> asInitiator(P2LNodeInternal parent, P2Link.Relayed to) {
+        short conversationId = createConversationForRelay(parent);
+        P2LConversation convo = parent.internalConvo(SL_CONNECTION_RELAY, conversationId, to.relayLink.resolve());
+        convo.setRM(300); //for some reason the first packet takes a while to complete - so lets wait a little longer
 
-            if(parent.getSelfLink().isDirect()) {
-                P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, to, conversationId);
+        if(parent.getSelfLink().isDirect()) {
+            P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, to, conversationId);//should be registered before..
 
-                byte result = convo.initExpectClose(convo.encode(true, to.name)).nextByte();
-                if (result == EXPECT_INCOMING_CONNECTION) {
-                    return reverseConnectionEstablishedFuture.get(5000);
-                } else {
-                    return false;
-                }
-            } else {
-                P2LMessage m1 = convo.initExpect(convo.encode(false, to.name));
+            return convo.initExpectCloseAsync(convo.encode(true, to.name)).andThen(m1 -> {
                 byte result = m1.nextByte();
-                if (result == CONTINUE_WITH_NAT_PUNCH) {
-                    P2Link.Direct directLinkOfRequestedName = (P2Link.Direct) P2Link.Direct.from(m1.nextVariable());
-
-                    //before we close we will send a packet to the link, just so we create a hole in our own firewall.. We need no response, as it is too likely that it at least reached our router - creating the hole.
-                    parent.sendInternalMessage(directLinkOfRequestedName.resolve(), P2LMessage.createNatHolePacket());
-
-                    P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, to, conversationId);
-
-                    convo.close(); //now we can close and the remote can attempt a connection to our ip (not known to us, but known to the peer we used to relay) - an ip which should now have an NAT-entry for the remote
-
-                    return reverseConnectionEstablishedFuture.get(5000);
-                } else if(result == CONTINUE_WITH_NAT_PUNCH_MODIFY_DESTINATION_IP_TO_RELAY_IP) {
-                    P2Link.Direct directLinkOfRequestedName = new P2Link.Direct(to.relayLink.dnsOrIp, m1.nextInt());
-
-                    //before we close we will send a packet to the link, just so we create a hole in our own firewall.. We need no response, as it is too likely that it at least reached our router - creating the hole.
-                    parent.sendInternalMessage(directLinkOfRequestedName.resolve(), P2LMessage.createNatHolePacket());
-
-                    P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, to, conversationId);
-
-                    convo.close(); //now we can close and the remote can attempt a connection to our ip (not known to us, but known to the peer we used to relay) - an ip which should now have an NAT-entry for the remote
-
-                    return reverseConnectionEstablishedFuture.get(5000);
+                if (result == EXPECT_INCOMING_CONNECTION) {
+                    return reverseConnectionEstablishedFuture;
                 } else {
-                    return false;
+                    return new P2LFuture<>(false);
                 }
-            }
-        } catch (TimeoutException | IOException e) {
-            e.printStackTrace();
-            return false;
+            });
+        } else {
+            return convo.initExpectAsync(convo.encode(false, to.name)).andThen(m1 -> {
+                try {
+                    byte result = m1.nextByte();
+                    if (result == CONTINUE_WITH_NAT_PUNCH) {
+                        P2Link.Direct directLinkOfRequestedName = (P2Link.Direct) P2Link.Direct.from(m1.nextVariable());
+
+                        //before we close we will send a packet to the link, just so we create a hole in our own firewall.. We need no response, as it is too likely that it at least reached our router - creating the hole.
+                        parent.sendInternalMessage(directLinkOfRequestedName.resolve(), P2LMessage.createNatHolePacket());
+
+                        P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, to, conversationId);
+
+                        convo.close(); //now we can close and the remote can attempt a connection to our ip (not known to us, but known to the peer we used to relay) - an ip which should now have an NAT-entry for the remote
+
+                        return reverseConnectionEstablishedFuture;
+                    } else if (result == CONTINUE_WITH_NAT_PUNCH_MODIFY_DESTINATION_IP_TO_RELAY_IP) {
+                        P2Link.Direct directLinkOfRequestedName = new P2Link.Direct(to.relayLink.dnsOrIp, m1.nextInt());
+
+                        //before we close we will send a packet to the link, just so we create a hole in our own firewall.. We need no response, as it is too likely that it at least reached our router - creating the hole.
+                        parent.sendInternalMessage(directLinkOfRequestedName.resolve(), P2LMessage.createNatHolePacket());
+
+                        P2LFuture<Boolean> reverseConnectionEstablishedFuture = waitForReverseConnection(parent, to, conversationId);
+
+                        convo.close(); //now we can close and the remote can attempt a connection to our ip (not known to us, but known to the peer we used to relay) - an ip which should now have an NAT-entry for the remote
+
+                        return reverseConnectionEstablishedFuture;
+                    } else {
+                        return new P2LFuture<>(false);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    return new P2LFuture<>(false);
+                }
+            });
         }
+    }
+    private static P2LFuture<Boolean> waitForReverseConnection(P2LNodeInternal parent, P2Link.Relayed requiredFrom, short requiredConversationId) {
+        if(parent.isConnectedTo(requiredFrom))
+            return new P2LFuture<>(true);
+
+        P2LFuture<Boolean> future = new P2LFuture<>();
+        BiConsumer<P2LConnection, Integer> listener = (con, connectConversationId) -> {
+            if(requiredConversationId == connectConversationId && requiredFrom.equals(con.link))
+                future.trySetCompleted(true);
+        };
+        parent.addConnectionEstablishedListener(listener);
+        future.callMeBack(b -> parent.removeConnectionEstablishedListener(listener));
+
+        if(parent.isConnectedTo(requiredFrom))
+            future.trySetCompleted(true);
+        return future;
     }
 
     //SL_REQUEST_DIRECT_CONNECT_TO
@@ -145,23 +164,6 @@ public class RelayedConnectionProtocol {
 
 
 
-
-    private static P2LFuture<Boolean> waitForReverseConnection(P2LNodeInternal parent, P2Link.Relayed requiredFrom, short requiredConversationId) {
-        if(parent.isConnectedTo(requiredFrom))
-            return new P2LFuture<>(true);
-
-        P2LFuture<Boolean> future = new P2LFuture<>();
-        BiConsumer<P2LConnection, Integer> listener = (con, connectConversationId) -> {
-            if(requiredConversationId == connectConversationId && requiredFrom.equals(con.link))
-                future.trySetCompleted(true);
-        };
-        parent.addConnectionEstablishedListener(listener);
-        future.callMeBack(b -> parent.removeConnectionEstablishedListener(listener));
-
-        if(parent.isConnectedTo(requiredFrom))
-            future.trySetCompleted(true);
-        return future;
-    }
 
     //GUARANTEED DIFFERENT CONVERSATION IDS FOR INITIAL DIRECT AND REVERSE CONNECTIONS, BECAUSE OF:
     // theoretical problem: coincidentally it could be possible that a peer initiates a connection using the same conversationId (SOLUTION: NEGATIVE AND POSITIVE CONVERSATION IDS)

@@ -2,6 +2,7 @@ package jokrey.utilities.network.link2peer.node.protocols;
 
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
+import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.net.InetSocketAddress;
 
@@ -43,7 +44,8 @@ public class EstablishConnectionProtocol {
     /**
      * Either 'to' or resolved can be null. If resolved is not null a direct connection attempt will be made.
      */
-    public static boolean asInitiator(P2LNodeInternal parent, P2Link to, InetSocketAddress resolved) {
+    public static P2LFuture<Boolean> asInitiator(P2LNodeInternal parent, P2Link to, InetSocketAddress resolved) {
+        if(parent.isConnectedTo(to)) return new P2LFuture<>(true);
         if(resolved != null) {
             return DirectConnectionProtocol.asInitiator(parent, resolved);
         } else if(to != null) {

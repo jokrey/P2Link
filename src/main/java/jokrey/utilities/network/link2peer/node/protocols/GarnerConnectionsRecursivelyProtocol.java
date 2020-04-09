@@ -33,7 +33,7 @@ public class GarnerConnectionsRecursivelyProtocol {
         for(P2Link peerLink : setupLinks) {
             if(newlyConnectedCounter >= newConnectionLimit || newlyConnectedCounter >= newConnectionLimitPerRecursion)
                 return connectedSetupLinks;
-            if (!parent.isConnectedTo(peerLink) && EstablishConnectionProtocol.asInitiator(parent, peerLink, null))
+            if (!parent.isConnectedTo(peerLink) && EstablishConnectionProtocol.asInitiator(parent, peerLink, null).get(5000))//todo async
                 newlyConnectedCounter++;
             connectedSetupLinks.add(peerLink);
         }

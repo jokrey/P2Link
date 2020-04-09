@@ -109,7 +109,7 @@ class IntermediateTests {
 
             P2Link[] subLinks = new P2Link[nodes.length - 2];
             for (int i = 0; i < subLinks.length; i++) subLinks[i] = nodes[i + 2].getSelfLink();
-            Set<P2Link> successes = nodes[1].establishConnections(subLinks).get(1000);
+            Collection<P2Link> successes = nodes[1].establishConnections(subLinks).get(1000);
             for (P2Link toBeConnected : subLinks)
                 assertTrue(successes.contains(toBeConnected));
 
@@ -134,7 +134,7 @@ class IntermediateTests {
 
             P2Link[] subLinks = new P2Link[nodes.length - 2];
             for (int i = 0; i < subLinks.length; i++) subLinks[i] = nodes[i + 2].getSelfLink();
-            Set<P2Link> successes = nodes[1].establishConnections(subLinks).get(1000);
+            Collection<P2Link> successes = nodes[1].establishConnections(subLinks).get(1000);
             for (P2Link toBeConnected : subLinks)
                 assertTrue(successes.contains(toBeConnected));
 

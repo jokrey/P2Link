@@ -7,7 +7,7 @@ import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
-import jokrey.utilities.network.link2peer.util.TimeoutException;
+import jokrey.utilities.network.link2peer.util.P2LFuture;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.SL_DIRECT_CONNECTION_REQUEST;
@@ -15,8 +15,6 @@ import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessage
 import static jokrey.utilities.network.link2peer.node.protocols.RelayedConnectionProtocol.createConversationForInitialDirect;
 
 /**
- * TODO async protocol
- *
  * @author jokrey
  */
 public class DirectConnectionProtocol {
@@ -24,32 +22,31 @@ public class DirectConnectionProtocol {
     private static final byte ALREADY_CONNECTED = 1;
     private static final byte NEW_CONNECTION_ESTABLISHED = 2;
 
-    public static boolean asInitiator(P2LNodeInternal parent, InetSocketAddress to) {
+    public static P2LFuture<Boolean> asInitiator(P2LNodeInternal parent, InetSocketAddress to) {
         return asInitiator(parent, to, NO_CONVERSATION_ID);
     }
-    public static boolean asInitiator(P2LNodeInternal parent, InetSocketAddress to, short conversationIdOverride) {
-        try {
-            if (parent.connectionLimitReached()) return false;
+    public static P2LFuture<Boolean> asInitiator(P2LNodeInternal parent, InetSocketAddress to, short conversationIdOverride) {
+        if (parent.connectionLimitReached()) return new P2LFuture<>(false);
 
-            short conversationId = conversationIdOverride == NO_CONVERSATION_ID ? createConversationForInitialDirect(parent) : conversationIdOverride;
-            P2LConversation convo = parent.internalConvo(SL_DIRECT_CONNECTION_REQUEST, conversationId, to);
+        short conversationId = conversationIdOverride == NO_CONVERSATION_ID ? createConversationForInitialDirect(parent) : conversationIdOverride;
+        P2LConversation convo = parent.internalConvo(SL_DIRECT_CONNECTION_REQUEST, conversationId, to);
 
-            ReceivedP2LMessage peerLinkMessage = convo.initExpect(linkToMessage(parent.getSelfLink(), convo));
-            convo.close();
+        return convo.initExpectAsync(linkToMessage(parent.getSelfLink(), convo)).andThen(peerLinkMessage -> {
+            boolean closeMessageSent = convo.tryClose();
+            if(!closeMessageSent) return new P2LFuture<>(false);
+
             byte result = peerLinkMessage.nextByte();
 
             if (result == REFUSED) {
-                return false;
+                return new P2LFuture<>(false);
             } else if (result == ALREADY_CONNECTED) {
                 parent.graduateToEstablishedConnection(new P2LConnection(new P2Link.Direct(to), to, peerLinkMessage.nextInt(), convo.getAvRTT()), conversationId);
-                return true;
+                return new P2LFuture<>(true);
             } else {
                 parent.graduateToEstablishedConnection(connectionFromMessage(peerLinkMessage, peerLinkMessage.sender, convo.getAvRTT()), conversationId);
-                return true;
+                return new P2LFuture<>(true);
             }
-        } catch (TimeoutException | IOException e) {
-            return false;
-        }
+        });
     }
 
 

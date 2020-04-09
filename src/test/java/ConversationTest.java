@@ -157,7 +157,7 @@ public class ConversationTest {
         testEnvConversation(true, 60, 100, false, false,
                 (convo, no) -> {//client
                     convo.initCloseAsync(convo.encodeSingle(rm[0])).callMeBack(success::setCompletedOrCanceledBasedOn);
-                    assertTrue(success.get(3000));
+                    assertTrue(success.get(30000));
                 },
                 (convo, m0) -> {//server
                     assertArrayEquals(rm[0], m0.asBytes());
@@ -173,7 +173,7 @@ public class ConversationTest {
                         assertArrayEquals(rm[1], m1.asBytes());
                         success.setCompleted(true);
                     });
-                    assertTrue(success.get(3000));
+                    assertTrue(success.get(30000));
                 },
                 (convo, m0) -> {//server
                     assertArrayEquals(rm[0], m0.asBytes());

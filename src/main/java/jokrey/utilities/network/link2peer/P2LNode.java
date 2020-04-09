@@ -12,8 +12,8 @@ import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -142,7 +142,7 @@ public interface P2LNode {
      * @param addresses to connect to
      * @return future set of established given connections
      */
-    P2LFuture<Set<P2Link>> establishConnections(P2Link... addresses);
+    P2LFuture<Collection<P2Link>> establishConnections(P2Link... addresses);
 
     /**
      * @param to is connected to?
