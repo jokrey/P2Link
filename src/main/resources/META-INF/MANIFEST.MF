@@ -1,2 +1,4 @@
 Manifest-Version: 1.0
-Main-Class: jokrey.utilities.network.link2peer.rendevouz.RendezvousServer
+Main-Class: jokrey.utilities.network.link2peer.rendezvous.RendezvousServ
+ er
+

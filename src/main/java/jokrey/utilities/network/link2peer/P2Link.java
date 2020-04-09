@@ -64,7 +64,7 @@ public abstract class P2Link {
             this.port = port;
         }
         public Direct(InetSocketAddress raw) {
-            this(raw.getHostName(), raw.getPort());
+            this(raw.getAddress().getHostAddress(), raw.getPort());
         }
 
         @Override public boolean isDirect() { return true; }

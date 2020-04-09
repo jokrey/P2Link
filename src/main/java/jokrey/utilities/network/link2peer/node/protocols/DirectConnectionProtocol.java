@@ -56,8 +56,10 @@ public class DirectConnectionProtocol {
 
         if (parent.connectionLimitReached()) {
             convo.answerClose(convo.encode(REFUSED));
-        } else if (parent.isConnectedTo(newPeerConnection.link)) {
+        } else if (parent.isConnectedTo(newPeerConnection.address)) {
             convo.answerClose(convo.encode(ALREADY_CONNECTED, P2LMessage.CUSTOM_RAW_SIZE_LIMIT));
+        } else if (parent.isConnectedTo(newPeerConnection.link) && !parent.isConnectedTo(newPeerConnection.address)) {
+            convo.answerClose(convo.encode(REFUSED));
         } else {
             parent.graduateToEstablishedConnection(newPeerConnection, initialRequestMessage.header.getConversationId());
             convo.answerClose(linkToMessage(parent.getSelfLink(), convo));

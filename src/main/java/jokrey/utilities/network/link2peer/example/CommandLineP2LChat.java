@@ -5,6 +5,7 @@ import jokrey.utilities.command.line.helper.CommandLoop;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
+import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.network.link2peer.util.TimeoutException;
@@ -81,11 +82,12 @@ public class CommandLineP2LChat {
                 "peers");
         loop.addCommand("printSelf", "Prints own nodes link", Argument.noargs(), args -> System.out.println(node.getSelfLink()),
                 "self", "me");
+        loop.addCommand("toggleDebugPrintouts", "All Debug Messages Will Be Printed", Argument.noargs(), args -> DebugStats.MSG_PRINTS_ACTIVE = !DebugStats.MSG_PRINTS_ACTIVE,
+                "printAll");
         loop.addCommand("sendBroadcast", "Sends a string(args[0]) as a broadcast", Argument.with(String.class), args ->
                 node.sendBroadcastWithReceipts(P2LMessage.with(0, args[1].getRaw().getBytes(StandardCharsets.UTF_8))), "broadcast", "brd");
         loop.addCommand("sendIndividualMessage", "Sends a string(args[1]) as an individual message to an active peer link(args[0])", Argument.with(String.class, String.class), args -> {
             P2Link to = P2Link.from(args[0].getRaw()); //unresolved, maybe
-//            InetSocketAddress realTo = node.getConnection(to);
             try {
                 P2LFuture<Boolean> successFut = node.sendMessageWithReceipt(to, P2LMessage.with(0, args[1].getRaw().getBytes(StandardCharsets.UTF_8)));
                 Boolean success = successFut.getOrNull(P2LHeuristics.DEFAULT_PROTOCOL_ANSWER_RECEIVE_TIMEOUT * 2);
