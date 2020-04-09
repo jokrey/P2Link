@@ -247,7 +247,6 @@ public class P2LConversationImplV2 implements P2LConversation {
         if(isInitiated()) throw new IllegalStateException("cannot init twice");
         step = 0;
         P2LFuture<ReceivedP2LMessage> result = answerExpectAsync(message);
-        result.whenCanceled(() -> Thread.dumpStack());
         result.callMeBackFirst(received -> markSelfClosed());
         return result;
     }
