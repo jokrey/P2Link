@@ -16,7 +16,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.InterfaceAddress;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -94,7 +93,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
 
     @Override public P2LFuture<P2Link.Direct> whoAmI(InetSocketAddress requestFrom) {
-        return outgoingPool.execute(() -> WhoAmIProtocol.asInitiator(P2LNodeImpl.this, requestFrom));
+        return WhoAmIProtocol.asInitiator(this, requestFrom);
     }
 
     @Override public void close() {
@@ -106,7 +105,8 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     @Override public P2LFuture<Boolean> establishConnection(P2Link to) {
         return EstablishConnectionProtocol.asInitiator(this, to, null);
     }
-    @Override public P2LFuture<Collection<P2Link>> establishConnections(P2Link... links) {
+    //Note - if canceled NO results are available. However at some point(after conversation timeout) all at that point completed connections are available.
+    @Override public P2LFuture<List<P2Link>> establishConnections(P2Link... links) {
         LinkedList<P2LFuture<P2Link>> connectionResults = new LinkedList<>();
         for(P2Link link : links)
             connectionResults.addLast(EstablishConnectionProtocol.asInitiator(this, link, null).toType(success -> success?link:null));
@@ -116,11 +116,11 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         DisconnectSingleConnectionProtocol.asInitiator(this, from.address);
     }
 
-    @Override public List<P2Link> recursiveGarnerConnections(int newConnectionLimit, int newConnectionLimitPerRecursion, P2Link... setupLinks) {
+    @Override public P2LFuture<List<P2Link>> recursiveGarnerConnections(int newConnectionLimit, int newConnectionLimitPerRecursion, P2Link... setupLinks) {
         return GarnerConnectionsRecursivelyProtocol.recursiveGarnerConnections(this, newConnectionLimit, newConnectionLimitPerRecursion, Arrays.asList(setupLinks));
     }
 
-    @Override public List<P2Link> queryKnownLinksOf(InetSocketAddress from) throws IOException {
+    @Override public P2LFuture<List<P2Link>> queryKnownLinksOf(InetSocketAddress from) {
         return RequestPeerLinksProtocol.asInitiator(this, from);
     }
 

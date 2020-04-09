@@ -2,12 +2,13 @@ package jokrey.utilities.network.link2peer.node.protocols;
 
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
+import jokrey.utilities.network.link2peer.util.P2LFuture;
+import jokrey.utilities.network.link2peer.util.P2LThreadPool;
+import jokrey.utilities.network.link2peer.util.TimeoutException;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 public class GarnerConnectionsRecursivelyProtocol {
     /**
@@ -18,54 +19,55 @@ public class GarnerConnectionsRecursivelyProtocol {
      *
      * The max peer limit in the constructor is being respected at all times
      *
-     * @param newConnectionLimit maximum number of new connections, after this limit is reached the algorithm will terminate
+     * @param newConnectionGoal maximum number of new connections, after this limit is reached the algorithm will terminate(however more new connections may have been made at that point) - just used as a rough estimate byte
      * @param setupLinks links to begin discovering connections from, setup links are connected to and count as new connections in the newConnectionLimit
      * @return newly, successfully connected links
      */
-    public static List<P2Link> recursiveGarnerConnections(P2LNodeInternal parent, int newConnectionLimit, int newConnectionLimitPerRecursion, List<P2Link> setupLinks) {
-        //also naturally limited by peerLimit set in constructor (and ram cap)
+    public static P2LFuture<List<P2Link>> recursiveGarnerConnections(P2LNodeInternal parent, int newConnectionGoal, int newConnectionGoalPerRecursion, List<P2Link> setupLinks) {
+//        //also naturally limited by peerLimit set in constructor (and ram cap, but what isn't)
+        int goal = Math.min(newConnectionGoal, newConnectionGoalPerRecursion);
 
-        if(setupLinks.isEmpty() || newConnectionLimit <=0)
-            return Collections.emptyList();
+        if(setupLinks.isEmpty() || newConnectionGoal <=0)
+            return new P2LFuture<>(Collections.emptyList());
+        if(setupLinks.size() > goal)
+            throw new IllegalArgumentException("cannot have more setup links that the limit(min(newConnectionGoal, newConnectionGoalPerRecursion))");
 
-        List<P2Link> connectedSetupLinks = new ArrayList<>(setupLinks.size());
-        int newlyConnectedCounter = 0;
-        for(P2Link peerLink : setupLinks) {
-            if(newlyConnectedCounter >= newConnectionLimit || newlyConnectedCounter >= newConnectionLimitPerRecursion)
-                return connectedSetupLinks;
-            if (!parent.isConnectedTo(peerLink) && EstablishConnectionProtocol.asInitiator(parent, peerLink, null).get(5000))//todo async
-                newlyConnectedCounter++;
-            connectedSetupLinks.add(peerLink);
-        }
+        return parent.establishConnections(setupLinks.toArray(new P2Link[0])).andThen(connectedSetupLinks -> {
+            Collections.shuffle(connectedSetupLinks);
 
-        List<P2Link> foundUnconnectedLinks = new ArrayList<>();
-        for (int i = 0, connectedSetupLinksSize = connectedSetupLinks.size(); i < connectedSetupLinksSize; i++) {
-            P2Link connectedSetupLink = connectedSetupLinks.get(i);
-            try {
-                InetSocketAddress resolvedConnectedSetupLink = parent.resolve(connectedSetupLink);
-                System.out.println("connectedSetupLink = " + connectedSetupLink);
-                System.out.println("resolvedConnectedSetupLink = " + resolvedConnectedSetupLink);
-                List<P2Link> foundLinks = RequestPeerLinksProtocol.asInitiator(parent, resolvedConnectedSetupLink);
-                for (P2Link link : foundLinks) {
-                    if (!parent.isConnectedTo(link))
-                        foundUnconnectedLinks.add(link);
+            int numberConnected = connectedSetupLinks.size();
+            int remaining = goal - numberConnected;
+            if(remaining <= 0)
+                return new P2LFuture<>(connectedSetupLinks);
+            else {
+                List<P2LFuture<List<P2Link>>> requests = new LinkedList<>();
+
+                for (P2Link connectedSetupLink : connectedSetupLinks) {
+                    InetSocketAddress resolvedConnectedSetupLink = parent.resolve(connectedSetupLink);
+                    requests.add(RequestPeerLinksProtocol.asInitiator(parent, resolvedConnectedSetupLink));
                 }
-                if (i + 1 > 3 && foundUnconnectedLinks.size() > 2 * parent.remainingNumberOfAllowedPeerConnections()) { //fixme heuristic
-                    //assume that one of 3 peers is honest and that at least half unconnected links are still valid...
-                    break;
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
+
+                return P2LFuture.oneForAll(requests).andThen(lists -> {
+                    List<P2Link> foundUnconnectedLinks = new ArrayList<>();
+                    for (List<P2Link> list : lists)
+                        for (P2Link link : list)
+                            if (!parent.isConnectedTo(link))
+                                foundUnconnectedLinks.add(link);
+                    Collections.shuffle(foundUnconnectedLinks);
+                    return recursiveGarnerConnections(parent, remaining, newConnectionGoalPerRecursion, takeAtMost(foundUnconnectedLinks, Math.min(remaining, (int) (newConnectionGoalPerRecursion*1.5/*fixme heuristic*/)))).toType(recursivelyConnected -> {
+                        connectedSetupLinks.addAll(recursivelyConnected);
+                        return connectedSetupLinks;
+                    });
+                });
             }
-        }
+        });
+    }
 
-        Collections.shuffle(foundUnconnectedLinks); // randomize which connections to establish first, to make it harder to isolate a peer
-
-        connectedSetupLinks.addAll(recursiveGarnerConnections(parent,
-                  newConnectionLimit - newlyConnectedCounter,
-                                    newConnectionLimitPerRecursion,
-                                    foundUnconnectedLinks));
-
-        return connectedSetupLinks;
+    private static <E> List<E> takeAtMost(List<E> list, int num) {
+        int limit = Math.min(num, list.size());
+        ArrayList<E> r = new ArrayList<>(limit);
+        for(int i=0;i<limit;i++)
+            r.add(list.get(i));
+        return r;
     }
 }

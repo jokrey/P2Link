@@ -7,6 +7,7 @@ import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
+import jokrey.utilities.network.link2peer.util.TimeoutException;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -59,16 +60,16 @@ public class CommandLineP2LChat {
         loop.addCommand("garnerConnectionsFrom", "Recursively garners n(args[1]) connections from setup link(args[0])", Argument.with(String.class, Integer.class), args -> {
             P2Link garnerFrom = P2Link.from(args[0].getRaw());
             Integer limit = args[1].get();
-            List<P2Link> newlyConnected = node.recursiveGarnerConnections(limit, garnerFrom);
+            List<P2Link> newlyConnected = node.recursiveGarnerConnections(limit, garnerFrom).get(5000);
             System.out.println("Newly connected to: " + newlyConnected);
         },"garner");
         loop.addCommand("requestFrom", "Request known connections from setup link(args[0]) - returned links can be connected to", Argument.with(String.class), args -> {
             P2Link requestFrom = P2Link.from(args[0].getRaw());
             try {
-                List<P2Link> links = node.queryKnownLinksOf(requestFrom);
+                List<P2Link> links = node.queryKnownLinksOf(requestFrom).get(2500);
                 System.out.println("links = " + links);
-            } catch (IOException e) {
-                System.err.println("error requesting "+e.getMessage());
+            } catch (TimeoutException e) {
+                System.err.println(e.getClass().getName() + " error requesting "+e.getMessage());
                 e.printStackTrace();
             }
         },"request");

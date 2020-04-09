@@ -5,6 +5,7 @@ import jokrey.utilities.simple.data_structure.pairs.Pair;
 
 import java.util.Collection;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -581,17 +582,20 @@ public class P2LFuture<T> {
      * Converts the collection of futures into a future of a collections.
      * The resulting future is set to completed if all given futures are completed or canceled.
      * The results of canceled futures are naturally not included in the resulting collection.
-     * The resulting future is never canceled. Even if all original futures are canceled the resulting future is just set completed with an empty collection.
+     * The resulting future is never canceled automatically. Even if all original futures are canceled the resulting future is just set completed with an empty collection.
      * The order in the given and resulting collection are not necessarily in the same order.
+     *
+     * If the resulting future is canceled by the caller, all given future will be attempted to be canceled.
+     *
      * @param futures collection of futures of the same type
      * @return the newly created future for the collection of results
      */
-    public static <T, F extends P2LFuture<T>> P2LFuture<Collection<T>> oneForAll(Collection<F> futures) {
+    public static <T, F extends P2LFuture<T>> P2LFuture<List<T>> oneForAll(Collection<F> futures) {
         int origSize = futures.size();
         AtomicInteger counter = new AtomicInteger(0); //required so that cancelations are properly handled
         LinkedList<T> collector = new LinkedList<>();
 
-        P2LFuture<Collection<T>> allResults = new P2LFuture<>();
+        P2LFuture<List<T>> allResults = new P2LFuture<>();
         for(P2LFuture<T> future:futures)
             future.callMeBack(e -> {
                 if(e != null) {
@@ -606,6 +610,11 @@ public class P2LFuture<T> {
             });
         if(futures.isEmpty())
             allResults.setCompleted(collector);
+
+        allResults.whenCanceled(() -> {
+            for(P2LFuture<T> future:futures)
+                future.tryCancel();
+        });
         return allResults;
     }
 

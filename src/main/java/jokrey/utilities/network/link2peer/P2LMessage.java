@@ -177,9 +177,9 @@ public class P2LMessage extends MessageEncoder {
     @Override public int hashCode() {
         return header.hashCode() + 13*super.hashCode();
     }
-    @Override public String toString() {
-        return "P2LMessage{header=" + header + ", contentHash=" + contentHash + ", raw(pay=["+header.getSize()+", "+(size)+"])=" + Arrays.toString(Arrays.copyOfRange(content,0, header.getSize()+Math.min(getPayloadLength(), 12))) + '}';
-    }
+//    @Override public String toString() {
+//        return "P2LMessage{header=" + header + ", contentHash=" + contentHash + ", raw(pay=["+header.getSize()+", "+(size)+"])=" + Arrays.toString(Arrays.copyOfRange(content,0, header.getSize()+Math.min(getPayloadLength(), 12))) + '}';
+//    }
 
 
 

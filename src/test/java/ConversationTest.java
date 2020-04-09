@@ -154,7 +154,7 @@ public class ConversationTest {
     @Test void convTest_initCloseAsync() throws IOException {
         byte[][] rm = rand(1, 1000);
         P2LFuture<Boolean> success = new P2LFuture<>();
-        testEnvConversation(true, 60, 100, false, false,
+        testEnvConversation(true, 60, 100, false, true,
                 (convo, no) -> {//client
                     convo.initCloseAsync(convo.encodeSingle(rm[0])).callMeBack(success::setCompletedOrCanceledBasedOn);
                     assertTrue(success.get(30000));

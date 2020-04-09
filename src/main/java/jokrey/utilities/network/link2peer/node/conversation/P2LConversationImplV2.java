@@ -247,9 +247,8 @@ public class P2LConversationImplV2 implements P2LConversation {
         if(isInitiated()) throw new IllegalStateException("cannot init twice");
         step = 0;
         P2LFuture<ReceivedP2LMessage> result = answerExpectAsync(message);
-        result.callMeBackFirst(received -> {
-            markSelfClosed();
-        });
+        result.whenCanceled(() -> Thread.dumpStack());
+        result.callMeBackFirst(received -> markSelfClosed());
         return result;
     }
     @Override public void closeWith(MessageEncoder message) throws IOException {
@@ -743,7 +742,7 @@ public class P2LConversationImplV2 implements P2LConversation {
     private class DefaultRetryer<T> extends AsyncRetryer<T, ReceivedP2LMessage> {
         DefaultRetryer(P2LMessage messageToRetry) {
             super(P2LConversationImplV2.this.maxAttempts);
-            finalResultCanceledHandler = () -> handler.remove(P2LConversationImplV2.this);
+            finalResultCanceledHandler = () -> handler.remove(P2LConversationImplV2.this);//IF RESULT FUTURE IS CANCELED THE ENTIRE CONVERSATION IS CANCELED.
             attemptFunction = () -> {
                 latest = new P2LFuture<>();
                 latest.callMeBack(calcWaitBeforeRetryTime(counter), this); //HAS TO BE BEFORE SEND MESSAGE - For thread, deadlock and call cascade reasons

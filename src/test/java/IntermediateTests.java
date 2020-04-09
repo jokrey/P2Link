@@ -92,7 +92,7 @@ class IntermediateTests {
 //            for (P2Link toBeConnected : subLinks)
 //                assertTrue(successes.contains(toBeConnected));
 
-            List<P2Link> newConnections = nodes[0].recursiveGarnerConnections(4, nodes[1].getSelfLink());
+            List<P2Link> newConnections = nodes[0].recursiveGarnerConnections(4, nodes[1].getSelfLink()).get(5000);
 
             printPeers(nodes);
 
@@ -115,7 +115,7 @@ class IntermediateTests {
 
             printPeers(nodes);
 
-            List<P2Link> newConnections = nodes[0].recursiveGarnerConnections(4, nodes[1].getSelfLink());
+            List<P2Link> newConnections = nodes[0].recursiveGarnerConnections(4, nodes[1].getSelfLink()).get(5000);
             assertEquals(4, newConnections.size());
 
             printPeers(nodes);
@@ -138,7 +138,7 @@ class IntermediateTests {
             for (P2Link toBeConnected : subLinks)
                 assertTrue(successes.contains(toBeConnected));
 
-            List<P2Link> newConnections = nodes[0].recursiveGarnerConnections(1000, nodes[1].getSelfLink());
+            List<P2Link> newConnections = nodes[0].recursiveGarnerConnections(1000, nodes[1].getSelfLink()).get(5000);
             assertEquals(4, newConnections.size());
 
             printPeers(nodes);
@@ -329,7 +329,7 @@ class IntermediateTests {
         printPeers(senderNode);
         printPeers(nodes);
         assertTrue(connectAsLine(nodes).get(1000));
-        List<P2Link> successLinks = senderNode.recursiveGarnerConnections(4, nodes[0].getSelfLink());
+        List<P2Link> successLinks = senderNode.recursiveGarnerConnections(4, nodes[0].getSelfLink()).get(5000);
         assertEquals(4, successLinks.size());
 
         System.out.println("successLinks = " + successLinks);
@@ -416,8 +416,8 @@ class IntermediateTests {
         P2LFuture<Boolean> fullConnectFuture = fullConnect(nodes);
         fullConnectFuture.get(8000);
         sleep(5000);
-        senderNode.recursiveGarnerConnections(200, nodes[0].getSelfLink(), nodes[1].getSelfLink());
-        System.err.println("FULL CONNECT");
+        List<P2Link> newlyConnected = senderNode.recursiveGarnerConnections(200, nodes[0].getSelfLink(), nodes[1].getSelfLink()).get(10000);
+        System.err.println("FULL CONNECT: "+newlyConnected.size());
         printPeers(senderNode);
         printPeers(nodes);
         assertTrue(fullConnectFuture.get(1000));
@@ -453,7 +453,7 @@ class IntermediateTests {
         printPeers(senderNode);
         printPeers(nodes);
         assertTrue(fullConnectFuture.get(2500));
-        senderNode.recursiveGarnerConnections(200, nodes[0].getSelfLink(), nodes[1].getSelfLink());
+        newlyConnected = senderNode.recursiveGarnerConnections(200, nodes[0].getSelfLink(), nodes[1].getSelfLink()).get(10000);
         printPeers(senderNode);
         printPeers(nodes);
 
@@ -464,9 +464,7 @@ class IntermediateTests {
 
         for(P2LNode node:nodes) {
             if(new Random().nextBoolean()) {
-                //no longer possible to wait for a message from a specific node - because that would not really be broadcast semantics, right?
-//                assertThrows(TimeoutException.class, () -> node.expectBroadcastMessage(nodes[0].getSelfLink(), 10).get(1000));
-                assertArrayEquals(brdMsgToSend.get(), node.expectBroadcastMessage(/*local(senderNode), */10).get(10000).asBytes());
+                assertArrayEquals(brdMsgToSend.get(), node.expectBroadcastMessage(senderLink, 10).get(10000).asBytes());
             } else {
                 assertArrayEquals(brdMsgToSend.get(), node.expectBroadcastMessage(10).get(10000).asBytes());
             }
@@ -563,11 +561,11 @@ class IntermediateTests {
 
 
             connectAsRing(nodes);
-            nodes[0].establishConnections(nodes[2].getSelfLink(), nodes[4].getSelfLink(), nodes[5].getSelfLink(), nodes[7].getSelfLink()).waitForIt();
-            nodes[2].establishConnections(nodes[9].getSelfLink(), nodes[6].getSelfLink(), nodes[8].getSelfLink(), nodes[7].getSelfLink()).waitForIt();
-            nodes[5].establishConnections(nodes[1].getSelfLink(), nodes[2].getSelfLink(), nodes[9].getSelfLink(), nodes[8].getSelfLink()).waitForIt();
-            nodes[6].establishConnections(nodes[0].getSelfLink(), nodes[2].getSelfLink(), nodes[9].getSelfLink(), nodes[7].getSelfLink()).waitForIt();
-            nodes[8].establishConnections(nodes[3].getSelfLink()).waitForIt();
+            nodes[0].establishConnections(nodes[2].getSelfLink(), nodes[4].getSelfLink(), nodes[5].getSelfLink(), nodes[7].getSelfLink()).waitForIt(10000);
+            nodes[2].establishConnections(nodes[9].getSelfLink(), nodes[6].getSelfLink(), nodes[8].getSelfLink(), nodes[7].getSelfLink()).waitForIt(10000);
+            nodes[5].establishConnections(nodes[1].getSelfLink(), nodes[2].getSelfLink(), nodes[9].getSelfLink(), nodes[8].getSelfLink()).waitForIt(10000);
+            nodes[6].establishConnections(nodes[0].getSelfLink(), nodes[2].getSelfLink(), nodes[9].getSelfLink(), nodes[7].getSelfLink()).waitForIt(10000);
+            nodes[8].establishConnections(nodes[3].getSelfLink()).waitForIt(8000);
             printPeers(nodes);
 
             for (P2LNode node : nodes)
@@ -707,7 +705,7 @@ class IntermediateTests {
             P2LFuture<Boolean> hidRelayConFut = hidNode2.establishConnection(pubRelayNode3.getSelfLink());
             assertTrue(pubRelayConFut.get(1000) && hidRelayConFut.get(1000));
 
-            List<P2Link> linksQueriedFromRelayNode = pubNode1.queryKnownLinksOf(pubRelayNode3.getSelfLink());
+            List<P2Link> linksQueriedFromRelayNode = pubNode1.queryKnownLinksOf(pubRelayNode3.getSelfLink()).get(3000);
             System.out.println("linksQueriedFromRelayNode(pubHid) = " + linksQueriedFromRelayNode);
             assertEquals(1, linksQueriedFromRelayNode.size()); //NOTE: only equal to 1, because the requesting link is obviously filtered from queried list
             P2LFuture<Boolean> pubHidConFut = pubNode1.establishConnection(linksQueriedFromRelayNode.get(0));//automatically establishes a connection - through a reverse connection from hid to pub
@@ -723,7 +721,7 @@ class IntermediateTests {
             P2LFuture<Boolean> hidRelayConFut2 = hidNode2.establishConnection(pubRelayNode3.getSelfLink());
             assertTrue(hidRelayConFut1.get(1000) && hidRelayConFut2.get(1000));
 
-            linksQueriedFromRelayNode = hidNode1.queryKnownLinksOf(pubRelayNode3.getSelfLink());
+            linksQueriedFromRelayNode = hidNode1.queryKnownLinksOf(pubRelayNode3.getSelfLink()).get(3000);
             System.out.println("linksQueriedFromRelayNode(hidHid) = " + linksQueriedFromRelayNode);
             assertEquals(1, linksQueriedFromRelayNode.size());
             P2LFuture<Boolean> hidHidConFut = hidNode1.establishConnection(linksQueriedFromRelayNode.get(0));//automatically establishes a connection - through a reverse connection from hid to pub
