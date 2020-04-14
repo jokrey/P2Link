@@ -8,6 +8,7 @@ import jokrey.utilities.network.link2peer.P2Link;
 import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
 import jokrey.utilities.network.link2peer.node.conversation.P2LConversation;
 import jokrey.utilities.network.link2peer.node.core.P2LConnection;
+import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.util.P2LFuture;
 import jokrey.utilities.simple.data_structure.BadConcurrentMultiKeyMap;
 
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Scanner;
 
+import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.*;
 import static jokrey.utilities.simple.data_structure.queue.ConcurrentQueueTest.sleep;
 
 /**
@@ -69,21 +71,18 @@ public class RendezvousServer implements AutoCloseable {
 
     public static final byte DENIED = -1;
     public static final byte SUCCESS = 1;
-    public static final int C_REGISTER = 1;
-    public static final int C_REQUEST = 2;
-    public static final int C_REQUEST_ALL = 3;
 
-    private final P2LNode node;
+    private final P2LNodeInternal node;
 
     private final BadConcurrentMultiKeyMap<String, InetSocketAddress, IdentityTriple> registeredIdentities = new BadConcurrentMultiKeyMap<>();
 
     public RendezvousServer(P2Link.Direct selfLink) throws IOException {
-        node = P2LNode.create(selfLink, 512);
+        node = (P2LNodeInternal) P2LNode.create(selfLink, 512);
 
         node.addConnectionDroppedListener(p2LConnection -> {
             registeredIdentities.removeBy2(p2LConnection.address);
         });
-        node.registerConversationFor(C_REGISTER, (convo, m0) -> {
+        node.registerInternalConversationFor(RENDEZVOUS_C_REGISTER, (convo, m0) -> {
             convo.close();
             P2LConnection registeringConversation = node.getConnection(convo.getPeer());
             if(registeringConversation != null) {
@@ -96,7 +95,7 @@ public class RendezvousServer implements AutoCloseable {
                 System.out.println(convo.getPeer() + " - tried registering without being connected... That is not possible(then you couldn't use this rendezvous server as a relay node)");
             }
         });
-        node.registerConversationFor(C_REQUEST, (convo, m0) -> {
+        node.registerInternalConversationFor(RENDEZVOUS_C_REQUEST, (convo, m0) -> {
             MessageEncoder replyEncoder = convo.encoder();
             if(!registeredIdentities.containsBy2(convo.getPeer())) { //requester has to be registered here also
                 replyEncoder.encode(DENIED);
@@ -111,7 +110,7 @@ public class RendezvousServer implements AutoCloseable {
             }
             convo.closeWith(replyEncoder);
         });
-        node.registerConversationFor(C_REQUEST_ALL, (convo, no) -> {
+        node.registerInternalConversationFor(RENDEZVOUS_C_REQUEST_ALL, (convo, no) -> {
             MessageEncoder replyEncoder = convo.encoder();
             IdentityTriple requesterIdentity = registeredIdentities.getBy2(convo.getPeer());
             if(requesterIdentity == null) { //requester has to be registered here also
@@ -135,14 +134,14 @@ public class RendezvousServer implements AutoCloseable {
      */
     public static P2LFuture<Boolean> register(P2LNode node, P2Link.Direct rendezvousServerLink, IdentityTriple selfIdentity) throws IOException {
         return node.establishConnection(rendezvousServerLink).andThen(alwaysTrue -> {
-            P2LConversation convo = node.convo(C_REGISTER, rendezvousServerLink);
+            P2LConversation convo = node.convo(RENDEZVOUS_C_REGISTER, rendezvousServerLink);
             return convo.initCloseAsync(selfIdentity.encodeInto(convo.encoder(), false));
         });
     }
 
     /** Node has to be previously registered with {@link #register(P2LNode, P2Link.Direct, IdentityTriple)} */
     public static IdentityTriple[] request(P2LNode node, P2Link.Direct rendezvousServerLink, String... names) throws IOException {
-        P2LConversation convo = node.convo(C_REQUEST, rendezvousServerLink);
+        P2LConversation convo = node.convo(RENDEZVOUS_C_REQUEST, rendezvousServerLink);
         MessageEncoder requestEncoder = convo.encoder();
         for (String name : names)
             requestEncoder.encodeVariableString(name);
@@ -163,7 +162,7 @@ public class RendezvousServer implements AutoCloseable {
 
     /** Node has to be previously registered with {@link #register(P2LNode, P2Link.Direct, IdentityTriple)} */
     public static IdentityTriple[] requestAsManyAsPossible(P2LNode node, P2Link.Direct rendezvousServerLink) throws IOException {
-        P2LConversation convo = node.convo(C_REQUEST_ALL, rendezvousServerLink);
+        P2LConversation convo = node.convo(RENDEZVOUS_C_REQUEST_ALL, rendezvousServerLink);
 
         ReceivedP2LMessage reply = convo.initExpectClose();
         if(reply.nextByte() == SUCCESS) {

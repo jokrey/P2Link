@@ -12,6 +12,9 @@ public class P2LInternalMessageTypes {
     public static final short SL_NAT_HOLE_PACKET = -7;
     public static final short SL_REQUEST_DIRECT_CONNECT_TO_MODIFY_DESTINATION_IP_TO_RELAY_IP = -8;
 
+    public static final int RENDEZVOUS_C_REGISTER = -10;
+    public static final int RENDEZVOUS_C_REQUEST = -11;
+    public static final int RENDEZVOUS_C_REQUEST_ALL = -12;
 
     public static final short SC_BROADCAST_WITH_HASH = -21;
     public static final short SC_DISCONNECT = -22;
