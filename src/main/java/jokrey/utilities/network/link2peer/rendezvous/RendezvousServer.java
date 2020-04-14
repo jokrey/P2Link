@@ -132,16 +132,18 @@ public class RendezvousServer implements AutoCloseable {
     /*
     SIMPLY DISCONNECT TO UNREGISTER
      */
-    public static P2LFuture<Boolean> register(P2LNode node, P2Link.Direct rendezvousServerLink, IdentityTriple selfIdentity) throws IOException {
+    public static P2LFuture<Boolean> register(P2LNode node, P2Link.Direct rendezvousServerLink, IdentityTriple selfIdentity) {
+        P2LNodeInternal forcedInternal = (P2LNodeInternal) node;
         return node.establishConnection(rendezvousServerLink).andThen(alwaysTrue -> {
-            P2LConversation convo = node.convo(RENDEZVOUS_C_REGISTER, rendezvousServerLink);
+            P2LConversation convo = forcedInternal.internalConvo(RENDEZVOUS_C_REGISTER, rendezvousServerLink.resolve());
             return convo.initCloseAsync(selfIdentity.encodeInto(convo.encoder(), false));
         });
     }
 
     /** Node has to be previously registered with {@link #register(P2LNode, P2Link.Direct, IdentityTriple)} */
     public static IdentityTriple[] request(P2LNode node, P2Link.Direct rendezvousServerLink, String... names) throws IOException {
-        P2LConversation convo = node.convo(RENDEZVOUS_C_REQUEST, rendezvousServerLink);
+        P2LNodeInternal forcedInternal = (P2LNodeInternal) node;
+        P2LConversation convo = forcedInternal.internalConvo(RENDEZVOUS_C_REQUEST, rendezvousServerLink.resolve());
         MessageEncoder requestEncoder = convo.encoder();
         for (String name : names)
             requestEncoder.encodeVariableString(name);
@@ -162,7 +164,8 @@ public class RendezvousServer implements AutoCloseable {
 
     /** Node has to be previously registered with {@link #register(P2LNode, P2Link.Direct, IdentityTriple)} */
     public static IdentityTriple[] requestAsManyAsPossible(P2LNode node, P2Link.Direct rendezvousServerLink) throws IOException {
-        P2LConversation convo = node.convo(RENDEZVOUS_C_REQUEST_ALL, rendezvousServerLink);
+        P2LNodeInternal forcedInternal = (P2LNodeInternal) node;
+        P2LConversation convo = forcedInternal.internalConvo(RENDEZVOUS_C_REQUEST_ALL, rendezvousServerLink.resolve());
 
         ReceivedP2LMessage reply = convo.initExpectClose();
         if(reply.nextByte() == SUCCESS) {
