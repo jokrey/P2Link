@@ -34,7 +34,7 @@ import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessage
  */
 final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     private final IncomingHandler incomingHandler;
-    private final P2LThreadPool outgoingPool = new P2LThreadPool(4, 64);
+    private final P2LThreadPool outgoingPool = new P2LThreadPool(4, 64, 80);
 
     /**
      * If the self link is not known, it has to be EXPLICITLY queried and SET as public link using the who am I protocol

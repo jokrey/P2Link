@@ -7,6 +7,7 @@ import jokrey.utilities.network.link2peer.node.conversation.ConversationHandler;
 import jokrey.utilities.network.link2peer.node.conversation.ConversationHandlerV2_2;
 import jokrey.utilities.network.link2peer.node.protocols.*;
 import jokrey.utilities.network.link2peer.node.stream.StreamMessageHandler;
+import jokrey.utilities.network.link2peer.util.CapacityReachedException;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
 
 import java.io.IOException;
@@ -37,7 +38,7 @@ public class IncomingHandler {
     final StreamMessageHandler streamMessageHandler = new StreamMessageHandler();
     final ConversationHandler conversationMessageHandler = new ConversationHandlerV2_2();
 
-    final P2LThreadPool handleReceivedMessagesPool = new P2LThreadPool(4, 64);
+    final P2LThreadPool handleReceivedMessagesPool = new P2LThreadPool(4, 64, 80);
 
 
     private void handleReceivedMessage(DatagramPacket receivedPacket) throws Throwable {
@@ -166,6 +167,8 @@ public class IncomingHandler {
                         return;
                 } catch (IOException e) {
                     e.printStackTrace();
+                } catch (CapacityReachedException e) {
+                    System.err.println("incoming thread pool reached capacity. Try using async message handling or some sort of load balancing.");
                 }
             }
         }).start();
