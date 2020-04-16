@@ -5,7 +5,7 @@ import jokrey.utilities.network.link2peer.node.message_headers.MinimalHeader;
 import jokrey.utilities.network.link2peer.node.message_headers.P2LMessageHeader;
 import jokrey.utilities.network.link2peer.node.message_headers.ReceiptHeader;
 import jokrey.utilities.network.link2peer.util.Hash;
-import jokrey.utilities.transparent_storage.bytes.wrapper.SubBytesStorage;
+import jokrey.utilities.transparent_storage.bytes.SubBytesStorage;
 
 import java.net.DatagramPacket;
 import java.net.InetSocketAddress;

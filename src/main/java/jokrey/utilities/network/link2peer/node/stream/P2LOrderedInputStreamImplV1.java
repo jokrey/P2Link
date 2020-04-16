@@ -5,7 +5,7 @@ import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
 import jokrey.utilities.network.link2peer.node.core.P2LNodeInternal;
 import jokrey.utilities.network.link2peer.util.SyncHelp;
-import jokrey.utilities.transparent_storage.bytes.wrapper.SubBytesStorage;
+import jokrey.utilities.transparent_storage.bytes.SubBytesStorage;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
