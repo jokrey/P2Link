@@ -21,6 +21,10 @@ import java.util.Scanner;
  */
 public class CommandLineP2LChat {
     public static void main(String[] arguments) throws IOException {
+        System.out.println("NOTE: If you are trying to connect to a peer via ipv4 that is behind the same router,\n" +
+                "   via its public-ip/gateway-ip(external nat-address, as for example seen by a rendezvous server behind that router access via that public ip),\n" +
+                "   then be aware this ONLY works if the router supports NAT-Loopback/NAT-Hairpinning (some do not in 2020)....");
+
         Scanner userIn = new Scanner(System.in);
 
         String rawInput;
@@ -54,10 +58,19 @@ public class CommandLineP2LChat {
         CommandLoop loop = new CommandLoop();
         loop.addCommand("connectTo", "Connects to peer at link(args[0]) of the form [ip/dns]:[port]", Argument.with(String.class), args -> {
             P2Link connectTo = P2Link.from(args[0].getRaw());
-            boolean success = node.establishConnection(connectTo).get();
+            boolean success = node.establishConnection(connectTo).get(10000);
             if(success)
                 System.out.println("connected to "+connectTo);
         },"connect");
+        loop.addCommand("linkFormat", "Prints the link format", Argument.noargs(), args -> {
+            System.out.println("Link Format:\n" +
+                    "  direct link:\n" +
+                    "     <ip/dns>:<port>\n" +
+                    "  relayed link [NO USE HERE - CAN BE USED TO CONNECT]:\n" +
+                    "     <name>[<direct link of relay server>]\n" +
+                    "  local link:\n" +
+                    "     <name>[local=<port>]");
+        },"format");
         loop.addCommand("garnerConnectionsFrom", "Recursively garners n(args[1]) connections from setup link(args[0])", Argument.with(String.class, Integer.class), args -> {
             P2Link garnerFrom = P2Link.from(args[0].getRaw());
             Integer limit = args[1].get();
