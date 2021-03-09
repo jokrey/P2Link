@@ -9,6 +9,7 @@ import jokrey.utilities.network.link2peer.node.protocols.*;
 import jokrey.utilities.network.link2peer.node.stream.StreamMessageHandler;
 import jokrey.utilities.network.link2peer.util.CapacityReachedException;
 import jokrey.utilities.network.link2peer.util.P2LThreadPool;
+import jokrey.utilities.network.link2peer.util.ShutDownException;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -162,6 +163,8 @@ public class IncomingHandler {
                             e.printStackTrace();
                         }
                     });
+                } catch (ShutDownException e) {
+                    return;
                 } catch (SocketException e) {
                     if(e.getMessage().equals("socket closed"))
                         return;

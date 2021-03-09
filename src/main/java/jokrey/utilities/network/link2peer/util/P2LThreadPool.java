@@ -14,8 +14,8 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class P2LThreadPool {
     private final int coreThreads, maxThreads, maxQueuedTasks;
-    private List<P2LThread> pool;
-    private Queue<P2LTask<?>> queuedTasks = new LinkedList<>();
+    private final List<P2LThread> pool;
+    private final Queue<P2LTask<?>> queuedTasks = new LinkedList<>();
 
     public P2LThreadPool(int coreThreads, int maxThreads) {
         this(coreThreads, maxThreads, Integer.MAX_VALUE);
@@ -215,6 +215,8 @@ public class P2LThreadPool {
             try {
                 task.run();
                 return true;
+            } catch (ShutDownException t) {
+                return false;
             } catch (Throwable t) {
                 t.printStackTrace();
                 return false;
@@ -226,6 +228,8 @@ public class P2LThreadPool {
             @Override protected R run() {
                 try {
                     return task.run();
+                } catch (ShutDownException t) {
+                    return null;//sets task to canceled
                 } catch (Throwable t) {
                     t.printStackTrace();
                     return null;//sets task to canceled
