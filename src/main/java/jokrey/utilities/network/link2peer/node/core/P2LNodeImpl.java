@@ -47,13 +47,10 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         this(selfLink, Integer.MAX_VALUE);
     }
     P2LNodeImpl(P2Link selfLink, int connectionLimit) throws IOException {
-        TimeDiffMarker.setMark("P2LNodeImpl");
         setSelfLink(selfLink);
         this.connectionLimit = connectionLimit;
-        TimeDiffMarker.println("P2LNodeImpl");
 
         incomingHandler = new IncomingHandler(this);
-        TimeDiffMarker.println("P2LNodeImpl");
 
         new Thread(() -> {
             while(!incomingHandler.isClosed()) {
@@ -91,7 +88,6 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
                 }
             }
         }).start();
-        TimeDiffMarker.println("P2LNodeImpl");
     }
 
     @Override public P2Link getSelfLink() { return selfLink; }
