@@ -1,5 +1,6 @@
 package jokrey.utilities.network.link2peer.node.core;
 
+import jokrey.utilities.debug_analysis_helper.TimeDiffMarker;
 import jokrey.utilities.network.link2peer.*;
 import jokrey.utilities.network.link2peer.node.DebugStats;
 import jokrey.utilities.network.link2peer.node.P2LHeuristics;
@@ -46,10 +47,13 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         this(selfLink, Integer.MAX_VALUE);
     }
     P2LNodeImpl(P2Link selfLink, int connectionLimit) throws IOException {
+        TimeDiffMarker.setMark("P2LNodeImpl");
         setSelfLink(selfLink);
         this.connectionLimit = connectionLimit;
+        TimeDiffMarker.println("P2LNodeImpl");
 
         incomingHandler = new IncomingHandler(this);
+        TimeDiffMarker.println("P2LNodeImpl");
 
         new Thread(() -> {
             while(!incomingHandler.isClosed()) {
@@ -87,6 +91,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
                 }
             }
         }).start();
+        TimeDiffMarker.println("P2LNodeImpl");
     }
 
     @Override public P2Link getSelfLink() { return selfLink; }
@@ -331,15 +336,6 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
         return outgoingPool.execute(tasks);
     }
 
-    private final InterfaceAddress ip4InterfaceAddress = NetUtil.getLocalIPv4InterfaceAddress(); //might take a while to instantiate - so we have to do it before
-    @Override public InterfaceAddress getLocalIPv4InterfaceAddress() {
-        return ip4InterfaceAddress;
-    }
-    private InterfaceAddress ip6InterfaceAddress = NetUtil.getLocalIPv4InterfaceAddress(); //might take a while to instantiate - so we have to do it before
-    @Override public InterfaceAddress getLocalIPv6InterfaceAddress() {
-        return ip6InterfaceAddress;
-    }
-
     //LISTENERS:
     private final ArrayList<P2LMessageListener<ReceivedP2LMessage>> individualMessageListeners = new ArrayList<>();
     private final ArrayList<P2LMessageListener<P2LBroadcastMessage>> broadcastMessageListeners = new ArrayList<>();
@@ -369,7 +365,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     }
 
 
-    private AtomicInteger runningConversationId = new AtomicInteger(NO_CONVERSATION_ID + 1);
+    private final AtomicInteger runningConversationId = new AtomicInteger(NO_CONVERSATION_ID + 1);
 //    private AtomicInteger runningConversationId = new AtomicInteger(ThreadLocalRandom.current().nextInt(Short.MAX_VALUE/2));
     @Override public short createUniqueConversationId() {
         //Lock free - i hope

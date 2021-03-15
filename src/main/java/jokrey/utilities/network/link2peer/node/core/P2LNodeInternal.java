@@ -104,9 +104,4 @@ public interface P2LNodeInternal extends P2LNode {
         validateMsgTypeNotInternal(type);
         return expectInternalMessage(from, type, conversationId);
     }
-
-
-
-    InterfaceAddress getLocalIPv4InterfaceAddress();
-    InterfaceAddress getLocalIPv6InterfaceAddress();
 }

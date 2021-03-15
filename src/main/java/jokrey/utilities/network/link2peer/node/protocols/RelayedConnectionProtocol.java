@@ -10,6 +10,7 @@ import jokrey.utilities.network.link2peer.util.P2LFuture;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.InterfaceAddress;
 import java.util.function.BiConsumer;
 
 import static jokrey.utilities.network.link2peer.node.core.P2LInternalMessageTypes.*;
@@ -141,8 +142,8 @@ public class RelayedConnectionProtocol {
             P2LConversation convoWithSecondPeer = parent.internalConvo(SL_REQUEST_DIRECT_CONNECT_TO, connectionId, rawAddressSecondPeer);
             convoWithSecondPeer.initClose(convoWithSecondPeer.encodeSingle(directLinkToRequesterPeerBytes));
         } else {
-            boolean isRequesterPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressRequesterPeer.getAddress(), parent.getLocalIPv4InterfaceAddress());
-            boolean isSecondPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressSecondPeer.getAddress(), parent.getLocalIPv4InterfaceAddress());
+            boolean isRequesterPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressRequesterPeer.getAddress(), loadOrGetIp4InterfaceAddress());
+            boolean isSecondPeerInLocalSubnet = NetUtil.isV4AndFromSameSubnet(rawAddressSecondPeer.getAddress(), loadOrGetIp4InterfaceAddress());
 
             if(isRequesterPeerInLocalSubnet == isSecondPeerInLocalSubnet) { //i.e. either both in WAN or both in LAN - i.e. nat punch is either not required but works anyways or is required and hopefully works(nat config)
                 //NAT PUNCH - requester has already send punching packet(which will likely not be received by remote) - so now the remote can start sending
@@ -171,6 +172,19 @@ public class RelayedConnectionProtocol {
         }
     }
 
+
+
+    private static InterfaceAddress ip4InterfaceAddress = null;
+    private static InterfaceAddress loadOrGetIp4InterfaceAddress() { //might take a while to instantiate - so we have to do it statically and lazily
+        if(ip4InterfaceAddress == null) {
+            synchronized (RelayedConnectionProtocol.class) {
+                if (ip4InterfaceAddress == null) {
+                    ip4InterfaceAddress = NetUtil.getLocalIPv4InterfaceAddress();
+                }
+            }
+        }
+        return ip4InterfaceAddress;
+    }
 
 
 
