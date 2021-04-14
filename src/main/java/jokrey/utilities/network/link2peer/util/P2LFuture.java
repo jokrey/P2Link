@@ -2,6 +2,7 @@ package jokrey.utilities.network.link2peer.util;
 
 import jokrey.utilities.network.link2peer.util.P2LThreadPool.Task;
 import jokrey.utilities.simple.data_structure.pairs.Pair;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.LinkedList;
@@ -63,6 +64,11 @@ public class P2LFuture<T> {
     public P2LFuture(T result) {
         this(DEFAULT_TIMEOUT);
         this.result = result;
+    }
+    public static<T> P2LFuture<T> withResult(T result) {
+        P2LFuture<T> f = new P2LFuture<>();
+        f.setCompleted(result);
+        return f;
     }
 
     private volatile boolean isGetWaiting = false;
