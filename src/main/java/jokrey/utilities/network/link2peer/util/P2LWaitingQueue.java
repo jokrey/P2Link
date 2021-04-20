@@ -21,7 +21,11 @@ public final class P2LWaitingQueue<I, T> {
         P2LFuture<T> f = qAtI.poll();
         if(f == null) return false;
 
-        f.setCompleted(result);
-        return true;
+        if(f.isLikelyInactive()) {
+            return notify(identifier, result);
+        } else {
+            f.setCompleted(result);
+            return true;
+        }
     }
 }
