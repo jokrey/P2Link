@@ -21,6 +21,7 @@ import static jokrey.utilities.network.link2peer.node.protocols.RelayedConnectio
  */
 public class DirectConnectionProtocol {
     private static final byte REFUSED = -1;
+    private static final byte REFUSED_NAME_COLLISION = -2;
     private static final byte ALREADY_CONNECTED = 1;
     private static final byte NEW_CONNECTION_ESTABLISHED = 2;
 
@@ -39,7 +40,7 @@ public class DirectConnectionProtocol {
 
             byte result = peerLinkMessage.nextByte();
 
-            if (result == REFUSED) {
+            if (result == REFUSED || result == REFUSED_NAME_COLLISION) {
                 return new P2LFuture<>(false);
             } else if (result == ALREADY_CONNECTED) {
                 parent.graduateToEstablishedConnection(new P2LConnection(new P2Link.Direct(to), to, peerLinkMessage.nextInt(), convo.getAvRTT()), conversationId);
@@ -61,7 +62,7 @@ public class DirectConnectionProtocol {
         } else if (parent.isConnectedTo(newPeerConnection.address)) {
             convo.answerClose(convo.encode(ALREADY_CONNECTED, P2LMessage.CUSTOM_RAW_SIZE_LIMIT));
         } else if (parent.isConnectedTo(newPeerConnection.link) && !parent.isConnectedTo(newPeerConnection.address)) {
-            convo.answerClose(convo.encode(REFUSED));
+            convo.answerClose(convo.encode(REFUSED_NAME_COLLISION));
         } else {
             parent.graduateToEstablishedConnection(newPeerConnection, initialRequestMessage.header.getConversationId());
             convo.answerClose(linkToMessage(parent.getSelfLink(), convo));
