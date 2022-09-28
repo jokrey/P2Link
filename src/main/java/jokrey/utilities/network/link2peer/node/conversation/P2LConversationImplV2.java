@@ -116,7 +116,7 @@ public class P2LConversationImplV2 implements P2LConversation {
         if(received.header.getStep() == step || (pausedDoubleExpectMode && received.header.getStep() == step+1)) {
             latest.trySetCompleted(received);
         } else {
-            System.out.println(parent.getSelfLink()+" - received unexpected message step: "+received.header.getStep()+", expected: "+step);
+            //System.err.println(parent.getSelfLink()+" - received unexpected message step: "+received.header.getStep()+", expected: "+step + ", received header: "+received.header);
             DebugStats.conversation_numDoubleReceived.getAndIncrement();
         }
     }
@@ -134,7 +134,7 @@ public class P2LConversationImplV2 implements P2LConversation {
     }
     private void ensureCanStepWith(MessageEncoder message) {
         ensureCanStep();
-        if (message.contentSize() > con.remoteBufferSize * 3) System.err.println("message requires more than three packages - should use long message functionality");
+        if (message.contentSize() > con.remoteBufferSize * 3L) System.err.println("message requires more than three packages - should use long message functionality");
     }
     private void resetLatest() {
         latest.tryCancel();
@@ -253,7 +253,7 @@ public class P2LConversationImplV2 implements P2LConversation {
     @Override public void closeWith(MessageEncoder message) throws IOException {
         if(!isServer) throw new IllegalStateException("can only be used when server");
         if(step != 1) throw new IllegalStateException("can only be used as first instruction");
-        if(message.contentSize() > con.remoteBufferSize*3) System.err.println("message requires more than three packages - should use long message functionality");
+        if(message.contentSize() > con.remoteBufferSize* 3L) System.err.println("message requires more than three packages - should use long message functionality");
         ConversationHeader header = new ConversationHeader(type, conversationId, step, false);
         P2LMessage msg = P2LMessage.from(header, message);
         markSelfClosed();

@@ -1,4 +1,5 @@
 import jokrey.utilities.debug_analysis_helper.TimeDiffMarker;
+import jokrey.utilities.encoder.as_union.li.bytes.MessageEncoder;
 import jokrey.utilities.network.link2peer.P2LMessage;
 import jokrey.utilities.network.link2peer.P2LNode;
 import jokrey.utilities.network.link2peer.ReceivedP2LMessage;
@@ -715,6 +716,34 @@ public class ConversationTest {
                         if(success == null || !success) fail();
                         serverDone.setCompleted(true);
                     });
+                });
+    }
+
+
+
+//    @Test
+    void convTest_pingPongWithPauses() throws IOException {
+        byte[][] rm = rand(100, 1000);
+        testEnvConversation(true, 0, 4, false, true,
+                (convo, no) -> {//client
+                    ReceivedP2LMessage m0 = convo.initExpectAfterPause(MessageEncoder.from(convo.getHeaderSize(), rm[0]), 10_000);
+                    assertArrayEquals(rm[0], m0.asBytes());
+
+                    for(int i = 0; i<9; i++) {
+                        byte[] res = convo.answerExpectAfterPause(rm[i], 10_000).asBytes();
+                        assertArrayEquals(rm[i+1], res);
+                    }
+                    convo.close();
+                },
+                (convo, m0) -> {//server
+                    assertArrayEquals(rm[0], m0.asBytes());
+
+                    for(int i = 0; i<9; i++) {
+                        byte[] res = convo.answerExpectData(rm[i]);
+                        assertArrayEquals(rm[i], res);
+                        convo.pause();
+                    }
+                    convo.close();
                 });
     }
 

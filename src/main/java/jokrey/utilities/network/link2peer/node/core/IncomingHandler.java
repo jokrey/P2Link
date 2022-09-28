@@ -48,14 +48,14 @@ public class IncomingHandler {
         if(DebugStats.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE>0) {
             boolean dropped = ThreadLocalRandom.current().nextInt(0, 100) < DebugStats.INTENTIONALLY_DROPPED_PACKAGE_PERCENTAGE;
             if (dropped) {
-                System.out.println(" - DROPPED - "+parent.getSelfLink() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
+                System.out.println(" - DROPPED - "+parent.getSelfLink() + " - IncomingHandler_handleReceivedMessage - from = [" + from + "], message.header = [" + message.header + "]");
                 DebugStats.incomingHandler_numIntentionallyDropped.getAndIncrement();
                 return;
             }
         }
         if(message.header.getType() == SL_NAT_HOLE_PACKET) return; //Packets of this type are dropped ASAP
         if(DebugStats.MSG_PRINTS_ACTIVE)
-            System.out.println(parent.getSelfLink() + " - handleReceivedMessage - from = [" + from + "], message = [" + message + "]");
+            System.out.println(parent.getSelfLink() + " - handleReceivedMessage - from = [" + from + "], message.header = [" + message.header + "]");
 
         parent.notifyPacketReceivedFrom(from);
 

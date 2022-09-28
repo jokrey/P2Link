@@ -35,7 +35,7 @@ import static jokrey.utilities.network.link2peer.node.message_headers.P2LMessage
  */
 final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     private final IncomingHandler incomingHandler;
-    private final P2LThreadPool outgoingPool = new P2LThreadPool(4, 64, 80);
+    private final P2LThreadPool outgoingPool = new P2LThreadPool(4, 64, 100);
 
     /**
      * If the self link is not known, it has to be EXPLICITLY queried and SET as public link using the who am I protocol
@@ -149,13 +149,13 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     @Override public void sendInternalMessage(InetSocketAddress to, P2LMessage message) throws IOException {
         if(message.canBeSentInSinglePacket()) {
             if(DebugStats.MSG_PRINTS_ACTIVE)
-                System.out.println(getSelfLink()+" - sendInternalMessage - to = [" + to + "], message = " + message);
+                System.out.println(getSelfLink()+" - sendInternalMessage - to = [" + to + "], message.header = " + message.header);
+//            System.err.println(getSelfLink()+" - sending: "+message.header);
             incomingHandler.serverSocket.send(message.toPacket(to));
         } else {
             //todo - is it really desirable to have packages be broken up THIS automatically???
             //    - like it is cool that breaking up packages does not make a difference, but... like it is so transparent it could lead to inefficiencies
-//            throw new IllegalStateException(message.size+"");
-            System.out.println("sendLong(being broken up) - message = " + message + ", to = " + to);
+            System.err.println(getSelfLink() + " - sendLong(being broken up into "+ (message.requiredRawSize() / P2LMessage.getMaxPacketSize() + 1)+" parts) - message.header = "+message.header+", to = " + to);
             incomingHandler.longMessageHandler.send(this, message, to);
         }
     }

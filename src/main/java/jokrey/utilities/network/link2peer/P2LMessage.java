@@ -59,7 +59,7 @@ public class P2LMessage extends MessageEncoder {
     
     public final P2LMessageHeader header;
 
-    private Hash contentHash;
+    private final Hash contentHash;
 
     /** @return a cached version of the contentHash of this message. The contentHash is 20 bytes long(sha1), usable with contentHash map and includes sender, type and data. */
     public Hash getContentHash() {
@@ -95,7 +95,7 @@ public class P2LMessage extends MessageEncoder {
         return new DatagramPacket(content, actualLength, to);
     }
 
-    private static int getMaxPacketSize() {
+    public static int getMaxPacketSize() {
         return Math.min(CUSTOM_RAW_SIZE_LIMIT, MAX_UDP_PACKET_SIZE);
     }
 
