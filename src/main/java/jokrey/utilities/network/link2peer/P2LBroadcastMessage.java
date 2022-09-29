@@ -21,8 +21,8 @@ public class P2LBroadcastMessage extends P2LMessage {
     }
 
 
-    //the broadcast algorithm requires the message to be packed before sending - this is required to allow header information such as type and expiresAfter to differ from the carrying message
-    //    additionally the sender needs to be explicitly stored - as it is omitted/automatically determined in normal messages
+    //the broadcast algorithm requires the message to be packed before sending - this is required to allow header information such as type and expiresAfter to differ from the carrying message.
+    //    Additionally, the sender needs to be explicitly stored - as it is omitted/automatically determined in normal messages
     public void packInto(MessageEncoder encoder) {
         int highestByteWritten = header.writeTo(encoder.content, encoder.offset);
 //        System.out.println("highestByteWritten = " + highestByteWritten);

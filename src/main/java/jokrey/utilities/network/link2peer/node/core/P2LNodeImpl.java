@@ -40,7 +40,7 @@ final class P2LNodeImpl implements P2LNode, P2LNodeInternal {
     /**
      * If the self link is not known, it has to be EXPLICITLY queried and SET as public link using the who am I protocol
      *  (because it is difficult to distinguish a local network ip from a public one
-     *  Otherwise establishing connections will only be possible as a hidden node that requires relaying by the public node (a node will favor public links over hidden links in querying connections)
+     *  Otherwise, establishing connections will only be possible as a hidden node that requires relaying by the public node (a node will favor public links over hidden links in querying connections)
      */
     private P2Link selfLink;
     P2LNodeImpl(P2Link selfLink) throws IOException {

@@ -287,11 +287,11 @@ public interface P2LConversation {
     default ReceivedP2LMessage initExpect() throws IOException, TimeoutException {
         return initExpect(EMPTY_BYTES);
     }
-    /** When the client wants to initiate a conversation, but does not have anything to say. AND additionally wants to close the conversation right away. */
+    /** When the client wants to initiate a conversation, but does not have anything to say. AND additionally, wants to close the conversation right away. */
     default byte[] initExpectDataClose() throws IOException, TimeoutException {   //does not make sense for answer - if you answer with nothing you did something wrong..
         return initExpectDataClose(EMPTY_BYTES);
     }
-    /** When the client wants to initiate a conversation, but does not have anything to say. AND additionally wants to close the conversation right away. */
+    /** When the client wants to initiate a conversation, but does not have anything to say. AND additionally, wants to close the conversation right away. */
     default ReceivedP2LMessage initExpectClose() throws IOException, TimeoutException {   //does not make sense for answer - if you answer with nothing you did something wrong..
         return initExpectClose(EMPTY_BYTES);
     }

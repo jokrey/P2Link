@@ -163,7 +163,7 @@ public class P2LFuture<T> {
     /**
      * After the timeout is reached this future is automatically canceled by a minimial impact helper thread that is static and therefore the same for this JVM instance.
      * The helper thread can be shutdown manually using {@link AsyncTimeoutSchedulerThread#shutdown()}, otherwise it will remain in an idle wait state.
-     * Otherwise it functions exactly like the normal {@link #callMeBack(Consumer)}.
+     * Otherwise, it functions exactly like the normal {@link #callMeBack(Consumer)}.
      * @param timeout timeout in ms after which this future will be canceled. It is therefore the upper boundary for how long the callback will NOT be called, before it is(what a sentence, sorry it is late)
      * @param callback callback receiving the result or null if the timeout is reached
      */
@@ -452,7 +452,7 @@ public class P2LFuture<T> {
      * If the returned future is canceled, the underlying (i.e. this) future is also canceled.
      * If the returned future is completed directly(not automatically through completing the underlying future), then behaviour is undefined.
      *
-     * The returned future will ALWAYS be waited upon, additionally the original future will automatically be waited upon from now on
+     * The returned future will ALWAYS be waited upon. Additionally, the original future will automatically be waited upon from now on
      *    unlike before, where {@link #isWaiting()} could be used to determine whether the 'user' is still waiting on it - this is no longer possible
      *
      * @param resultIfSuccess result of type R
@@ -470,7 +470,7 @@ public class P2LFuture<T> {
      * If the returned future is canceled, the underlying (i.e. this) future is also canceled.
      * If the returned future is completed directly(not automatically through completing the underlying future), then behaviour is undefined.
      *
-     * The returned future will ALWAYS be waited upon, additionally the original future will automatically be waited upon from now on
+     * The returned future will ALWAYS be waited upon. Additionally, the original future will automatically be waited upon from now on
      *    unlike before, where {@link #isWaiting()} could be used to determine whether the 'user' is still waiting on it - this is no longer possible
      *
      * The converter function is only called with non null values. If the converter function returns null the returned future is canceled. However 'this', the original future remains uncanceled.

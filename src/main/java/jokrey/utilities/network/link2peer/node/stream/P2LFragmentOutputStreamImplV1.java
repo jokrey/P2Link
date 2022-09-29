@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  *   64bit(32 for now) offset, chunkSize can be read from first package(does not matter which - since fixed)
  *   Length fixed would allow: Requery from receiver side (it knows packages are missing)
  *     After twice av round trip time
- *     Otherwise the sender would have to resend after twice av round trip time without receipt and send last package
+ *     Otherwise, the sender would have to resend after twice av round trip time without receipt and send last package
  * ADDITIONALLY REQUIRED:
  *   Delay/max num packages sent simultaneously (defaults to
  *   Based on percentage of received packages (should be above 80% (???))
@@ -57,8 +57,8 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
     public static final long DEFAULT_BATCH_DELAY = 333;
     public static final int RECEIPT_DELAY_MULTIPLIER = 3;
 
-    private int packageSize;
-    private long batch_delay_ms;
+    private final int packageSize;
+    private final long batch_delay_ms;
 
     private final BatchSizeCalculator batchSizeCalculator;
     protected P2LFragmentOutputStreamImplV1(P2LNodeInternal parent, InetSocketAddress to, P2LConnection con, short type, short conversationId, short step) {
@@ -226,7 +226,7 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
         sendBatch();
     }
 
-    private ConcurrentLinkedDeque<Fragment> batch = new ConcurrentLinkedDeque<>();
+    private final ConcurrentLinkedDeque<Fragment> batch = new ConcurrentLinkedDeque<>();
 
     private void addFirstInBatch(Fragment toSend) {
         if(toSend.isEmpty()) return;
@@ -517,7 +517,7 @@ public class P2LFragmentOutputStreamImplV1 extends P2LFragmentOutputStream {
             Pair<Long, LongTupleList> batchSent = iterator.next();
             for (int i = 0; i < batchSent.r.size(); i++) {
                 long sentAt = (long) ((now - batchSent.l) + (batch_delay_ms * (i / (double) batchSent.r.size())));
-                long thresholdToExpectReceival = now - (con==null?batch_delay_ms:con.avRTT*2);
+                long thresholdToExpectReceival = now - (con==null?batch_delay_ms:con.avRTT* 2L);
                 if (sentAt > thresholdToExpectReceival || i + 1 == batchSent.r.size()) {
                     batchSent.r.removeRange(0, i+1);
                     if(batchSent.r.isEmpty() && iterator.previousIndex()!=-1)

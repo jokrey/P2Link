@@ -205,7 +205,7 @@ public class P2LConversationImplV2 implements P2LConversation {
     @Override public void answerClose(MessageEncoder message) throws IOException {
         ensureCanStepWith(message);
         pausedMode = false;
-        //always requests receipt, but only receives it through that if the remote was not waiting for it. Otherwise answerExpect returns and sends close
+        //always requests receipt, but only receives it through that if the remote was not waiting for it. Otherwise, answerExpect returns and sends close
         ConversationHeader header = new ConversationHeader(type, conversationId, step, true);
         P2LMessage msg = P2LMessage.from(header, message);
 

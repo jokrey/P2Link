@@ -2,7 +2,7 @@ package jokrey.utilities.network.link2peer.util;
 
 /**
  * Task that can be run by the {@link P2LThreadPool}.
- * Additionally it is a future, i.e. the underlying task produces a result that completes said future.
+ * Additionally, it is a future, i.e. the underlying task produces a result that completes said future.
  * If the underlying task throws an exception, the future is canceled.
  *
  * @author jokrey

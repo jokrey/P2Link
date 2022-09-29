@@ -174,7 +174,7 @@ public class P2LConversationImplV1 implements P2LConversation {
     private void answerClose(MessageEncoder encoded, boolean init) throws IOException {
         if(step == -2) throw new IllegalStateException("please init");
         if(step == -1) throw new IllegalStateException("already closed");
-        //always requests receipt, but only receives it through that if the remote was not waiting for it. Otherwise answerExpect returns and sends close
+        //always requests receipt, but only receives it through that if the remote was not waiting for it. Otherwise, answerExpect returns and sends close
         ConversationHeader header = new ConversationHeader(type, conversationId, step, true);
         P2LMessage msg = P2LMessage.from(header, encoded);
 

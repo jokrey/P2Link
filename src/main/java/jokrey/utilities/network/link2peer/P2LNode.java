@@ -160,7 +160,7 @@ public interface P2LNode {
 
     /**
      * Sends a disconnect request to the node at the given address.
-     * Additionally it marks from as a broken connection and removes it from established connections.
+     * Additionally, it marks from as a broken connection and removes it from established connections.
      * @param from node address to disconnect from
      */
     default void disconnectFrom(P2LConnection from) {
@@ -240,8 +240,8 @@ public interface P2LNode {
 
     /**
      * Sends the given message to the given address.
-     * Additionally block as long as no receipt for the given message has been received.
-     * Additionally retry a given number of times after a given timeout. After each retry the given initial timeout is doubled (compare tcp's reasoning for a similar behaviour).
+     * Additionally, block as long as no receipt for the given message has been received.
+     * Additionally, retry a given number of times after a given timeout. After each retry the given initial timeout is doubled (compare tcp's reasoning for a similar behaviour).
      * If the the receipt was still not received after all retries, the connection is marked as broken.
      *
      * CURRENTLY: no handling of double message. Double received message in the context of a retry are handled twice (in case the receive drops)

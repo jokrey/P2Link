@@ -33,7 +33,7 @@ public class P2LHeuristics {
     /**
      * receiving even 1024 udp packets without any package loss is increasingly unlikely in a commodity internet setting
      *      especially with the expected associated congestion that is not considered by the VERY simple long message protocol
-     * Additionally the greater this number the more effective an application layer slow loris attack on the system
+     * Additionally, the greater this number the more effective an application layer slow loris attack on the system
      */
     public static int LONG_MESSAGE_MAX_NUMBER_OF_PARTS = 1024;
 }
